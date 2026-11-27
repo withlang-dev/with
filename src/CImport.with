@@ -217,6 +217,7 @@ let CXK_NULL_STMT: i32 = 230
 let CXK_DECL_STMT: i32 = 231
 let CXK_INT_LITERAL: i32 = 106
 let CXK_FLOAT_LITERAL: i32 = 107
+let CXK_IMAGINARY_LITERAL: i32 = 108
 let CXK_STRING_LITERAL: i32 = 109
 let CXK_CHAR_LITERAL: i32 = 110
 let CXK_PAREN_EXPR: i32 = 111
@@ -297,6 +298,10 @@ let CI_CAST_FLOAT_TO_BOOL: i32 = 25
 let CI_CAST_BOOL_TO_FLOAT: i32 = 26
 let CI_CAST_BITCAST: i32 = 28
 let CI_CAST_INT_WIDEN_SIGN: i32 = 29
+let CI_CAST_REAL_TO_COMPLEX: i32 = 30
+let CI_CAST_COMPLEX_TO_REAL: i32 = 31
+let CI_CAST_COMPLEX_CAST: i32 = 32
+let CI_CAST_COMPLEX_TO_BOOL: i32 = 33
 // Kinds the bridge does not emit — distinct negative sentinels
 // so `cast_kind == CI_CAST_*` comparisons never match anything
 // the bridge returns.
@@ -318,6 +323,8 @@ let UO_PRE_DEC: i32 = 8
 let UO_POST_INC: i32 = 9
 let UO_POST_DEC: i32 = 10
 let UO_EXTENSION: i32 = 11
+let UO_REAL: i32 = 12
+let UO_IMAG: i32 = 13
 
 // Process a c_import header spec and return synthetic .w source text.
 // Returns "" if the bridge is unavailable or parsing fails.
@@ -1032,10 +1039,10 @@ fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx: bo
         ci_mark_type_name_emitted("c_ulonglong")
         ci_mark_type_name_emitted("c_longdouble")
 
-    // Emit Complex32/Complex64 for _Complex float/double
+    // Complex32/Complex64 live in std.complex (one type per meaning, #2817);
+    // mark them emitted so headers do not redeclare them, and import
+    // std.complex below if the translation references either.
     if with_cimport_is_name_emitted("Complex32") == 0:
-        output.push_str("type Complex32 \{ real: f32, imag: f32 }\n")
-        output.push_str("type Complex64 \{ real: f64, imag: f64 }\n")
         with_cimport_mark_name_emitted("Complex32")
         with_cimport_mark_name_emitted("Complex64")
         ci_mark_type_name_emitted("Complex32")
@@ -1158,7 +1165,8 @@ fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx: bo
     g_migrate_macro_miss_names = [:]
 
     let rendered = output.to_str()
-    ci_omitted_manifest_comments() ++ ci_unprototyped_manifest_comments() ++ rendered
+    let complex_use = if ci_str_contains(rendered, "Complex32") or ci_str_contains(rendered, "Complex64"): "use std.complex\n" else: ""
+    ci_omitted_manifest_comments() ++ ci_unprototyped_manifest_comments() ++ complex_use ++ rendered
 
 // Mark all declaration names from cached text as emitted in the global dedup table.
 // This ensures that fs-cached c_import results don't conflict with subsequent c_imports.
@@ -7947,7 +7955,7 @@ fn ci_cursor_value_is_void(session: i64, cursor: i32):
 // made it the function's return value). A volatile read is an access C
 // keeps, so it stays.
 fn ci_discard_operand_is_pure(session: i64, cursor: i32, kind: i32) -> bool:
-    if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL:
+    if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_IMAGINARY_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL:
         return true
     // A `sizeof` is a constant: `(void) sizeof(struct { _Static_assert(..); })`
     // is a compile-time check clang made when it parsed the unit, and the
@@ -9955,7 +9963,7 @@ impl CiExprPool:
                 return self.lower_expr_ir(session, inner_cursor, types, scope)
 
         // Literal + DeclRef leaves (B2).
-        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF:
+        if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_IMAGINARY_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL or kind == CXK_DECL_REF:
             return self.lower_literal_or_ref(session, cursor, kind, types, scope)
 
         // Parenthesized expression — wraps a single inner expr.
@@ -10824,6 +10832,16 @@ fn ci_classify_implicit_cast_safe(session: i64, cursor: i32, inner_cursor: i32) 
         return CI_CAST_NOOP
     let outer_is_bool = with_ci_type_is_bool(session, cursor)
     let inner_is_bool = with_ci_type_is_bool(session, inner_cursor)
+    let outer_is_complex = outer_ty_str == "Complex32" or outer_ty_str == "Complex64"
+    let inner_is_complex = inner_ty_str == "Complex32" or inner_ty_str == "Complex64"
+    if outer_is_bool and inner_is_complex:
+        return CI_CAST_COMPLEX_TO_BOOL
+    if outer_is_complex and inner_is_complex:
+        return CI_CAST_COMPLEX_CAST
+    if outer_is_complex and not inner_is_complex:
+        return CI_CAST_REAL_TO_COMPLEX
+    if not outer_is_complex and inner_is_complex:
+        return CI_CAST_COMPLEX_TO_REAL
     let outer_is_ptr = with_ci_type_is_pointer(session, cursor)
     let inner_is_ptr = with_ci_type_is_pointer(session, inner_cursor)
     let outer_is_float = with_ci_type_is_float(session, cursor)
@@ -10934,6 +10952,12 @@ impl CiExprPool:
             let zero_s = self.add_string("0.0")
             let zero = self.add(CiExprKind.CIE_FLOAT_LIT, zero_s, 0, 0, 0)
             return self.binary(CiBinOp.CIBO_NEQ, inner_id, zero, 0)
+
+        if cast_kind == CI_CAST_COMPLEX_TO_BOOL or cast_kind == CI_CAST_REAL_TO_COMPLEX or cast_kind == CI_CAST_COMPLEX_TO_REAL or cast_kind == CI_CAST_COMPLEX_CAST:
+            let inner_id = self.lower_expr_ir(session, inner_cursor, types, scope)
+            if inner_id == 0:
+                return 0
+            return self.build_complex_cast_expr(session, cursor, inner_cursor, cast_kind, inner_id, types)
 
         // Remaining kinds (ARRAY_TO_PTR, INT_TO_PTR, PTR_TO_INT,
         // BITCAST/PTR_CAST, INT_WIDEN*, INT_TRUNC, FLOAT_WIDEN/TRUNC,
@@ -11529,6 +11553,30 @@ impl CiExprPool:
                     src = src.slice(0, src.len() - 1)
             let s = self.add_string(src)
             return self.add(CiExprKind.CIE_FLOAT_LIT, s, 0, 0, 0)
+
+        if kind == CXK_IMAGINARY_LITERAL:
+            let spelling = ci_trim(with_ci_cursor_spelling_text(session, cursor))
+            var src = if spelling.len() > 0 and ((spelling[0] >= 48 and spelling[0] <= 57) or spelling[0] == 46): spelling else: ci_trim(with_ci_cursor_source_text(session, cursor))
+            while src.len() > 0:
+                let last = src[src.len() - 1]
+                if last == 105 or last == 73 or last == 106 or last == 74 or last == 102 or last == 70 or last == 108 or last == 76:
+                    src = src.slice(0, src.len() - 1)
+                else:
+                    break
+            if src.len() == 0:
+                src = "1.0"
+            if not ci_str_contains(src, ".") and not ci_str_contains(src, "e") and not ci_str_contains(src, "E"):
+                src = src ++ ".0"
+            let cty_str = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
+            let is_f32 = cty_str == "Complex32"
+            let cname = if is_f32: "Complex32" else: "Complex64"
+            let fty = types.named_type_from_text(if is_f32: "f32" else: "f64")
+            let cty = types.named_type_from_text(cname)
+            let zero = self.add(CiExprKind.CIE_FLOAT_LIT, self.add_string("0.0"), 0, 0, fty)
+            let imag = self.add(CiExprKind.CIE_FLOAT_LIT, self.add_string(src), 0, 0, fty)
+            let args = [zero as i32, imag as i32]
+            ci_migrate_note_complex_symbol(cname)
+            return self.build_named_call_expr_typed(cname ++ ".new", args, cty)
 
         if kind == CXK_STRING_LITERAL:
             let literal_src = ci_literal_token_text(session, cursor)
@@ -12162,6 +12210,18 @@ impl CiExprPool:
             if op == BO_EQ or op == BO_NE:
                 let folded = self.fold_nonnull_fn_null_compare(session, types, lhs_cmp, rhs_cmp, op == BO_EQ)
                 if folded != 0: return folded
+                let lhs_cmp_ty = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_cursor))
+                let rhs_cmp_ty = with_ci_type_translated(session, with_ci_cursor_type(session, rhs_cursor))
+                let lhs_is_c = lhs_cmp_ty == "Complex32" or lhs_cmp_ty == "Complex64"
+                let rhs_is_c = rhs_cmp_ty == "Complex32" or rhs_cmp_ty == "Complex64"
+                if lhs_is_c or rhs_is_c:
+                    let common = if lhs_cmp_ty == "Complex64" or rhs_cmp_ty == "Complex64": "Complex64" else: "Complex32"
+                    if lhs_cmp_ty != common:
+                        let kind = if lhs_is_c: CI_CAST_COMPLEX_CAST else: CI_CAST_REAL_TO_COMPLEX
+                        lhs_cmp = self.build_complex_cast_to_name(session, lhs_cursor, common, kind, lhs_cmp, types)
+                    if rhs_cmp_ty != common:
+                        let kind = if rhs_is_c: CI_CAST_COMPLEX_CAST else: CI_CAST_REAL_TO_COMPLEX
+                        rhs_cmp = self.build_complex_cast_to_name(session, rhs_cursor, common, kind, rhs_cmp, types)
             let cond_id = self.binary(ci_cmp_op, lhs_cmp, rhs_cmp, 0)
             let one_idx = self.add_string("1")
             let zero_idx = self.add_string("0")
@@ -12240,6 +12300,22 @@ impl CiExprPool:
 
         if lhs_is_ptr or rhs_is_ptr or lhs_is_array or rhs_is_array:
             return 0
+
+        let bin_res_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
+        if (bin_res_ty_str == "Complex32" or bin_res_ty_str == "Complex64") and (op == BO_ADD or op == BO_SUB or op == BO_MUL or op == BO_DIV):
+            var c_lhs = lhs_id
+            var c_rhs = rhs_id
+            let lhs_is_c = lhs_ty_str == "Complex32" or lhs_ty_str == "Complex64"
+            let rhs_is_c = rhs_ty_str == "Complex32" or rhs_ty_str == "Complex64"
+            if lhs_ty_str != bin_res_ty_str:
+                let kind = if lhs_is_c: CI_CAST_COMPLEX_CAST else: CI_CAST_REAL_TO_COMPLEX
+                c_lhs = self.build_complex_cast_to_name(session, lhs_cursor, bin_res_ty_str, kind, c_lhs, types)
+            if rhs_ty_str != bin_res_ty_str:
+                let kind = if rhs_is_c: CI_CAST_COMPLEX_CAST else: CI_CAST_REAL_TO_COMPLEX
+                c_rhs = self.build_complex_cast_to_name(session, rhs_cursor, bin_res_ty_str, kind, c_rhs, types)
+            let c_bin_op = if op == BO_ADD: CiBinOp.CIBO_ADD else if op == BO_SUB: CiBinOp.CIBO_SUB else if op == BO_MUL: CiBinOp.CIBO_MUL else: CiBinOp.CIBO_DIV
+            let c_res_ty = types.named_type_from_text(bin_res_ty_str)
+            return self.binary(c_bin_op, c_lhs, c_rhs, c_res_ty)
 
         let lhs_text = ci_print_expr(self.val(), types, lhs_id, 0, 0)
         let rhs_text = ci_print_expr(self.val(), types, rhs_id, 0, 0)
@@ -12351,6 +12427,10 @@ impl CiExprPool:
 
         if op == UO_PLUS:
             return child_id
+        if op == UO_REAL or op == UO_IMAG:
+            let field_name = if op == UO_REAL: "real" else: "imag"
+            let field_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+            return self.add(CiExprKind.CIE_FIELD, child_id as i32, self.add_string(field_name), 0, field_ty)
         if op == UO_DEREF:
             var deref_ty = 0 as CiTypeId
             var child_ty = self.get_type(child_id)
@@ -12382,6 +12462,10 @@ impl CiExprPool:
             return self.add(CiExprKind.CIE_DEREF, deref_child as i32, 0, 0, deref_ty)
 
         if op == UO_MINUS:
+            let unary_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
+            if unary_ty_str == "Complex32" or unary_ty_str == "Complex64":
+                let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+                return self.unary(CiUnaryOp.CIUO_NEG, child_id, result_ty)
             if with_ci_type_is_unsigned(session, cursor) == false:
                 if self.kind(child_id) == CiExprKind.CIE_INT_LIT:
                     let lit = self.get_string(self.get_d0(child_id))
@@ -12495,6 +12579,50 @@ impl CiExprPool:
         let zero = self.int_lit(zero_idx, 0)
         self.binary(CiBinOp.CIBO_NEQ, inner_id, zero, 0)
 
+    fn build_complex_cast_to_name(session: i64, inner_cursor: i32, outer_ty_str: &str, cast_kind: i32, inner_id: CiExprId, types: CiTypePool) -> CiExprId:
+        if cast_kind == CI_CAST_REAL_TO_COMPLEX:
+            let is_f32 = outer_ty_str == "Complex32"
+            let cname = if is_f32: "Complex32" else: "Complex64"
+            let fty = types.named_type_from_text(if is_f32: "f32" else: "f64")
+            let cty = types.named_type_from_text(cname)
+            let val = self.cast_if_needed(fty, inner_id, inner_cursor, session, types)
+            let args = [val as i32]
+            ci_migrate_note_complex_symbol(cname)
+            return self.build_named_call_expr_typed(cname ++ ".from_real", args, cty)
+        if cast_kind == CI_CAST_COMPLEX_CAST:
+            let is_f32 = outer_ty_str == "Complex32"
+            let cname = if is_f32: "Complex32" else: "Complex64"
+            let dest_comp_ty = types.named_type_from_text(if is_f32: "f32" else: "f64")
+            let cty = types.named_type_from_text(cname)
+            let real_f = self.cast(dest_comp_ty, self.add(CiExprKind.CIE_FIELD, inner_id as i32, self.add_string("real"), 0, 0))
+            let imag_f = self.cast(dest_comp_ty, self.add(CiExprKind.CIE_FIELD, inner_id as i32, self.add_string("imag"), 0, 0))
+            let args = [real_f as i32, imag_f as i32]
+            ci_migrate_note_complex_symbol(cname)
+            return self.build_named_call_expr_typed(cname ++ ".new", args, cty)
+        inner_id
+
+    fn build_complex_cast_expr(session: i64, cursor: i32, inner_cursor: i32, cast_kind: i32, inner_id: CiExprId, types: CiTypePool) -> CiExprId:
+        let outer_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
+        let inner_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, inner_cursor))
+        if cast_kind == CI_CAST_COMPLEX_TO_BOOL:
+            let real_f = self.add(CiExprKind.CIE_FIELD, inner_id as i32, self.add_string("real"), 0, 0)
+            let imag_f = self.add(CiExprKind.CIE_FIELD, inner_id as i32, self.add_string("imag"), 0, 0)
+            let zero = self.add(CiExprKind.CIE_FLOAT_LIT, self.add_string("0.0"), 0, 0, 0)
+            let r_nz = self.binary(CiBinOp.CIBO_NEQ, real_f, zero, 0)
+            let i_nz = self.binary(CiBinOp.CIBO_NEQ, imag_f, zero, 0)
+            return self.binary(CiBinOp.CIBO_LOGICAL_OR, r_nz, i_nz, 0)
+        if cast_kind == CI_CAST_REAL_TO_COMPLEX or cast_kind == CI_CAST_COMPLEX_CAST:
+            return self.build_complex_cast_to_name(session, inner_cursor, outer_ty_str, cast_kind, inner_id, types)
+        if cast_kind == CI_CAST_COMPLEX_TO_REAL:
+            let inner_comp = if inner_ty_str == "Complex32": "f32" else: "f64"
+            let inner_comp_ty = types.named_type_from_text(inner_comp)
+            let real_f = self.add(CiExprKind.CIE_FIELD, inner_id as i32, self.add_string("real"), 0, inner_comp_ty)
+            let dest_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+            if dest_ty == 0 or ci_print_type(types, dest_ty) == inner_comp:
+                return real_f
+            return self.cast(dest_ty, real_f)
+        inner_id
+
     fn apply_implicit_cast_to_value_id(session: i64, cursor: i32, inner_cursor: i32, inner_id: CiExprId, types: CiTypePool, scope: CiScope) -> CiExprId:
         let cast_kind = ci_classify_implicit_cast_safe(session, cursor, inner_cursor)
 
@@ -12502,6 +12630,9 @@ impl CiExprPool:
             return self.null_ptr(0)
         if cast_kind == CI_CAST_NOOP or cast_kind == CI_CAST_FUNCTION_TO_PTR or cast_kind == CI_CAST_LVALUE_TO_RVALUE or cast_kind == CI_CAST_UNKNOWN:
             return inner_id
+
+        if cast_kind == CI_CAST_COMPLEX_TO_BOOL or cast_kind == CI_CAST_REAL_TO_COMPLEX or cast_kind == CI_CAST_COMPLEX_TO_REAL or cast_kind == CI_CAST_COMPLEX_CAST:
+            return self.build_complex_cast_expr(session, cursor, inner_cursor, cast_kind, inner_id, types)
 
         if cast_kind == CI_CAST_INT_TO_BOOL:
             return self.int_to_bool_bridge(inner_id)
@@ -12676,7 +12807,7 @@ impl CiExprPool:
         let rhs_ty = self.overflow_builtin_canonical_type(rhs_cursor_ty, types)
         if out_ty.len() == 0 or lhs_ty != out_ty or rhs_ty != out_ty:
             return self.reject_builtin_call(session, cursor, callee_text, "operand and result types must be the same supported integer type")
-        let op = if callee_text == "__builtin_add_overflow": "add" else if callee_text == "__builtin_sub_overflow": "sub" else: "mul"
+        let op = if callee_text.contains("add_overflow"): "add" else if callee_text.contains("sub_overflow"): "sub" else: "mul"
         let canonical_ty = types.named_type_from_text(out_ty)
         if canonical_ty == 0:
             return self.reject_builtin_call(session, cursor, callee_text, "could not materialize the integer type")
@@ -12950,8 +13081,45 @@ impl CiExprPool:
             if result_ty == 0:
                 return self.reject_builtin_call(session, cursor, callee_text, "missing branch prediction hint result type")
             return self.cast(result_ty, arg_ids[0] as CiExprId)
-        if callee_text == "__builtin_add_overflow" or callee_text == "__builtin_sub_overflow" or callee_text == "__builtin_mul_overflow":
+        if callee_text == "__builtin_add_overflow" or callee_text == "__builtin_sub_overflow" or callee_text == "__builtin_mul_overflow" or callee_text == "__builtin_sadd_overflow" or callee_text == "__builtin_saddl_overflow" or callee_text == "__builtin_saddll_overflow" or callee_text == "__builtin_uadd_overflow" or callee_text == "__builtin_uaddl_overflow" or callee_text == "__builtin_uaddll_overflow" or callee_text == "__builtin_ssub_overflow" or callee_text == "__builtin_ssubl_overflow" or callee_text == "__builtin_ssubll_overflow" or callee_text == "__builtin_usub_overflow" or callee_text == "__builtin_usubl_overflow" or callee_text == "__builtin_usubll_overflow" or callee_text == "__builtin_smul_overflow" or callee_text == "__builtin_smull_overflow" or callee_text == "__builtin_smulll_overflow" or callee_text == "__builtin_umul_overflow" or callee_text == "__builtin_umull_overflow" or callee_text == "__builtin_umulll_overflow":
             return self.build_overflow_builtin_call(session, cursor, callee_text, arg_ids, types)
+        if callee_text == "__builtin_huge_valf" or callee_text == "__builtin_inff":
+            let f32_ty = types.named_type_from_text("f32")
+            let one = self.cast(f32_ty, self.add(CiExprKind.CIE_FLOAT_LIT, self.add_string("1.0"), 0, 0, f32_ty))
+            let zero = self.cast(f32_ty, self.add(CiExprKind.CIE_FLOAT_LIT, self.add_string("0.0"), 0, 0, f32_ty))
+            return self.binary(CiBinOp.CIBO_DIV, one, zero, f32_ty)
+        if callee_text == "__builtin_huge_val" or callee_text == "__builtin_inf":
+            let f64_ty = types.named_type_from_text("f64")
+            let one = self.add(CiExprKind.CIE_FLOAT_LIT, self.add_string("1.0"), 0, 0, f64_ty)
+            let zero = self.add(CiExprKind.CIE_FLOAT_LIT, self.add_string("0.0"), 0, 0, f64_ty)
+            return self.binary(CiBinOp.CIBO_DIV, one, zero, f64_ty)
+        if callee_text == "__builtin_complex" and arg_ids.len() == 2:
+            let cty_str = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
+            let is_f32 = cty_str == "Complex32"
+            let cname = if is_f32: "Complex32" else: "Complex64"
+            let fty = types.named_type_from_text(if is_f32: "f32" else: "f64")
+            let cty = types.named_type_from_text(cname)
+            let cargs = [self.cast(fty, arg_ids[0] as CiExprId) as i32, self.cast(fty, arg_ids[1] as CiExprId) as i32]
+            ci_migrate_note_complex_symbol(cname)
+            return self.build_named_call_expr_typed(cname ++ ".new", cargs, cty)
+        if callee_text == "__builtin_fabs" or callee_text == "__builtin_fabsf" or callee_text == "__builtin_copysign" or callee_text == "__builtin_copysignf" or callee_text == "__builtin_sqrt" or callee_text == "__builtin_sqrtf" or callee_text == "__builtin_floor" or callee_text == "__builtin_floorf" or callee_text == "__builtin_ceil" or callee_text == "__builtin_ceilf" or callee_text == "__builtin_round" or callee_text == "__builtin_roundf" or callee_text == "__builtin_trunc" or callee_text == "__builtin_truncf":
+            let raw = callee_text.slice(10, callee_text.len())
+            let is_f32 = raw.ends_with("f")
+            let base = if is_f32: raw.slice(0, raw.len() - 1) else: raw
+            let fty = types.named_type_from_text(if is_f32: "f32" else: "f64")
+            let margs = []
+            for arg_id in arg_ids:
+                margs.push(self.cast(fty, arg_id as CiExprId) as i32)
+            return self.build_named_call_expr_typed(base, margs, fty)
+        if callee_text == "__builtin_fmax" or callee_text == "__builtin_fmaxf" or callee_text == "__builtin_fmin" or callee_text == "__builtin_fminf":
+            let libc_name = callee_text.slice(10, callee_text.len())
+            let is_f32 = libc_name.ends_with("f")
+            let fty = types.named_type_from_text(if is_f32: "f32" else: "f64")
+            let margs = []
+            for arg_id in arg_ids:
+                margs.push(self.cast(fty, arg_id as CiExprId) as i32)
+            ci_migrate_note_libc_symbol(libc_name)
+            return self.build_named_call_expr_typed(libc_name, margs, fty)
         // glibc's `fpclassify(x)`: the five FP_* values, then the operand.
         // std.libc's function answers with the target's same five.
         if callee_text == "__builtin_fpclassify":
@@ -13081,6 +13249,18 @@ impl CiStmtPool:
                 return CiValueExprIR {
                     setup_stmt: self.merge_ir( arr.setup_stmt, idx.setup_stmt),
                     value_expr: index_id,
+                }
+            return ci_value_ir_invalid()
+
+        if kind == CXK_UNARY_OP and nc > 0 and (with_ci_unary_op(session, cursor) == UO_REAL or with_ci_unary_op(session, cursor) == UO_IMAG):
+            let op = with_ci_unary_op(session, cursor)
+            let operand = self.lower_lvalue_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
+            if ci_value_ir_valid(operand):
+                let field_name = if op == UO_REAL: "real" else: "imag"
+                let field_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+                return CiValueExprIR {
+                    setup_stmt: operand.setup_stmt,
+                    value_expr: exprs.add(CiExprKind.CIE_FIELD, operand.value_expr as i32, exprs.add_string(field_name), 0, field_ty),
                 }
             return ci_value_ir_invalid()
 
@@ -13232,7 +13412,7 @@ impl CiStmtPool:
             let cast_inner = ci_find_last_expr_child(session, cursor)
             if cast_inner >= 0:
                 let cast_kind = ci_classify_implicit_cast_safe(session, cursor, cast_inner)
-                if cast_kind == CI_CAST_INT_TO_BOOL or cast_kind == CI_CAST_PTR_TO_BOOL or cast_kind == CI_CAST_FLOAT_TO_BOOL:
+                if cast_kind == CI_CAST_INT_TO_BOOL or cast_kind == CI_CAST_PTR_TO_BOOL or cast_kind == CI_CAST_FLOAT_TO_BOOL or cast_kind == CI_CAST_COMPLEX_TO_BOOL or cast_kind == CI_CAST_REAL_TO_COMPLEX or cast_kind == CI_CAST_COMPLEX_TO_REAL or cast_kind == CI_CAST_COMPLEX_CAST:
                     if ci_fold_int_ok(session, cursor) and not ci_expr_children_need_rvalue_lowering(session, cursor):
                         let bval = with_ci_eval_int_value(session, cursor)
                         if bval == 0 or bval == 1:
@@ -13681,10 +13861,14 @@ impl CiStmtPool:
                     if target_ty == 0:
                         return ci_value_ir_invalid()
                     var casted = inner.value_expr
-                    if types.kind(target_ty) == CiTypeKind.CT_POINTER:
-                        casted = exprs.decay_array_value_expr(session, inner_child, inner.value_expr, target_ty, types)
-                    if (casted as i32) == (inner.value_expr as i32):
-                        casted = exprs.cast_if_needed(target_ty, inner.value_expr, inner_child, session, types)
+                    let cstyle_kind = ci_classify_implicit_cast_safe(session, cursor, inner_child)
+                    if cstyle_kind == CI_CAST_COMPLEX_TO_BOOL or cstyle_kind == CI_CAST_REAL_TO_COMPLEX or cstyle_kind == CI_CAST_COMPLEX_TO_REAL or cstyle_kind == CI_CAST_COMPLEX_CAST:
+                        casted = exprs.build_complex_cast_expr(session, cursor, inner_child, cstyle_kind, inner.value_expr, types)
+                    else:
+                        if types.kind(target_ty) == CiTypeKind.CT_POINTER:
+                            casted = exprs.decay_array_value_expr(session, inner_child, inner.value_expr, target_ty, types)
+                        if (casted as i32) == (inner.value_expr as i32):
+                            casted = exprs.cast_if_needed(target_ty, inner.value_expr, inner_child, session, types)
                     return CiValueExprIR {
                         setup_stmt: inner.setup_stmt,
                         value_expr: casted,
@@ -14863,6 +15047,7 @@ impl CiStmtPool:
 fn ci_cursor_kind_is_expression(kind: i32) -> bool:
     if kind == CXK_INT_LITERAL: return true
     if kind == CXK_FLOAT_LITERAL: return true
+    if kind == CXK_IMAGINARY_LITERAL: return true
     if kind == CXK_STRING_LITERAL: return true
     if kind == CXK_CHAR_LITERAL: return true
     if kind == CXK_DECL_REF: return true
@@ -23047,7 +23232,15 @@ fn ci_libc_constant_use(session: i64, cursor: i32, kind: i32) -> str:
         return ""
     name
 
+// C99 <complex.h> functions provided by std.complex (#2817).
+fn ci_is_complex_fn(name: &str) -> bool:
+    let base = if name.ends_with("f") and name.len() > 1: name.slice(0, name.len() - 1) else: name
+    base == "creal" or base == "cimag" or base == "conj" or
+        base == "cabs" or base == "carg" or base == "cexp" or
+        base == "clog" or base == "csqrt" or base == "cpow"
+
 fn ci_libc_symbol_allowed_as(name: &str, kind: i32) -> bool:
+    if (kind & CI_LIBC_KIND_FN) != 0 and ci_is_complex_fn(name): return true
     (ci_libc_symbol_kind_mask(name) & kind) != 0
 
 // #884: the spelling to use when CALLING a function. ci_migrate_c_function_name
@@ -23089,6 +23282,9 @@ fn ci_is_system_prelude_collision_decl(session: i64, idx: i32, name: &str) -> bo
 fn ci_note_filtered_system_symbol_ref(session: i64, name: &str, kind: i32) -> bool:
     if name.len() == 0:
         return true
+    if (kind & CI_LIBC_KIND_FN) != 0 and ci_is_complex_fn(name):
+        ci_migrate_note_complex_symbol(name)
+        return true
     if ci_libc_symbol_allowed_as(name, kind):
         ci_migrate_note_libc_symbol(name)
         return true
@@ -23102,6 +23298,9 @@ fn ci_note_filtered_system_symbol_ref(session: i64, name: &str, kind: i32) -> bo
 
 fn ci_note_filtered_system_symbol_ref_at(session: i64, cursor: i32, name: &str, kind: i32) -> bool:
     if name.len() == 0:
+        return true
+    if (kind & CI_LIBC_KIND_FN) != 0 and ci_is_complex_fn(name):
+        ci_migrate_note_complex_symbol(name)
         return true
     if ci_libc_symbol_allowed_as(name, kind):
         ci_migrate_note_libc_symbol(name)

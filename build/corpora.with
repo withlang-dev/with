@@ -9,6 +9,7 @@ use build.c_algorithms
 use build.tommyds
 use build.stc
 use build.mlib
+use build.compiler_rt_complex
 use std.crypto.sha256
 
 // The corpus registry (wo_bundles.md, stdlib_sourcing_plan.md):
@@ -19,7 +20,7 @@ use std.crypto.sha256
 // module under build/; nothing else names it. Indexed, not a List: a Corpus
 // is ephemeral (its hooks take references), and the seed's comptime
 // evaluator iterates a List of ephemeral records as strings.
-pub fn corpus_count() -> i32: 6
+pub fn corpus_count() -> i32: 7
 
 pub fn corpus_at(index: i32) -> Corpus:
     if index == 0: return pcre2_corpus()
@@ -27,7 +28,8 @@ pub fn corpus_at(index: i32) -> Corpus:
     if index == 2: return c_algorithms_corpus()
     if index == 3: return tommyds_corpus()
     if index == 4: return stc_corpus()
-    mlib_corpus()
+    if index == 5: return mlib_corpus()
+    compiler_rt_complex_corpus()
 
 pub fn corpus_by_name(name: &str) -> Corpus:
     for i in 0..corpus_count():
@@ -106,7 +108,7 @@ pub fn run_corpus_migrate_action(ctx: ActionCtx) -> i32:
     let generated = corpus_scratch(ctx) ++ "/generated"
     if corpus_generate(&ctx, corpus, generated) != 0: return 1
     if corpus.license.len() > 0:
-        if corpus_copy(ctx, reference ++ "/" ++ corpus.license, generated ++ "/" ++ corpus.license) != 0: return 1
+        if corpus_copy(ctx, reference ++ "/" ++ corpus.license, generated ++ "/" ++ corpus_basename(corpus.license)) != 0: return 1
     if fs.write_text(generated ++ "/UPSTREAM", corpus.upstream.revision ++ "\nsha256=" ++ corpus.upstream.sha256 ++ "\n") != 0: return 1
     if fs.exists(output) and fs.remove_tree(output) != 0: return corpus_fail(ctx, "cannot replace " ++ output)
     if fs.rename(generated, output) != 0: return corpus_fail(ctx, "cannot publish " ++ output)
@@ -178,7 +180,7 @@ pub fn run_corpus_promote_action(ctx: ActionCtx) -> i32:
         let base = corpus_basename(path)
         // The modules, the pin record, the license and the contracts the
         // bodies prove (D159, `contracts.tsv`) are the corpus.
-        if not path.ends_with(".with") and base != "UPSTREAM" and base != corpus.license and base != "contracts.tsv": continue
+        if not path.ends_with(".with") and base != "UPSTREAM" and base != corpus_basename(corpus.license) and base != "contracts.tsv": continue
         if corpus_copy(ctx, path, destination ++ "/" ++ base) != 0: return 1
         if path.ends_with(".with"): copied = copied + 1
     if corpus_write_stamp(&ctx, corpus, trigger) != 0: return 1
@@ -341,20 +343,29 @@ fn target_with_corpus_module_inputs(target: Target, ctx: &BuildCtx, corpus: &Cor
 /// the root tools, the drift lane, and the corpus's own lanes.
 pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &str) -> Build:
     let up = corpus.upstream
-    var graph = out.download(corpus.stem ++ "-download", Download {
-        url: up.url.clone(), sha256: up.sha256.clone(), output_path: up.archive.clone(),
-    })
-    graph = graph.extract_tar_gz(corpus.stem ++ "-reference", up.archive.clone(), up.extracted.clone())
+    var graph = out
+    if up.url.len() > 0:
+        graph = graph.download(corpus.stem ++ "-download", Download {
+            url: up.url.clone(), sha256: up.sha256.clone(), output_path: up.archive.clone(),
+        })
+        graph = graph.extract_tar_gz(corpus.stem ++ "-reference", up.archive.clone(), up.extracted.clone())
 
-    var prepare = corpus_target(.Action, corpus, "prepare-reference", up.reference ++ "/.with-reference-ready")
+    let prepare_output = if up.url.len() > 0: up.reference ++ "/.with-reference-ready" else: "out/" ++ corpus.name ++ "_reference/.with-reference-ready"
+    var prepare = corpus_target(.Action, corpus, "prepare-reference", prepare_output)
     prepare.action = run_corpus_prepare_reference_action
-    prepare = prepare.input(up.extracted.clone()).dep(corpus.stem ++ "-reference")
-    prepare = prepare.write_scope(up.reference.clone())
+    if up.url.len() > 0:
+        prepare = prepare.input(up.extracted.clone()).dep(corpus.stem ++ "-reference")
+        prepare = prepare.write_scope(up.reference.clone())
+    else:
+        prepare = prepare.dep(up.archive ++ "")
+        prepare = prepare.write_scope("out/" ++ corpus.name ++ "_reference")
     graph = graph.add_target(prepare)
 
     var migrate = corpus_target(.Action, corpus, "migrate", corpus_migrated_dir(corpus))
     migrate.action = run_corpus_migrate_action
-    migrate = migrate.input(up.reference.clone()).dep(corpus.stem ++ "-prepare-reference")
+    if up.url.len() > 0:
+        migrate = migrate.input(up.reference.clone())
+    migrate = migrate.dep(corpus.stem ++ "-prepare-reference")
     migrate = corpus_migrating_target(migrate, release_compiler)
     graph = graph.add_target(migrate)
 

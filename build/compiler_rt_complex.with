@@ -1,0 +1,163 @@
+module build.compiler_rt_complex
+
+use std.build
+use build.corpus
+use build.wo
+
+// LLVM compiler-rt complex arithmetic builtins (`__mulsc3`, `__muldc3`,
+// `__divsc3`, `__divdc3`), Apache-2.0 WITH LLVM-exception (LICENSE.TXT ships
+// beside the migration). Backing engine for `std.complex` multiplication and
+// division (#2817), implementing C99 Annex G infinity/NaN/overflow handling
+// without a libm dependency.
+
+const CRT_COMPLEX_RELEASE = "llvmorg-22.1.6"
+const CRT_COMPLEX_SHA256 = "ba534c6835a5b9c2162c806e269799fe41fca952a3c25baff1afcff23841ec2b"
+
+fn crt_complex_upstream() -> Upstream:
+    // Reuse the pinned LLVM source tree managed by `sdk-llvm-source`
+    // (build/sdk.with) rather than re-downloading the full monorepo.
+    Upstream {
+        url: "",
+        sha256: CRT_COMPLEX_SHA256 ++ "",
+        revision: CRT_COMPLEX_RELEASE ++ "",
+        archive: "sdk-llvm-source",
+        extracted: ".deps/src",
+        reference: ".deps/src/llvm-project-llvmorg-22.1.6",
+    }
+
+fn crt_complex_headers() -> List[str]:
+    ["fp_lib.h", "int_lib.h", "int_math.h", "int_types.h", "int_util.h", "int_endianness.h"]
+
+fn crt_complex_declared_externs() -> List[str]:
+    [
+        "__compilerrt_abort_impl",
+        "__paritysi2",
+        "__paritydi2",
+        "__divdi3",
+        "__divsi3",
+        "__udivsi3",
+        "__udivmodsi4",
+        "__udivmoddi4",
+        "__clzti2",
+        "__udivmodti4",
+        "__addsf3",
+        "__adddf3",
+    ]
+
+pub fn compiler_rt_complex_corpus() -> Corpus:
+    Corpus {
+        name: "compiler_rt_complex", stem: "compiler-rt-complex",
+        package: "std.engines.compiler_rt_complex",
+        corpus_rel: "std/engines/compiler_rt_complex",
+        corpus_dir: "lib/std/engines/compiler_rt_complex",
+        upstream: crt_complex_upstream(),
+        license: "compiler-rt/LICENSE.TXT",
+        harness: ["harness"], drift_harness: "harness.with", drift_harness_arg: "",
+        module_floor: 5,
+        // `_MSC_VER=1900` selects compiler-rt's plain `{ real, imaginary }`
+        // struct layout for Fcomplex/Dcomplex in int_types.h (while keeping
+        // clang's `__builtin_*` path in int_math.h), breaking any cyclic
+        // module dependency between std.complex and its engine.
+        defines: ["_MSC_VER=1900"],
+        excludes: [],
+        include_dirs: [],
+        declared_externs: crt_complex_declared_externs(),
+        forced_includes: [],
+        promote_after: [],
+        test_lane: "compiler-rt-complex-test",
+        extra_generated_dirs: [],
+        prepare_reference: corpus_no_prepare,
+        stage: crt_complex_stage,
+        migrate: corpus_migrate_directory,
+        finish_generated: corpus_no_finish,
+        verify_generated: corpus_no_verify,
+        lanes: crt_complex_lanes,
+    }
+
+fn crt_complex_div_wrapper(prefix: &str, impl_header: &str) -> str:
+    "// Precision-isolated wrapper so SINGLE_PRECISION and DOUBLE_PRECISION\n" ++
+    "// fp_lib.h typedefs and helpers do not collide in shared defs.\n" ++
+    "#define rep_t " ++ prefix ++ "_rep_t\n" ++
+    "#define srep_t " ++ prefix ++ "_srep_t\n" ++
+    "#define fp_t " ++ prefix ++ "_fp_t\n" ++
+    "#define fromRep " ++ prefix ++ "_fromRep\n" ++
+    "#define toRep " ++ prefix ++ "_toRep\n" ++
+    "#define normalize " ++ prefix ++ "_normalize\n" ++
+    "#define wideLeftShift " ++ prefix ++ "_wideLeftShift\n" ++
+    "#define wideRightShiftWithSticky " ++ prefix ++ "_wideRightShiftWithSticky\n" ++
+    "#include \"" ++ impl_header ++ "\"\n"
+
+fn crt_complex_harness_source() -> str:
+    "#include <stdio.h>\n" ++
+    "#include <math.h>\n" ++
+    "#include \"int_lib.h\"\n" ++
+    "extern Fcomplex __mulsc3(float a, float b, float c, float d);\n" ++
+    "extern Dcomplex __muldc3(double a, double b, double c, double d);\n" ++
+    "extern Fcomplex __divsc3(float a, float b, float c, float d);\n" ++
+    "extern Dcomplex __divdc3(double a, double b, double c, double d);\n" ++
+    "int main(void) {\n" ++
+    "    Fcomplex mf = __mulsc3(3.0f, 4.0f, 1.0f, 2.0f);\n" ++
+    "    if (mf.real != -5.0f || mf.imaginary != 10.0f) return 1;\n" ++
+    "    Dcomplex md = __muldc3(3.0, 4.0, 1.0, 2.0);\n" ++
+    "    if (md.real != -5.0 || md.imaginary != 10.0) return 2;\n" ++
+    "    Fcomplex df = __divsc3(-5.0f, 10.0f, 1.0f, 2.0f);\n" ++
+    "    if (df.real != 3.0f || df.imaginary != 4.0f) return 3;\n" ++
+    "    Dcomplex dd = __divdc3(-5.0, 10.0, 1.0, 2.0);\n" ++
+    "    if (dd.real != 3.0 || dd.imaginary != 4.0) return 4;\n" ++
+    "    double inf = 1.0 / 0.0;\n" ++
+    "    Dcomplex mi = __muldc3(inf, 0.0, 1.0, 1.0);\n" ++
+    "    if (!isinf(mi.real) || !isinf(mi.imaginary)) return 5;\n" ++
+    "    Dcomplex di = __divdc3(1.0, 1.0, 0.0, 0.0);\n" ++
+    "    if (!isinf(di.real) || !isinf(di.imaginary)) return 6;\n" ++
+    "    Dcomplex big = __divdc3(1e300, 1e300, 1e300, 1e300);\n" ++
+    "    if (big.real != 1.0 || big.imaginary != 0.0) return 7;\n" ++
+    "    printf(\"compiler_rt_complex ok\\n\");\n" ++
+    "    return 0;\n" ++
+    "}\n"
+
+fn crt_complex_stage(ctx: &ActionCtx, corpus: &Corpus, reference: &str, source: &str) -> i32:
+    let builtins = reference ++ "/compiler-rt/lib/builtins"
+    for h in crt_complex_headers():
+        if corpus_copy(ctx, builtins ++ "/" ++ h, source ++ "/" ++ h) != 0: return 1
+    if corpus_copy(ctx, builtins ++ "/mulsc3.c", source ++ "/mulsc3.c") != 0: return 1
+    if corpus_copy(ctx, builtins ++ "/muldc3.c", source ++ "/muldc3.c") != 0: return 1
+    if corpus_copy(ctx, builtins ++ "/divsc3.c", source ++ "/divsc3_impl.h") != 0: return 1
+    if corpus_copy(ctx, builtins ++ "/divdc3.c", source ++ "/divdc3_impl.h") != 0: return 1
+    if ctx.fs().write_text(source ++ "/divsc3.c", crt_complex_div_wrapper("crt_s", "divsc3_impl.h")) != 0: return corpus_fail(ctx, "cannot write divsc3.c")
+    if ctx.fs().write_text(source ++ "/divdc3.c", crt_complex_div_wrapper("crt_d", "divdc3_impl.h")) != 0: return corpus_fail(ctx, "cannot write divdc3.c")
+    if ctx.fs().write_text(source ++ "/harness.c", crt_complex_harness_source()) != 0: return corpus_fail(ctx, "cannot write harness.c")
+    0
+
+pub fn run_compiler_rt_complex_test_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let output = ctx.output()
+    if corpus_reset_dir(ctx, output) != 0: return 1
+    let compiler = corpus_abs(ctx, ctx.inputs()[0])
+    let binary = output ++ "/harness"
+    let compile_args = [
+        compiler,
+        "build",
+        "-O1",
+        "lib/std/engines/compiler_rt_complex/harness.with",
+        "-o",
+        corpus_abs(ctx, binary),
+    ]
+    let compiled = ctx.process_runner().run_capture_cwd(compile_args, corpus_abs(ctx, binary ++ ".compile.stdout"), corpus_abs(ctx, binary ++ ".compile.stderr"), 600000, corpus_abs(ctx, "."))
+    if compiled.rc != 0: return corpus_fail(ctx, f"compile harness exited {compiled.rc}\n" ++ fs.read_text(binary ++ ".compile.stderr"))
+    if corpus_provenance(ctx, output, ctx.inputs()[0]) != 0: return 1
+    if corpus_provenance(ctx, output, binary) != 0: return 1
+    let argv = [corpus_abs(ctx, binary)]
+    let result = ctx.process_runner().run_capture(argv, corpus_abs(ctx, binary ++ ".stdout"), corpus_abs(ctx, binary ++ ".stderr"), 600000)
+    if result.rc != 0: return corpus_fail(ctx, f"harness exited {result.rc}\n" ++ result.stdout ++ result.stderr)
+    if not result.stdout.contains("compiler_rt_complex ok"): return corpus_fail(ctx, "harness output missing ok line\n" ++ result.stdout)
+    if fs.write_text(output ++ "/report.txt", "upstream=" ++ CRT_COMPLEX_RELEASE ++ "\nPASS harness\n") != 0: return 1
+    print("compiler_rt_complex harness passed")
+    0
+
+fn crt_complex_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &str) -> Build:
+    var test = target_new(.Action, "compiler-rt-complex-test", "").output("out/compiler_rt_complex_test").timeout(3600000)
+    test.action = run_compiler_rt_complex_test_action
+    test = test.input(release_compiler ++ "").dep("build")
+    test = test.input(corpus.corpus_dir ++ "/harness.with").input(corpus.corpus_dir ++ "/bundle.with")
+    test = test.write_scope("out/compiler_rt_complex_test")
+    out.add_target(test)

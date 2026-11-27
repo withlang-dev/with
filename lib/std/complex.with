@@ -1,0 +1,240 @@
+// std.complex — C99-compatible single- and double-precision complex numbers.
+//
+// `Complex32` and `Complex64` are `@[repr(C)]` two-field value types matching
+// C99 `float _Complex` / `double _Complex` (and UCRT `_Fcomplex` / `_Dcomplex`)
+// across all supported native targets. Multiplication and division implement
+// C99 Annex G infinity/NaN/overflow semantics through the migrated compiler-rt
+// complex engine (`std.engines.compiler_rt_complex`); the transcendental C99
+// `<complex.h>` functions bind the platform C library's libm entry points.
+
+use std.traits
+use std.engines.compiler_rt_complex.mulsc3
+use std.engines.compiler_rt_complex.muldc3
+use std.engines.compiler_rt_complex.divsc3
+use std.engines.compiler_rt_complex.divdc3
+
+/// Single-precision complex number (`real + imag * i`), ABI-compatible with C99 `float _Complex`.
+@[repr(C)]
+pub type Complex32 {
+    pub real: f32 = 0.0,
+    pub imag: f32 = 0.0,
+}
+
+/// Double-precision complex number (`real + imag * i`), ABI-compatible with C99 `double _Complex`.
+@[repr(C)]
+pub type Complex64 {
+    pub real: f64 = 0.0,
+    pub imag: f64 = 0.0,
+}
+
+// ── Platform C99 <complex.h> libm bindings ───────────────────────────
+
+@[link_name("cabsf")]
+extern fn libm_cabsf(z: Complex32) -> f32
+@[link_name("cargf")]
+extern fn libm_cargf(z: Complex32) -> f32
+@[link_name("cexpf")]
+extern fn libm_cexpf(z: Complex32) -> Complex32
+@[link_name("clogf")]
+extern fn libm_clogf(z: Complex32) -> Complex32
+@[link_name("csqrtf")]
+extern fn libm_csqrtf(z: Complex32) -> Complex32
+@[link_name("cpowf")]
+extern fn libm_cpowf(x: Complex32, y: Complex32) -> Complex32
+
+@[link_name("cabs")]
+extern fn libm_cabs(z: Complex64) -> f64
+@[link_name("carg")]
+extern fn libm_carg(z: Complex64) -> f64
+@[link_name("cexp")]
+extern fn libm_cexp(z: Complex64) -> Complex64
+@[link_name("clog")]
+extern fn libm_clog(z: Complex64) -> Complex64
+@[link_name("csqrt")]
+extern fn libm_csqrt(z: Complex64) -> Complex64
+@[link_name("cpow")]
+extern fn libm_cpow(x: Complex64, y: Complex64) -> Complex64
+
+// ── Complex32 traits, constructors & methods ─────────────────────────
+
+impl Copy for Complex32 {}
+
+impl Default for Complex32:
+    fn default() -> Complex32:
+        Complex32 { real: 0.0, imag: 0.0 }
+
+impl One for Complex32:
+    fn one() -> Complex32:
+        Complex32 { real: 1.0, imag: 0.0 }
+
+impl Eq for Complex32:
+    fn eq(other: &Complex32) -> bool:
+        self.real == other.real and self.imag == other.imag
+
+impl Add[Complex32, Complex32] for Complex32:
+    fn add(rhs: &Complex32) -> Complex32:
+        Complex32 { real: self.real + rhs.real, imag: self.imag + rhs.imag }
+
+impl Sub[Complex32, Complex32] for Complex32:
+    fn sub(rhs: &Complex32) -> Complex32:
+        Complex32 { real: self.real - rhs.real, imag: self.imag - rhs.imag }
+
+impl Mul[Complex32, Complex32] for Complex32:
+    fn mul(rhs: &Complex32) -> Complex32:
+        let r = __mulsc3(self.real, self.imag, rhs.real, rhs.imag)
+        Complex32 { real: r.real, imag: r.imaginary }
+
+impl Div[Complex32, Complex32] for Complex32:
+    fn div(rhs: &Complex32) -> Complex32:
+        let r = __divsc3(self.real, self.imag, rhs.real, rhs.imag)
+        Complex32 { real: r.real, imag: r.imaginary }
+
+impl Neg[Complex32] for Complex32:
+    fn neg() -> Complex32:
+        Complex32 { real: -self.real, imag: -self.imag }
+
+impl Display for Complex32:
+    fn to_str() -> str:
+        if self.imag < 0.0: f"{self.real} - {-self.imag}i"
+        else: f"{self.real} + {self.imag}i"
+
+impl Debug for Complex32:
+    fn debug_str() -> str:
+        f"Complex32({self.real}, {self.imag})"
+
+pub fn Complex32.new(real: f32, imag: f32) -> Complex32:
+    Complex32 { real: real, imag: imag }
+
+pub fn Complex32.from_real(real: f32) -> Complex32:
+    Complex32 { real: real, imag: 0.0 }
+
+pub fn Complex32.from_imag(imag: f32) -> Complex32:
+    Complex32 { real: 0.0, imag: imag }
+
+impl Complex32:
+    pub fn conj() -> Complex32:
+        Complex32 { real: self.real, imag: -self.imag }
+
+    pub fn norm_sq() -> f32:
+        self.real * self.real + self.imag * self.imag
+
+    pub fn abs() -> f32:
+        libm_cabsf(*self)
+
+    pub fn arg() -> f32:
+        libm_cargf(*self)
+
+    pub fn exp() -> Complex32:
+        libm_cexpf(*self)
+
+    pub fn log() -> Complex32:
+        libm_clogf(*self)
+
+    pub fn sqrt() -> Complex32:
+        libm_csqrtf(*self)
+
+    pub fn pow(rhs: Complex32) -> Complex32:
+        libm_cpowf(*self, rhs)
+
+// ── Complex64 traits, constructors & methods ─────────────────────────
+
+impl Copy for Complex64 {}
+
+impl Default for Complex64:
+    fn default() -> Complex64:
+        Complex64 { real: 0.0, imag: 0.0 }
+
+impl One for Complex64:
+    fn one() -> Complex64:
+        Complex64 { real: 1.0, imag: 0.0 }
+
+impl Eq for Complex64:
+    fn eq(other: &Complex64) -> bool:
+        self.real == other.real and self.imag == other.imag
+
+impl Add[Complex64, Complex64] for Complex64:
+    fn add(rhs: &Complex64) -> Complex64:
+        Complex64 { real: self.real + rhs.real, imag: self.imag + rhs.imag }
+
+impl Sub[Complex64, Complex64] for Complex64:
+    fn sub(rhs: &Complex64) -> Complex64:
+        Complex64 { real: self.real - rhs.real, imag: self.imag - rhs.imag }
+
+impl Mul[Complex64, Complex64] for Complex64:
+    fn mul(rhs: &Complex64) -> Complex64:
+        let r = __muldc3(self.real, self.imag, rhs.real, rhs.imag)
+        Complex64 { real: r.real, imag: r.imaginary }
+
+impl Div[Complex64, Complex64] for Complex64:
+    fn div(rhs: &Complex64) -> Complex64:
+        let r = __divdc3(self.real, self.imag, rhs.real, rhs.imag)
+        Complex64 { real: r.real, imag: r.imaginary }
+
+impl Neg[Complex64] for Complex64:
+    fn neg() -> Complex64:
+        Complex64 { real: -self.real, imag: -self.imag }
+
+impl Display for Complex64:
+    fn to_str() -> str:
+        if self.imag < 0.0: f"{self.real} - {-self.imag}i"
+        else: f"{self.real} + {self.imag}i"
+
+impl Debug for Complex64:
+    fn debug_str() -> str:
+        f"Complex64({self.real}, {self.imag})"
+
+pub fn Complex64.new(real: f64, imag: f64) -> Complex64:
+    Complex64 { real: real, imag: imag }
+
+pub fn Complex64.from_real(real: f64) -> Complex64:
+    Complex64 { real: real, imag: 0.0 }
+
+pub fn Complex64.from_imag(imag: f64) -> Complex64:
+    Complex64 { real: 0.0, imag: imag }
+
+impl Complex64:
+    pub fn conj() -> Complex64:
+        Complex64 { real: self.real, imag: -self.imag }
+
+    pub fn norm_sq() -> f64:
+        self.real * self.real + self.imag * self.imag
+
+    pub fn abs() -> f64:
+        libm_cabs(*self)
+
+    pub fn arg() -> f64:
+        libm_carg(*self)
+
+    pub fn exp() -> Complex64:
+        libm_cexp(*self)
+
+    pub fn log() -> Complex64:
+        libm_clog(*self)
+
+    pub fn sqrt() -> Complex64:
+        libm_csqrt(*self)
+
+    pub fn pow(rhs: Complex64) -> Complex64:
+        libm_cpow(*self, rhs)
+
+// ── C99 <complex.h> free functions ───────────────────────────────────
+
+pub fn creal(z: Complex64) -> f64: z.real
+pub fn crealf(z: Complex32) -> f32: z.real
+pub fn cimag(z: Complex64) -> f64: z.imag
+pub fn cimagf(z: Complex32) -> f32: z.imag
+pub fn conj(z: Complex64) -> Complex64: Complex64 { real: z.real, imag: -z.imag }
+pub fn conjf(z: Complex32) -> Complex32: Complex32 { real: z.real, imag: -z.imag }
+
+pub fn cabs(z: Complex64) -> f64: libm_cabs(z)
+pub fn cabsf(z: Complex32) -> f32: libm_cabsf(z)
+pub fn carg(z: Complex64) -> f64: libm_carg(z)
+pub fn cargf(z: Complex32) -> f32: libm_cargf(z)
+pub fn cexp(z: Complex64) -> Complex64: libm_cexp(z)
+pub fn cexpf(z: Complex32) -> Complex32: libm_cexpf(z)
+pub fn clog(z: Complex64) -> Complex64: libm_clog(z)
+pub fn clogf(z: Complex32) -> Complex32: libm_clogf(z)
+pub fn csqrt(z: Complex64) -> Complex64: libm_csqrt(z)
+pub fn csqrtf(z: Complex32) -> Complex32: libm_csqrtf(z)
+pub fn cpow(x: Complex64, y: Complex64) -> Complex64: libm_cpow(x, y)
+pub fn cpowf(x: Complex32, y: Complex32) -> Complex32: libm_cpowf(x, y)

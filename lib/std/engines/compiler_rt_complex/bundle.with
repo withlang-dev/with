@@ -1,0 +1,8 @@
+// The compiler_rt_complex .wo bundle root, written by promotion (compiler-rt-complex-migrate)
+// from the migrated module list:
+// one `use` per corpus module; the harness (harness) is excluded.
+use std.engines.compiler_rt_complex.defs
+use std.engines.compiler_rt_complex.divdc3
+use std.engines.compiler_rt_complex.divsc3
+use std.engines.compiler_rt_complex.muldc3
+use std.engines.compiler_rt_complex.mulsc3

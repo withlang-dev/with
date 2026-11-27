@@ -1,0 +1,52 @@
+//! expect-stdout: migrate complex ok
+
+use pre_d_build_runner
+use std.fs
+
+fn main():
+    let case_dir = p7_prepare_case("migrate_complex_2817", "complex_2817")
+    let c_src =
+        "#include <complex.h>\n" ++
+        "double _Complex cmul(double _Complex a, double _Complex b) { return a * b; }\n" ++
+        "double _Complex cadd(double _Complex a, double _Complex b) { return a + b; }\n" ++
+        "double _Complex csub(double _Complex a, double _Complex b) { return a - b; }\n" ++
+        "double _Complex cdiv(double _Complex a, double _Complex b) { return a / b; }\n" ++
+        "double _Complex cneg(double _Complex a) { return -a; }\n" ++
+        "double _Complex cmix(double r, double _Complex z) { return r + z * 2.0 + 3.0 * I; }\n" ++
+        "double cre(double _Complex z) { return __real__(z) + __imag__(z); }\n" ++
+        "double cabs2(double _Complex z) { return creal(z)*creal(z) + cimag(z)*cimag(z); }\n" ++
+        "double _Complex cset(double a, double b) { double _Complex z = 0; __real__(z) = a; __imag__(z) = b; return z; }\n" ++
+        "float _Complex fcast(double _Complex z) { return (float _Complex)z; }\n" ++
+        "int ciszero(double _Complex z) { return z == 0.0; }\n" ++
+        "double cmag(double _Complex z) { return cabs(z); }\n"
+    p7_write(case_dir, "input/unit.c", c_src)
+    let migrated = p7_run(case_dir, "complex_migrate", "migrate\0input/unit.c\0--no-c-export\0-o\0src/unit.with\0")
+    p7_assert_success(migrated, "migrate C99 _Complex unit")
+    let text = read_file(p7_join(case_dir, "src/unit.with")).unwrap()
+    assert(text.contains("use std.complex"))
+    assert(not text.contains("type Complex64"))
+    let driver =
+        "use unit\n" ++
+        "use std.complex\n" ++
+        "fn main():\n" ++
+        "    let a = Complex64.new(3.0, 4.0)\n" ++
+        "    let b = Complex64.new(1.0, 2.0)\n" ++
+        "    assert(cmul(a, b) == Complex64.new(-5.0, 10.0))\n" ++
+        "    assert(cadd(a, b) == Complex64.new(4.0, 6.0))\n" ++
+        "    assert(csub(a, b) == Complex64.new(2.0, 2.0))\n" ++
+        "    assert(cdiv(cmul(a, b), b) == a)\n" ++
+        "    assert(cneg(a) == Complex64.new(-3.0, -4.0))\n" ++
+        "    assert(cmix(1.0, b) == Complex64.new(3.0, 7.0))\n" ++
+        "    assert(cre(a) == 7.0)\n" ++
+        "    assert(cabs2(a) == 25.0)\n" ++
+        "    assert(cset(5.0, -6.0) == Complex64.new(5.0, -6.0))\n" ++
+        "    assert(fcast(a) == Complex32.new(3.0, 4.0))\n" ++
+        "    assert(ciszero(Complex64.new(0.0, 0.0)) == 1)\n" ++
+        "    assert(ciszero(a) == 0)\n" ++
+        "    assert(cmag(a) == 5.0)\n" ++
+        "    print(\"driver ok\")\n"
+    p7_write(case_dir, "src/main.with", driver)
+    let executed = p7_run(case_dir, "complex_run", "run\0src/main.with\0")
+    p7_assert_success(executed, "compile and run migrated C99 _Complex unit")
+    assert(executed.stdout.contains("driver ok"))
+    print("migrate complex ok")

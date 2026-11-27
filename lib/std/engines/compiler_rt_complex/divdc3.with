@@ -1,0 +1,388 @@
+// Migrated from C
+use std.engines.compiler_rt_complex.defs
+use std.libc
+
+fn make_ti(__param_h: i64, __param_l: i64) -> i128 {
+    var __local_r: twords
+
+    (__local_r.s.high = (((__param_h as u64) as i64)))
+
+    (__local_r.s.low = ((__param_l as u64)))
+
+    return (unsafe *(&raw const __local_r as *const twords)).all
+
+}
+
+fn make_tu(__param_h: u64, __param_l: u64) -> u128 {
+    var __local_r: utwords
+
+    (__local_r.s.high = __param_h)
+
+    (__local_r.s.low = __param_l)
+
+    return (unsafe *(&raw const __local_r as *const utwords)).all
+
+}
+
+extern fn __compilerrt_abort_impl(__param_file: *const c_char, __param_line: i32, __param_function: *const c_char) -> Never
+extern fn __paritysi2(__param_a: i32) -> i32
+extern fn __paritydi2(__param_a: i64) -> i32
+extern fn __divdi3(__param_a: i64, __param_b: i64) -> i64
+extern fn __divsi3(__param_a: i32, __param_b: i32) -> i32
+extern fn __udivsi3(__param_n: u32, __param_d: u32) -> u32
+extern fn __udivmodsi4(__param_a: u32, __param_b: u32, __param_rem: *mut u32) -> u32
+extern fn __udivmoddi4(__param_a: u64, __param_b: u64, __param_rem: *mut u64) -> u64
+extern fn __clzti2(__param_a: i128) -> i32
+extern fn __udivmodti4(__param_a: u128, __param_b: u128, __param_rem: *mut u128) -> u128
+fn rep_clz(__param_a: u64) -> i32 {
+    return (__param_a as u64).clz()
+
+}
+
+unsafe fn wideMultiply(__param_a: u64, __param_b: u64, __param_hi: *mut u64, __param_lo: *mut u64) {
+    var __local_plolo: u64 = ((((((__param_a as u64) & (4294967295 as u64)) as u64) *% (((__param_b as u64) & (4294967295 as u64)) as u64)) as u64))
+
+    var __local_plohi: u64 = ((((((__param_a as u64) & (4294967295 as u64)) as u64) *% (((__param_b as u64) >> (32 as u32)) as u64)) as u64))
+
+    var __local_philo: u64 = ((((((__param_a as u64) >> (32 as u32)) as u64) *% (((__param_b as u64) & (4294967295 as u64)) as u64)) as u64))
+
+    var __local_phihi: u64 = ((((((__param_a as u64) >> (32 as u32)) as u64) *% (((__param_b as u64) >> (32 as u32)) as u64)) as u64))
+
+    var __local_r0: u64 = ((((__local_plolo as u64) & (4294967295 as u64)) as u64))
+
+    var __local_r1: u64 = ((((((((__local_plolo as u64) >> (32 as u32)) as u64) +% (((__local_plohi as u64) & (4294967295 as u64)) as u64)) as u64) +% (((__local_philo as u64) & (4294967295 as u64)) as u64)) as u64))
+
+    ((*__param_lo) = ((((__local_r0 as u64) +% (((__local_r1 as u64) << (32 as u32)) as u64)) as u64)))
+
+    ((*__param_hi) = ((((((((((__local_plohi as u64) >> (32 as u32)) as u64) +% (((__local_philo as u64) >> (32 as u32)) as u64)) as u64) +% (((__local_r1 as u64) >> (32 as u32)) as u64)) as u64) +% (__local_phihi as u64)) as u64)))
+
+}
+
+extern fn __adddf3(__param_a: f64, __param_b: f64) -> f64
+@[repr(C)]
+pub type crt_d_toRep_rep_anon = union { f: f64 = 0.0, i: u64 = 0 }
+impl Copy for crt_d_toRep_rep_anon
+pub fn crt_d_toRep(__param_x: f64) -> u64 {
+    var __local_rep: crt_d_toRep_rep_anon = crt_d_toRep_rep_anon { f: __param_x }
+
+    return (unsafe *(&raw const __local_rep as *const crt_d_toRep_rep_anon)).i
+
+}
+
+@[repr(C)]
+pub type crt_d_fromRep_rep_anon = union { f: f64 = 0.0, i: u64 = 0 }
+impl Copy for crt_d_fromRep_rep_anon
+pub fn crt_d_fromRep(__param_x: u64) -> f64 {
+    var __local_rep: crt_d_fromRep_rep_anon = crt_d_fromRep_rep_anon { i: __param_x }
+
+    return (unsafe *(&raw const __local_rep as *const crt_d_fromRep_rep_anon)).f
+
+}
+
+// contract: unproved:0:out-parameter read before the write
+pub unsafe fn crt_d_normalize(__param_significand: *mut u64) -> i32 {
+    var __local_shift: i32 = (((rep_clz((*__param_significand)) - rep_clz((((1 as u64) << (52 as u32)) as u64))) as i32))
+
+    ((*__param_significand) = (*__param_significand) << (__local_shift as u32))
+
+    return (1 - __local_shift)
+
+}
+
+// contract: unproved:0:out-parameter read before the write,unproved:1:out-parameter read before the write
+pub unsafe fn crt_d_wideLeftShift(__param_hi: *mut u64, __param_lo: *mut u64, __param_count: u32) {
+    ((*__param_hi) = (((((((*__param_hi) as u64) << (__param_count as u32)) as u64) | ((((*__param_lo) as u64) >> (((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (__param_count as u64)) as u32)) as u64)) as u64)))
+
+    ((*__param_lo) = (((((*__param_lo) as u64) << (__param_count as u32)) as u64)))
+
+}
+
+// contract: unproved:0:out-parameter read before the write,unproved:1:out-parameter read before the write
+pub unsafe fn crt_d_wideRightShiftWithSticky(__param_hi: *mut u64, __param_lo: *mut u64, __param_count: u32) -> Unit {
+    if (__param_count < ((sizeof[u64]() as u64) *% (8 as u64))) {
+        var __local_sticky: bool = (((((*__param_lo) as u64) << (((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (__param_count as u64)) as u32)) != 0))
+
+        ((*__param_lo) = (((((((((*__param_hi) as u64) << (((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (__param_count as u64)) as u32)) as u64) | ((((*__param_lo) as u64) >> (__param_count as u32)) as u64)) as u64) | ((__local_sticky as i32) as u64)) as u64)))
+
+        ((*__param_hi) = (((((*__param_hi) as u64) >> (__param_count as u32)) as u64)))
+
+    } else {
+        if (__param_count < ((2 as u64) *% (((sizeof[u64]() as u64) *% (8 as u64)) as u64))) {
+            var __local_sticky_1: bool = ((((((*__param_hi) as u64) << (((((2 as u64) *% (((sizeof[u64]() as u64) *% (8 as u64)) as u64)) as u64) -% (__param_count as u64)) as u32)) as u64) | ((*__param_lo) as u64)) != 0)
+
+            ((*__param_lo) = (((((((*__param_hi) as u64) >> (((__param_count as u64) -% (((sizeof[u64]() as u64) *% (8 as u64)) as u64)) as u32)) as u64) | ((__local_sticky_1 as i32) as u64)) as u64)))
+
+            ((*__param_hi) = ((0 as u64)))
+
+        } else {
+            var __local_sticky_2: bool = ((((*__param_hi) as u64) | ((*__param_lo) as u64)) != 0)
+
+            ((*__param_lo) = ((__local_sticky_2 as u64)))
+
+            ((*__param_hi) = ((0 as u64)))
+
+        }
+    }
+
+}
+
+fn __compiler_rt_logbX(__param_x: f64) -> f64 {
+    var __local_rep: u64 = ((crt_d_toRep(__param_x) as u64))
+
+    var __local_exp: i32 = ((((((__local_rep as u64) & (((((((1 as u64) << (((52 as u64) +% (((((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (52 as u64)) as u64) -% (1 as u64)) as u64)) as u32)) as u64) -% (1 as u64)) as u64) ^ (((((1 as u64) << (52 as u32)) as u64) -% (1 as u64)) as u64)) as u64)) as u64) >> (52 as u32)) as i32))
+
+    if (__local_exp == (((1 as i32) << (((((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (52 as u64)) as u64) -% (1 as u64)) as u32)) - 1)) {
+        var __ci_expr_logic_0: i32
+
+        if (((__local_rep as u64) & (((1 as u64) << (((52 as u64) +% (((((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (52 as u64)) as u64) -% (1 as u64)) as u64)) as u32)) as u64)) == 0) {
+            (__ci_expr_logic_0 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_0 = (if __param_x != __param_x: 1 else: 0))
+        }
+
+        if __ci_expr_logic_0 {
+            return __param_x
+
+        }
+        return (0 - __param_x)
+
+
+
+    }
+    if (__param_x == 0.0) {
+        return crt_d_fromRep((((((((((1 as u64) << (((52 as u64) +% (((((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (52 as u64)) as u64) -% (1 as u64)) as u64)) as u32)) as u64) -% (1 as u64)) as u64) ^ (((((1 as u64) << (52 as u32)) as u64) -% (1 as u64)) as u64)) as u64) | (((1 as u64) << (((52 as u64) +% (((((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (52 as u64)) as u64) -% (1 as u64)) as u64)) as u32)) as u64)) as u64))
+
+    }
+
+    if (__local_exp != 0) {
+        return (((__local_exp - (((((1 as i32) << (((((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (52 as u64)) as u64) -% (1 as u64)) as u32)) - 1) as i32) >> (1 as u32))) as f64))
+
+    }
+    (__local_rep = (__local_rep as u64) & (((((1 as u64) << (((52 as u64) +% (((((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (52 as u64)) as u64) -% (1 as u64)) as u64)) as u32)) as u64) -% (1 as u64)) as u64))
+
+    var __local_shift: i32 = (((1 - unsafe { crt_d_normalize((&raw mut __local_rep as *mut u64)) }) as i32))
+
+    (__local_exp = ((((((__local_rep as u64) & (((((((1 as u64) << (((52 as u64) +% (((((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (52 as u64)) as u64) -% (1 as u64)) as u64)) as u32)) as u64) -% (1 as u64)) as u64) ^ (((((1 as u64) << (52 as u32)) as u64) -% (1 as u64)) as u64)) as u64)) as u64) >> (52 as u32)) as i32)))
+
+    return ((((__local_exp - (((((1 as i32) << (((((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (52 as u64)) as u64) -% (1 as u64)) as u32)) - 1) as i32) >> (1 as u32))) - __local_shift) as f64))
+
+
+}
+
+fn __compiler_rt_scalbnX(__param_x: f64, __param_y: i32) -> f64 {
+    var __local_rep: u64 = ((crt_d_toRep(__param_x) as u64))
+
+    var __local_exp: i32 = ((((((__local_rep as u64) & (((((((1 as u64) << (((52 as u64) +% (((((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (52 as u64)) as u64) -% (1 as u64)) as u64)) as u32)) as u64) -% (1 as u64)) as u64) ^ (((((1 as u64) << (52 as u32)) as u64) -% (1 as u64)) as u64)) as u64)) as u64) >> (52 as u32)) as i32))
+
+    var __ci_expr_logic_0: i32
+
+    if (__param_x == 0.0) {
+        (__ci_expr_logic_0 = (if true: 1 else: 0))
+    } else {
+        (__ci_expr_logic_0 = (if __local_exp == (((1 as i32) << (((((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (52 as u64)) as u64) -% (1 as u64)) as u32)) - 1): 1 else: 0))
+    }
+
+    if __ci_expr_logic_0 {
+        return __param_x
+    }
+
+
+    var __local_sig: u64 = ((((__local_rep as u64) & (((((1 as u64) << (52 as u32)) as u64) -% (1 as u64)) as u64)) as u64))
+
+    if (__local_exp == 0) {
+        (__local_exp = __local_exp + unsafe { crt_d_normalize((&raw mut __local_sig as *mut u64)) })
+
+        (__local_sig = (__local_sig as u64) & ((~((1 as u64) << (52 as u32))) as u64))
+
+    }
+
+    if unsafe { __with_builtin_add_overflow_i32((__local_exp as i32), (__param_y as i32), (&raw mut __local_exp as *mut i32)) } {
+        (__local_exp = (((if __param_y >= 0: (libc.INT_MAX as i32) else: ((-2147483647 - 1) as i32)) as i32)))
+
+    }
+
+    var __local_sign: u64 = ((((__local_rep as u64) & (((1 as u64) << (((52 as u64) +% (((((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (52 as u64)) as u64) -% (1 as u64)) as u64)) as u32)) as u64)) as u64))
+
+    if (__local_exp >= (((1 as i32) << (((((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (52 as u64)) as u64) -% (1 as u64)) as u32)) - 1)) {
+        return (crt_d_fromRep((((__local_sign as u64) | (((((((1 as i32) << (((((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (52 as u64)) as u64) -% (1 as u64)) as u32)) - 1) - 1) as u64) << (52 as u32)) as u64)) as u64)) * 2.0)
+
+    }
+    if (__local_exp <= 0) {
+        var __local_tmp: f64 = ((crt_d_fromRep((((((__local_sign as u64) | (((1 as u64) << (52 as u32)) as u64)) as u64) | (__local_sig as u64)) as u64)) as f64))
+
+        (__local_exp = __local_exp + ((((((1 as i32) << (((((((sizeof[u64]() as u64) *% (8 as u64)) as u64) -% (52 as u64)) as u64) -% (1 as u64)) as u32)) - 1) as i32) >> (1 as u32)) - 1))
+
+        if (__local_exp < 1) {
+            (__local_exp = ((1 as i32)))
+        }
+
+        (__local_tmp = __local_tmp * crt_d_fromRep((((__local_exp as u64) << (52 as u32)) as u64)))
+
+        return __local_tmp
+
+    }
+    return crt_d_fromRep((((((__local_sign as u64) | (((__local_exp as u64) << (52 as u32)) as u64)) as u64) | (__local_sig as u64)) as u64))
+
+}
+
+fn __compiler_rt_fmaxX(__param_x: f64, __param_y: f64) -> f64 {
+    var __ci_expr_ternary_1: f64 = 0.0
+
+    var __ci_expr_logic_0: i32
+
+    if isnan(__param_x) {
+        (__ci_expr_logic_0 = (if true: 1 else: 0))
+    } else {
+        (__ci_expr_logic_0 = (if __param_x < __param_y: 1 else: 0))
+    }
+
+    if __ci_expr_logic_0 {
+        (__ci_expr_ternary_1 = __param_y)
+    } else {
+        (__ci_expr_ternary_1 = __param_x)
+    }
+
+    return __ci_expr_ternary_1
+
+
+}
+
+pub fn __compiler_rt_logb(__param_x: f64) -> f64 {
+    return __compiler_rt_logbX(__param_x)
+
+}
+
+pub fn __compiler_rt_scalbn(__param_x: f64, __param_y: i32) -> f64 {
+    return __compiler_rt_scalbnX(__param_x, __param_y)
+
+}
+
+pub fn __compiler_rt_fmax(__param_x: f64, __param_y: f64) -> f64 {
+    return fmax((__param_x as f64), (__param_y as f64))
+
+}
+
+pub fn __divdc3(__param___a: f64, __param___b: f64, __param___c: f64, __param___d: f64) -> Dcomplex {
+    var __local___a = __param___a
+    var __local___b = __param___b
+    var __local___c = __param___c
+    var __local___d = __param___d
+    var __local___ilogbw: i32 = ((0 as i32))
+
+    var __local___logbw: f64 = ((__compiler_rt_logb((__compiler_rt_fmax(fabs((__local___c as f64)), fabs((__local___d as f64))) as f64)) as f64))
+
+    if isfinite(__local___logbw) {
+        (__local___ilogbw = ((__local___logbw as i32)))
+
+        (__local___c = ((__compiler_rt_scalbn(__local___c, ((0 - __local___ilogbw) as i32)) as f64)))
+
+        (__local___d = ((__compiler_rt_scalbn(__local___d, ((0 - __local___ilogbw) as i32)) as f64)))
+
+    }
+
+    var __local___denom: f64 = ((((__local___c * __local___c) + (__local___d * __local___d)) as f64))
+
+    var __local_z: Dcomplex
+
+    (__local_z.real = ((__compiler_rt_scalbn(((((__local___a * __local___c) + (__local___b * __local___d)) / __local___denom) as f64), ((0 - __local___ilogbw) as i32)) as f64)))
+
+    (__local_z.imaginary = ((__compiler_rt_scalbn(((((__local___b * __local___c) - (__local___a * __local___d)) / __local___denom) as f64), ((0 - __local___ilogbw) as i32)) as f64)))
+
+    var __ci_expr_logic_0: i32 = 0
+
+    if isnan((unsafe *(&raw const __local_z as *const Dcomplex)).real) {
+        (__ci_expr_logic_0 = (if isnan((unsafe *(&raw const __local_z as *const Dcomplex)).imaginary): 1 else: 0))
+    }
+
+    if __ci_expr_logic_0 {
+        var __ci_expr_logic_2: i32 = 0
+
+        if (__local___denom == 0.0) {
+            var __ci_expr_logic_1: i32
+
+            if (not isnan(__local___a)) {
+                (__ci_expr_logic_1 = (if true: 1 else: 0))
+            } else {
+                (__ci_expr_logic_1 = (if not isnan(__local___b): 1 else: 0))
+            }
+
+            (__ci_expr_logic_2 = (if __ci_expr_logic_1: 1 else: 0))
+
+        }
+
+        if __ci_expr_logic_2 {
+            (__local_z.real = (((copysign((((1.0 as f32) / (0.0 as f32)) as f64), (__local___c as f64)) * __local___a) as f64)))
+
+            (__local_z.imaginary = (((copysign((((1.0 as f32) / (0.0 as f32)) as f64), (__local___c as f64)) * __local___b) as f64)))
+
+        } else {
+            var __ci_expr_logic_5: i32 = 0
+
+            var __ci_expr_logic_4: i32 = 0
+
+            var __ci_expr_logic_3: i32
+
+            if isinf(__local___a) {
+                (__ci_expr_logic_3 = (if true: 1 else: 0))
+            } else {
+                (__ci_expr_logic_3 = (if isinf(__local___b): 1 else: 0))
+            }
+
+            if __ci_expr_logic_3 {
+                (__ci_expr_logic_4 = (if isfinite(__local___c): 1 else: 0))
+            }
+
+            if __ci_expr_logic_4 {
+                (__ci_expr_logic_5 = (if isfinite(__local___d): 1 else: 0))
+            }
+
+            if __ci_expr_logic_5 {
+                (__local___a = copysign(((if isinf(__local___a): (1.0 as f64) else: (0.0 as f64)) as f64), (__local___a as f64)))
+
+                (__local___b = copysign(((if isinf(__local___b): (1.0 as f64) else: (0.0 as f64)) as f64), (__local___b as f64)))
+
+                (__local_z.real = (((((1.0 as f32) / (0.0 as f32)) * ((__local___a * __local___c) + (__local___b * __local___d))) as f64)))
+
+                (__local_z.imaginary = (((((1.0 as f32) / (0.0 as f32)) * ((__local___b * __local___c) - (__local___a * __local___d))) as f64)))
+
+            } else {
+                var __ci_expr_logic_8: i32 = 0
+
+                var __ci_expr_logic_7: i32 = 0
+
+                var __ci_expr_logic_6: i32 = 0
+
+                if isinf(__local___logbw) {
+                    (__ci_expr_logic_6 = (if __local___logbw > 0.0: 1 else: 0))
+                }
+
+                if __ci_expr_logic_6 {
+                    (__ci_expr_logic_7 = (if isfinite(__local___a): 1 else: 0))
+                }
+
+                if __ci_expr_logic_7 {
+                    (__ci_expr_logic_8 = (if isfinite(__local___b): 1 else: 0))
+                }
+
+                if __ci_expr_logic_8 {
+                    (__local___c = copysign(((if isinf(__local___c): (1.0 as f64) else: (0.0 as f64)) as f64), (__local___c as f64)))
+
+                    (__local___d = copysign(((if isinf(__local___d): (1.0 as f64) else: (0.0 as f64)) as f64), (__local___d as f64)))
+
+                    (__local_z.real = (((0.0 * ((__local___a * __local___c) + (__local___b * __local___d))) as f64)))
+
+                    (__local_z.imaginary = (((0.0 * ((__local___b * __local___c) - (__local___a * __local___d))) as f64)))
+
+                }
+
+            }
+
+        }
+
+
+    }
+
+
+    return __local_z
+
+}

@@ -1,0 +1,27 @@
+__compiler_rt_fmax	plain
+__compiler_rt_fmaxX	plain
+__compiler_rt_logb	plain
+__compiler_rt_logbX	plain
+__compiler_rt_logbf	plain
+__compiler_rt_scalbn	plain
+__compiler_rt_scalbnX	plain
+__compiler_rt_scalbnf	plain
+__divdc3	plain
+__divsc3	plain
+__muldc3	plain
+__mulsc3	plain
+crt_d_fromRep	plain
+crt_d_normalize	unproved:0:out-parameter read before the write
+crt_d_toRep	plain
+crt_d_wideLeftShift	unproved:0:out-parameter read before the write,unproved:1:out-parameter read before the write
+crt_d_wideRightShiftWithSticky	unproved:0:out-parameter read before the write,unproved:1:out-parameter read before the write
+crt_s_fromRep	plain
+crt_s_normalize	unproved:0:out-parameter read before the write
+crt_s_toRep	plain
+crt_s_wideLeftShift	unproved:0:out-parameter read before the write,unproved:1:out-parameter read before the write
+crt_s_wideRightShiftWithSticky	unproved:0:out-parameter read before the write,unproved:1:out-parameter read before the write
+main	plain
+make_ti	plain
+make_tu	plain
+rep_clz	plain
+wideMultiply	out:2:u64,out:3:u64

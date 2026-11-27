@@ -1,0 +1,379 @@
+// std.engines.compiler_rt_complex.defs — shared definitions for migrated PCRE2
+use rt.rt_core
+
+pub fn is_alpha(__with_c: i32) -> bool {
+    (__with_c >= 65 and __with_c <= 90) or (__with_c >= 97 and __with_c <= 122)
+}
+pub fn is_digit(__with_c: i32) -> bool {
+    __with_c >= 48 and __with_c <= 57
+}
+pub fn is_space(__with_c: i32) -> bool {
+    __with_c == 32 or __with_c == 9 or __with_c == 10 or __with_c == 13 or __with_c == 12 or __with_c == 11
+}
+pub fn is_alnum(__with_c: i32) -> bool {
+    is_alpha(__with_c) or is_digit(__with_c)
+}
+pub fn is_upper(__with_c: i32) -> bool {
+    __with_c >= 65 and __with_c <= 90
+}
+pub fn is_lower(__with_c: i32) -> bool {
+    __with_c >= 97 and __with_c <= 122
+}
+pub fn is_xdigit(__with_c: i32) -> bool {
+    (__with_c >= 48 and __with_c <= 57) or (__with_c >= 65 and __with_c <= 70) or (__with_c >= 97 and __with_c <= 102)
+}
+pub fn is_print(__with_c: i32) -> bool {
+    __with_c >= 32 and __with_c <= 126
+}
+pub fn to_lower(__with_c: i32) -> i32 {
+    if __with_c >= 65 and __with_c <= 90 { __with_c + 32 } else { __with_c }
+}
+pub fn to_upper(__with_c: i32) -> i32 {
+    if __with_c >= 97 and __with_c <= 122 { __with_c - 32 } else { __with_c }
+}
+pub extern fn strlen(s: *const c_char) -> u64
+pub extern fn strcmp(a: *const c_char, b: *const c_char) -> i32
+pub extern fn strncmp(a: *const c_char, b: *const c_char, n: i64) -> i32
+pub extern fn strchr(s: *const c_char, c: i32) -> *mut c_char
+pub extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void
+pub extern fn isalpha(c: i32) -> i32
+pub extern fn isdigit(c: i32) -> i32
+pub extern fn isalnum(c: i32) -> i32
+pub extern fn isspace(c: i32) -> i32
+pub extern fn isupper(c: i32) -> i32
+pub extern fn islower(c: i32) -> i32
+pub extern fn isxdigit(c: i32) -> i32
+pub extern fn isprint(c: i32) -> i32
+pub extern fn isgraph(c: i32) -> i32
+pub extern fn ispunct(c: i32) -> i32
+pub extern fn iscntrl(c: i32) -> i32
+pub extern fn tolower(c: i32) -> i32
+pub extern fn toupper(c: i32) -> i32
+
+pub type c_void = opaque
+pub extern fn abort() -> Never
+pub fn __ci_unreachable() -> Never: abort()
+
+// data model: LP64 (arm64-apple-macosx11.0)
+pub const C_DATA_MODEL: str = "LP64 (arm64-apple-macosx11.0)"
+pub unsafe fn __with_migrate_malloc(__with_n: u64) -> *mut c_void {
+    with_alloc(__with_n as i64) as *mut c_void
+}
+pub unsafe fn __with_migrate_calloc(__with_n: u64, __with_size: u64) -> *mut c_void {
+    with_alloc_zeroed(__with_n as i64, __with_size as i64) as *mut c_void
+}
+pub unsafe fn __with_migrate_realloc(__with_p: *mut c_void, __with_n: u64) -> *mut c_void {
+    with_realloc(__with_p as *mut u8, 0, __with_n as i64) as *mut c_void
+}
+pub unsafe fn __with_migrate_free(__with_p: *mut c_void) {
+    with_free(__with_p as *mut u8)
+}
+pub unsafe fn __with_builtin_add_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_result ^ __with_a) & (__with_result ^ __with_b)) < 0
+}
+pub unsafe fn __with_builtin_sub_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_a ^ __with_b) & (__with_result ^ __with_a)) < 0
+}
+pub unsafe fn __with_builtin_mul_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_a == 0 or __with_b == 0: false else if __with_a == -1: __with_result == __with_b else if __with_b == -1: __with_result == __with_a else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_u8(__with_a: u8, __with_b: u8, __with_out: *mut u8) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_result < __with_a
+}
+pub unsafe fn __with_builtin_sub_overflow_u8(__with_a: u8, __with_b: u8, __with_out: *mut u8) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_a < __with_b
+}
+pub unsafe fn __with_builtin_mul_overflow_u8(__with_a: u8, __with_b: u8, __with_out: *mut u8) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_b == 0: false else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_i16(__with_a: i16, __with_b: i16, __with_out: *mut i16) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_result ^ __with_a) & (__with_result ^ __with_b)) < 0
+}
+pub unsafe fn __with_builtin_sub_overflow_i16(__with_a: i16, __with_b: i16, __with_out: *mut i16) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_a ^ __with_b) & (__with_result ^ __with_a)) < 0
+}
+pub unsafe fn __with_builtin_mul_overflow_i16(__with_a: i16, __with_b: i16, __with_out: *mut i16) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_a == 0 or __with_b == 0: false else if __with_a == -1: __with_result == __with_b else if __with_b == -1: __with_result == __with_a else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_u16(__with_a: u16, __with_b: u16, __with_out: *mut u16) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_result < __with_a
+}
+pub unsafe fn __with_builtin_sub_overflow_u16(__with_a: u16, __with_b: u16, __with_out: *mut u16) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_a < __with_b
+}
+pub unsafe fn __with_builtin_mul_overflow_u16(__with_a: u16, __with_b: u16, __with_out: *mut u16) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_b == 0: false else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_i32(__with_a: i32, __with_b: i32, __with_out: *mut i32) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_result ^ __with_a) & (__with_result ^ __with_b)) < 0
+}
+pub unsafe fn __with_builtin_sub_overflow_i32(__with_a: i32, __with_b: i32, __with_out: *mut i32) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_a ^ __with_b) & (__with_result ^ __with_a)) < 0
+}
+pub unsafe fn __with_builtin_mul_overflow_i32(__with_a: i32, __with_b: i32, __with_out: *mut i32) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_a == 0 or __with_b == 0: false else if __with_a == -1: __with_result == __with_b else if __with_b == -1: __with_result == __with_a else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_u32(__with_a: u32, __with_b: u32, __with_out: *mut u32) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_result < __with_a
+}
+pub unsafe fn __with_builtin_sub_overflow_u32(__with_a: u32, __with_b: u32, __with_out: *mut u32) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_a < __with_b
+}
+pub unsafe fn __with_builtin_mul_overflow_u32(__with_a: u32, __with_b: u32, __with_out: *mut u32) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_b == 0: false else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_i64(__with_a: i64, __with_b: i64, __with_out: *mut i64) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_result ^ __with_a) & (__with_result ^ __with_b)) < 0
+}
+pub unsafe fn __with_builtin_sub_overflow_i64(__with_a: i64, __with_b: i64, __with_out: *mut i64) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_a ^ __with_b) & (__with_result ^ __with_a)) < 0
+}
+pub unsafe fn __with_builtin_mul_overflow_i64(__with_a: i64, __with_b: i64, __with_out: *mut i64) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_a == 0 or __with_b == 0: false else if __with_a == -1: __with_result == __with_b else if __with_b == -1: __with_result == __with_a else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_u64(__with_a: u64, __with_b: u64, __with_out: *mut u64) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_result < __with_a
+}
+pub unsafe fn __with_builtin_sub_overflow_u64(__with_a: u64, __with_b: u64, __with_out: *mut u64) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_a < __with_b
+}
+pub unsafe fn __with_builtin_mul_overflow_u64(__with_a: u64, __with_b: u64, __with_out: *mut u64) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_b == 0: false else: __with_result / __with_b != __with_a
+}
+pub unsafe fn __with_builtin_add_overflow_i128(__with_a: i128, __with_b: i128, __with_out: *mut i128) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_result ^ __with_a) & (__with_result ^ __with_b)) < 0
+}
+pub unsafe fn __with_builtin_sub_overflow_i128(__with_a: i128, __with_b: i128, __with_out: *mut i128) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_a ^ __with_b) & (__with_result ^ __with_a)) < 0
+}
+// The 128-bit overflow checks stay division-free on purpose: `/` on i128/u128
+// lowers to the __divti3/__udivti3 compiler-rt libcalls, and this shim is
+// compiled into freestanding runtime objects whose COFF link has no builtins
+// library to resolve them from. Limb decomposition keeps the check to multiplies
+// and shifts, which lower inline on every target and at every -O level.
+pub fn u128_mul_would_overflow(__with_a: u128, __with_b: u128) -> bool {
+    let __with_a_hi = (__with_a >> 64) as u64
+    let __with_b_hi = (__with_b >> 64) as u64
+    if __with_a_hi != 0 and __with_b_hi != 0: return true
+    let __with_a_lo = (__with_a as u64) as u128
+    let __with_b_lo = (__with_b as u64) as u128
+    let __with_cross = (__with_a_hi as u128) *% __with_b_lo +% (__with_b_hi as u128) *% __with_a_lo
+    if (__with_cross >> 64) != 0: return true
+    let __with_low = __with_a_lo *% __with_b_lo
+    ((__with_low >> 64) +% __with_cross) >> 64 != 0
+}
+pub unsafe fn __with_builtin_mul_overflow_i128(__with_a: i128, __with_b: i128, __with_out: *mut i128) -> bool {
+    unsafe { (*__with_out = __with_a *% __with_b) }
+    if __with_a == 0 or __with_b == 0: return false
+    let __with_neg = (__with_a < 0) != (__with_b < 0)
+    let __with_ua = if __with_a < 0: (0 as u128) -% (__with_a as u128) else: __with_a as u128
+    let __with_ub = if __with_b < 0: (0 as u128) -% (__with_b as u128) else: __with_b as u128
+    if u128_mul_would_overflow(__with_ua, __with_ub): return true
+    let __with_limit = if __with_neg: (1 as u128) << 127 else: ((1 as u128) << 127) -% 1
+    __with_ua *% __with_ub > __with_limit
+}
+pub unsafe fn __with_builtin_add_overflow_u128(__with_a: u128, __with_b: u128, __with_out: *mut u128) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_result < __with_a
+}
+pub unsafe fn __with_builtin_sub_overflow_u128(__with_a: u128, __with_b: u128, __with_out: *mut u128) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_a < __with_b
+}
+pub unsafe fn __with_builtin_mul_overflow_u128(__with_a: u128, __with_b: u128, __with_out: *mut u128) -> bool {
+    unsafe { (*__with_out = __with_a *% __with_b) }
+    u128_mul_would_overflow(__with_a, __with_b)
+}
+
+pub type si_int = i32
+
+pub type su_int = u32
+
+pub type di_int = i64
+
+pub type du_int = u64
+
+@[repr(C)]
+pub type dwords_s { low: u32 = 0, high: i32 = 0 }
+impl Copy for dwords_s
+@[repr(C)]
+pub type dwords = union { pub all: i64 = 0, pub s: dwords_s }
+impl Copy for dwords
+
+@[repr(C)]
+pub type udwords_s { low: u32 = 0, high: u32 = 0 }
+impl Copy for udwords_s
+@[repr(C)]
+pub type udwords = union { pub all: u64 = 0, pub s: udwords_s }
+impl Copy for udwords
+
+pub type ti_int = i128
+
+pub type tu_int = u128
+
+@[repr(C)]
+pub type twords_s { low: u64 = 0, high: i64 = 0 }
+impl Copy for twords_s
+@[repr(C)]
+pub type twords = union { pub all: i128 = 0, pub s: twords_s }
+impl Copy for twords
+
+@[repr(C)]
+pub type utwords_s { low: u64 = 0, high: u64 = 0 }
+impl Copy for utwords_s
+@[repr(C)]
+pub type utwords = union { pub all: u128 = 0, pub s: utwords_s }
+impl Copy for utwords
+
+@[repr(C)]
+pub type float_bits = union { pub u: u32 = 0, pub f: f32 = 0.0 }
+impl Copy for float_bits
+
+@[repr(C)]
+pub type double_bits = union { pub u: udwords, pub f: f64 = 0.0 }
+impl Copy for double_bits
+
+@[repr(C)]
+pub type uqwords { pub low: udwords, pub high: udwords }
+impl Copy for uqwords
+
+@[repr(C)]
+pub type Fcomplex { pub real: f32 = 0.0, pub imaginary: f32 = 0.0 }
+impl Copy for Fcomplex
+
+@[repr(C)]
+pub type Dcomplex { pub real: f64 = 0.0, pub imaginary: f64 = 0.0 }
+impl Copy for Dcomplex
+
+@[repr(C)]
+pub type Lcomplex { pub real: f64 = 0.0, pub imaginary: f64 = 0.0 }
+impl Copy for Lcomplex
+
+pub type half_rep_t = u32
+
+pub type crt_d_rep_t = u64
+
+pub type crt_d_srep_t = i64
+
+pub type crt_d_fp_t = f64
+
+pub type rep_t = crt_d_rep_t
+pub type srep_t = crt_d_srep_t
+pub type fp_t = crt_d_fp_t
+pub fn STR(x: str) -> str {
+    x
+}
+pub fn XSTR[T](a: T) -> T {
+    STR(a)
+}
+pub fn COMPILER_RT_ALIAS_VISIBILITY(name: i32) {
+    return
+}
+pub let CRT_HAS_FLOATING_POINT: i32 = 1
+pub let HAS_80_BIT_LONG_DOUBLE: i32 = 0
+pub fn REPEAT_0_TIMES(code_to_repeat: i32) {
+    return
+}
+pub fn REPEAT_1_TIMES[T](code_to_repeat: T) -> T {
+    code_to_repeat
+}
+pub let CRT_INFINITY: f32 = ((1.0 as f32) / (0.0 as f32))
+pub fn crt_isinf[T](x: T) -> T {
+    isinf(x)
+}
+pub fn crt_isnan[T](x: T) -> T {
+    isnan(x)
+}
+pub fn crt_fabs[T](x: T) -> T {
+    fabs(x)
+}
+pub fn crt_fabsf[T](x: T) -> T {
+    fabsf(x)
+}
+pub fn HALF_REP_C[T](v: T) -> u32 {
+    (v as u32)
+}
+pub fn REP_C[T](v: T) -> u64 {
+    (v as u64)
+}
+pub let significandBits: i32 = 52
+pub fn loWord[T](a: T) -> T {
+    (a & 0xffffffffu32)
+}
+pub fn hiWord[T](a: T) -> T {
+    (a >> 32)
+}
+pub let typeWidth: u64 = 64
+pub let exponentBits: u64 = 11
+pub let maxExponent: i32 = 2047
+pub let exponentBias: i32 = 1023
+pub let implicitBit: u64 = 4503599627370496
+pub let significandMask: u64 = 4503599627370495
+pub let signBit: u64 = ((0 as u64) -% ((9223372036854775807 as u64) +% (1 as u64)))
+pub let absMask: u64 = 9223372036854775807
+pub let exponentMask: u64 = 9218868437227405312
+pub let oneRep: u64 = 4607182418800017408
+pub let infRep: u64 = 9218868437227405312
+pub let quietBit: u64 = 2251799813685248
+pub let qnanRep: u64 = 9221120237041090560
+pub type crt_s_rep_t = u32
+
+pub type twice_rep_t = u64
+
+pub type crt_s_srep_t = i32
+
+pub type crt_s_fp_t = f32

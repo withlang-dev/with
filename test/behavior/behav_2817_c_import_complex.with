@@ -1,0 +1,36 @@
+//! expect-stdout: c_import complex ok
+
+use std.complex
+use c_import("#include <complex.h>\nstatic inline double _Complex c_fma_z(double _Complex a, double _Complex b, double _Complex c) { return a * b + c; }\nstatic inline float _Complex c_fma_zf(float _Complex a, float _Complex b, float _Complex c) { return a * b + c; }\n") as cplx
+
+fn near64(a: f64, b: f64, eps: f64) -> bool:
+    let d = a - b
+    if d < 0.0: -d < eps else: d < eps
+
+fn near32(a: f32, b: f32, eps: f32) -> bool:
+    let d = a - b
+    if d < 0.0: -d < eps else: d < eps
+
+fn main():
+    // std.complex.Complex64/Complex32 are the exact types c_import binds (one type per meaning).
+    let a = Complex64.new(3.0, 4.0)
+    let b = Complex64.new(1.0, 2.0)
+    let c = Complex64.new(5.0, -10.0)
+    let r = cplx.c_fma_z(a, b, c)
+    assert(r == Complex64.new(0.0, 0.0))
+
+    let af = Complex32.new(3.0, 4.0)
+    let bf = Complex32.new(1.0, 2.0)
+    let cf = Complex32.new(5.0, -10.0)
+    let rf = cplx.c_fma_zf(af, bf, cf)
+    assert(rf == Complex32.new(0.0, 0.0))
+
+    // Call platform C library _Complex functions directly through c_import with std.complex values.
+    let mag = cplx.cabs(a)
+    assert(near64(mag, 5.0, 1e-12))
+    let magf = cplx.cabsf(af)
+    assert(near32(magf, 5.0, 1e-5))
+    let sq = cplx.csqrt(Complex64.new(-1.0, 0.0))
+    assert(near64(sq.real, 0.0, 1e-12) and near64(sq.imag, 1.0, 1e-12))
+
+    print("c_import complex ok")
