@@ -6109,6 +6109,7 @@ fn ci_escape_reserved(name: &str) -> str:
     if name == "print_i32" or name == "print_i64" or name == "print_bool": return name ++ "_"
     if name == "assert" or name == "require" or name == "check": return name ++ "_"
     if name == "assert_eq" or name == "assert_ne" or name == "assert_matches_failed": return name ++ "_"
+    if name == "panic" or name == "unreachable" or name == "todo": return name ++ "_"
     if name == "int_to_string": return name ++ "_"
     if name == "and": return "and_"
     if name == "as": return "as_"

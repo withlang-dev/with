@@ -2522,6 +2522,8 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
     // The directories the installed package is imported from: what a
     // program's `c_import` of the header searches.
     ci_set_include_paths(import_dirs)
+    with_cimport_reset_names()
+    ci_reset_macro_consts()
     let header_alone: HashMap[str, bool] = [:]
     let header_umbrella: HashMap[str, str] = [:]
     var dependent_headers = ""
@@ -2557,6 +2559,14 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
                 dependent_count = dependent_count + 1
                 continue
             if not alone: project.symbols[si].header_file = through
+            // A prototype behind a build-only `#ifdef` (or omitted by c_import
+            // under the package's import defines) is not declared when a
+            // program imports the header, so the contract cannot name it.
+            if with_cimport_is_name_emitted(project.symbols[si].name) == 0:
+                project.symbols[si].header_declared = 0
+                uninstalled_count = uninstalled_count + 1
+                if uninstalled_count <= 12: uninstalled = uninstalled ++ (if uninstalled.len() > 0: ", " else: "") ++ project.symbols[si].name
+                continue
             continue
         project.symbols[si].header_declared = 0
         uninstalled_count = uninstalled_count + 1

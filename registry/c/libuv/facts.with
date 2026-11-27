@@ -1,0 +1,27 @@
+// libuv 1.53.0, the version `with get c.libuv` pins. Every citation is a line
+// of the package's installed header, include/uv.h.
+//
+// An event loop (uv_loop_t) and the cross-platform synchronization primitives
+// (uv_mutex_t, uv_rwlock_t, uv_cond_t, uv_barrier_t) are records the caller
+// allocates in place, initializes with an init function returning 0 on success
+// (negative UV_E* errno on error), and ends with a paired close/destroy
+// function. Handles attached to a loop (uv_timer_t, uv_tcp_t, ...) are closed
+// asynchronously via uv_close with a callback while the loop runs, so they are
+// not stated as synchronous Drop resources here.
+c facade libuv:
+    resource Loop wraps uv_loop_t
+        init uv_loop_init(self), ok 0    // uv.h 1.53.0 line 291: `int uv_loop_init(uv_loop_t* loop)` initializes a caller-allocated loop in place, returning 0 on success (line 295: "allocate the loop manually and use uv_loop_init instead")
+        drop uv_loop_close    // uv.h 1.53.0 line 292: `int uv_loop_close(uv_loop_t* loop)` releases all internal loop resources (line 302: "use uv_loop_close and free the memory manually instead")
+    resource Mutex wraps uv_mutex_t
+        init uv_mutex_init(self), ok 0    // uv.h 1.53.0 line 1863: `int uv_mutex_init(uv_mutex_t* handle)` initializes a mutex in place, returning 0 on success
+        init uv_mutex_init_recursive(self), ok 0    // uv.h 1.53.0 line 1864: `int uv_mutex_init_recursive(uv_mutex_t* handle)` initializes a recursive mutex in place, returning 0 on success
+        drop uv_mutex_destroy    // uv.h 1.53.0 line 1865: `void uv_mutex_destroy(uv_mutex_t* handle)` destroys a mutex initialized by uv_mutex_init or uv_mutex_init_recursive
+    resource RwLock wraps uv_rwlock_t
+        init uv_rwlock_init(self), ok 0    // uv.h 1.53.0 line 1870: `int uv_rwlock_init(uv_rwlock_t* rwlock)` initializes a read-write lock in place, returning 0 on success
+        drop uv_rwlock_destroy    // uv.h 1.53.0 line 1871: `void uv_rwlock_destroy(uv_rwlock_t* rwlock)` destroys a read-write lock initialized by uv_rwlock_init
+    resource Cond wraps uv_cond_t
+        init uv_cond_init(self), ok 0    // uv.h 1.53.0 line 1885: `int uv_cond_init(uv_cond_t* cond)` initializes a condition variable in place, returning 0 on success
+        drop uv_cond_destroy    // uv.h 1.53.0 line 1886: `void uv_cond_destroy(uv_cond_t* cond)` destroys a condition variable initialized by uv_cond_init
+    resource Barrier wraps uv_barrier_t
+        init uv_barrier_init(self), ok 0    // uv.h 1.53.0 line 1890: `int uv_barrier_init(uv_barrier_t* barrier, unsigned int count)` initializes a barrier in place, returning 0 on success
+        drop uv_barrier_destroy    // uv.h 1.53.0 line 1891: `void uv_barrier_destroy(uv_barrier_t* barrier)` destroys a barrier initialized by uv_barrier_init
