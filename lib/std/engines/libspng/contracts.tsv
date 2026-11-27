@@ -1,0 +1,152 @@
+buffer_read_fn	receiver-mut:spng_ctx,unproved:1:read only,unproved:2:read only
+calculate_image_size	unproved:0:calculate_image_width may write through it,unproved:2:out-parameter written conditionally
+calculate_image_width	unproved:0:calculate_scanline_width may write through it,unproved:2:out-parameter written conditionally
+calculate_scanline_width	unproved:0:NULL is an accepted argument,unproved:2:out-parameter a return before the write
+calculate_subimages	unproved:0:NULL is an accepted argument
+check_chrm_int	unproved:0:NULL is an accepted argument
+check_decode_fmt	receiver:spng_ihdr
+check_exif	unproved:0:NULL is an accepted argument
+check_ihdr	receiver:spng_ihdr
+check_offs	unproved:0:NULL is an accepted argument
+check_phys	unproved:0:NULL is an accepted argument
+check_plte	unproved:0:NULL is an accepted argument,unproved:1:read only
+check_png_keyword	unproved:0:read only
+check_png_text	unproved:0:read only
+check_sbit	unproved:0:NULL is an accepted argument,unproved:1:read only
+check_time	unproved:0:NULL is an accepted argument
+chunk_undo	unproved:0:NULL is an accepted argument
+decode_err	receiver-mut:spng_ctx
+decrease_cache_usage	unproved:0:NULL is an accepted argument
+defilter_scanline	unproved:0:read only,unproved:1:out-parameter written conditionally
+defilter_up	unproved:1:out-parameter read before the write,unproved:2:read only
+discard_chunk_bytes	unproved:0:NULL is an accepted argument
+encode_err	receiver-mut:spng_ctx
+encode_row	unproved:0:NULL is an accepted argument,unproved:1:read only
+encode_scanline	unproved:0:NULL is an accepted argument,unproved:1:read only
+expand_row	unproved:0:read only,unproved:1:read only,unproved:2:read only
+file_read_fn	receiver:spng_ctx,stored-unknown:1,unproved:2:read only
+file_write_fn	receiver:spng_ctx,unproved:1:read only,unproved:2:read only
+filter_scanline	unproved:0:out-parameter a return before the write,unproved:1:read only,unproved:2:read only
+filter_sum	unproved:0:read only,unproved:1:read only
+finish_chunk	unproved:0:NULL is an accepted argument
+finish_idat	unproved:0:NULL is an accepted argument
+gamma_correct_row	unproved:0:read only,unproved:3:read only
+get_best_filter	unproved:0:read only,unproved:1:read only
+get_sample	receiver-mut:spng__iter
+increase_cache_usage	unproved:0:NULL is an accepted argument
+is_critical_chunk	unproved:0:NULL is an accepted argument
+is_small_chunk	unproved:0:read only
+main	plain
+num_channels	receiver:spng_ihdr
+paeth	plain
+read_and_check_crc	unproved:0:NULL is an accepted argument
+read_chunk_bytes	unproved:0:NULL is an accepted argument
+read_chunk_bytes2	unproved:0:NULL is an accepted argument,stored-unknown:1
+read_chunks	unproved:0:NULL is an accepted argument
+read_data	unproved:0:NULL is an accepted argument
+read_header	unproved:0:NULL is an accepted argument
+read_idat_bytes	unproved:0:NULL is an accepted argument,unproved:1:out-parameter written conditionally
+read_ihdr	unproved:0:NULL is an accepted argument
+read_non_idat_chunks	unproved:0:NULL is an accepted argument
+read_s32	unproved:0:read only
+read_scanline	unproved:0:NULL is an accepted argument
+read_scanline_bytes	unproved:0:NULL is an accepted argument,stored-unknown:1
+read_u16	unproved:0:read only
+read_u32	unproved:0:read only
+require_bytes	unproved:0:NULL is an accepted argument
+rgb8_row_to_rgba8	unproved:0:read only,unproved:1:out-parameter read before the write
+sample_to_target	plain
+scale_row	unproved:0:out-parameter read before the write,unproved:4:read only
+splt_undo	unproved:0:NULL is an accepted argument
+spng__calloc	unproved:0:returns a pointer the receiver's view cannot carry
+spng__deflate_init	receiver-mut:spng_ctx,unproved:1:read only
+spng__free	receiver:spng_ctx,stored-unknown:1
+spng__inflate_init	receiver-mut:spng_ctx
+spng__inflate_stream	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write,unproved:2:out-parameter a return before the write,stored-unknown:4
+spng__iter_init	unproved:1:read only
+spng__malloc	unproved:0:returns a pointer the receiver's view cannot carry
+spng__realloc	unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:1
+spng__zalloc	unproved:0:read only
+spng__zfree	unproved:0:read only,stored-unknown:1
+spng_ctx_free	stored-unknown:0
+spng_ctx_new	plain
+spng_ctx_new2	unproved:0:NULL is an accepted argument
+spng_decode_chunks	unproved:0:NULL is an accepted argument
+spng_decode_image	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_decode_row	unproved:0:NULL is an accepted argument,unproved:1:out-parameter written conditionally
+spng_decode_scanline	unproved:0:NULL is an accepted argument,unproved:1:out-parameter written conditionally
+spng_decoded_image_size	unproved:0:NULL is an accepted argument,unproved:2:out-parameter written conditionally
+spng_encode_chunks	unproved:0:NULL is an accepted argument
+spng_encode_image	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_encode_row	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_encode_scanline	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_get_bkgd	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
+spng_get_chrm	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
+spng_get_chrm_int	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
+spng_get_chunk_limits	unproved:0:NULL is an accepted argument,unproved:1:out-parameter written conditionally,unproved:2:out-parameter written conditionally
+spng_get_exif	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
+spng_get_gama	unproved:0:NULL is an accepted argument,unproved:1:out-parameter read before the write
+spng_get_gama_int	unproved:0:NULL is an accepted argument,unproved:1:out-parameter read before the write
+spng_get_hist	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
+spng_get_iccp	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
+spng_get_ihdr	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
+spng_get_image_limits	unproved:0:NULL is an accepted argument,unproved:1:out-parameter written conditionally,unproved:2:out-parameter written conditionally
+spng_get_offs	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
+spng_get_option	unproved:0:NULL is an accepted argument,unproved:2:out-parameter written conditionally
+spng_get_phys	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
+spng_get_plte	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
+spng_get_png_buffer	unproved:0:NULL is an accepted argument,unproved:1:out-parameter read before the write,unproved:2:out-parameter read before the write
+spng_get_row_info	unproved:0:NULL is an accepted argument,unproved:1:out-parameter written conditionally
+spng_get_sbit	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
+spng_get_splt	unproved:0:NULL is an accepted argument,unproved:1:read only,unproved:2:out-parameter a return before the write
+spng_get_srgb	unproved:0:NULL is an accepted argument,unproved:1:out-parameter read before the write
+spng_get_text	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write,unproved:2:out-parameter a return before the write
+spng_get_time	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
+spng_get_trns	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
+spng_get_unknown_chunks	unproved:0:NULL is an accepted argument,unproved:1:read only,unproved:2:out-parameter a return before the write
+spng_set_bkgd	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_set_chrm	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_set_chrm_int	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_set_chunk_limits	unproved:0:NULL is an accepted argument
+spng_set_crc_action	unproved:0:NULL is an accepted argument
+spng_set_exif	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_set_gama	unproved:0:NULL is an accepted argument
+spng_set_gama_int	unproved:0:NULL is an accepted argument
+spng_set_hist	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_set_iccp	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_set_ihdr	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_set_image_limits	unproved:0:NULL is an accepted argument
+spng_set_offs	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_set_option	unproved:0:NULL is an accepted argument
+spng_set_phys	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_set_plte	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_set_png_buffer	unproved:0:NULL is an accepted argument,stored-unknown:1
+spng_set_png_file	unproved:0:NULL is an accepted argument,stored-unknown:1
+spng_set_png_stream	unproved:0:NULL is an accepted argument,stored-unknown:2
+spng_set_sbit	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_set_splt	unproved:0:NULL is an accepted argument,stored-unknown:1
+spng_set_srgb	unproved:0:NULL is an accepted argument
+spng_set_text	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_set_time	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_set_trns	unproved:0:NULL is an accepted argument,unproved:1:read only
+spng_set_unknown_chunks	unproved:0:NULL is an accepted argument,stored-unknown:1
+spng_strerror	plain
+spng_version_string	plain
+text_undo	unproved:0:NULL is an accepted argument
+trim_chunk	receiver-mut:spng_ctx
+trns_row	unproved:0:out-parameter written conditionally,unproved:1:read only,unproved:2:read only,unproved:4:read only
+u16_row_to_bigendian	unproved:0:read only
+u16_row_to_host	unproved:0:out-parameter read before the write
+unpack_scanline	unproved:0:out-parameter read before the write,unproved:1:read only
+update_row_info	receiver-mut:spng_ctx
+write_chunk	unproved:0:NULL is an accepted argument,stored-unknown:1,unproved:2:read only
+write_chunks_after_idat	unproved:0:NULL is an accepted argument
+write_chunks_before_idat	unproved:0:NULL is an accepted argument
+write_data	unproved:0:NULL is an accepted argument,unproved:1:read only
+write_header	unproved:0:NULL is an accepted argument,stored-unknown:1,unproved:3:out-parameter a return before the write
+write_idat_bytes	unproved:0:NULL is an accepted argument,stored-unknown:1
+write_iend	unproved:0:NULL is an accepted argument
+write_s32	unproved:0:out-parameter read before the write
+write_u16	unproved:0:out-parameter read before the write
+write_u32	unproved:0:out-parameter read before the write
+write_unknown_chunks	unproved:0:NULL is an accepted argument

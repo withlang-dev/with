@@ -296,7 +296,10 @@ fn cross_triple(tag: &str) -> str:
 // owning each file (#2014).
 fn cross_wo_plan(ctx: &BuildCtx, host_plan: &WoBundle, tag: &str) -> WoBundle:
     let triple = if tag == wo_host_target(): "" else: cross_triple(tag)
-    wo_bundle_plan_for_target(ctx, host_plan.name, host_plan.corpus_rel, host_plan.root, tag, triple)
+    var deps = []
+    for dep in host_plan.bundle_deps:
+        deps.push(build_owned_text(dep))
+    wo_bundle_plan_for_target(ctx, host_plan.name, host_plan.corpus_rel, host_plan.root, tag, triple, deps)
 
 // A cross tag's bundle targets: none for a host plan, which the host graph
 // already builds and installs. Built by stage1, as the host's and wasm32's

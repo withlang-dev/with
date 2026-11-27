@@ -23127,7 +23127,7 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "lseek" or name == "unlink": return CI_LIBC_KIND_FN
     if name == "fcntl": return CI_LIBC_KIND_FN
     if name == "getrlimit" or name == "setrlimit" or name == "__error": return CI_LIBC_KIND_FN
-    if name == "qsort" or name == "rand" or name == "srand": return CI_LIBC_KIND_FN
+    if name == "qsort" or name == "rand" or name == "srand" or name == "abs": return CI_LIBC_KIND_FN
     // Darwin's mach clock, modeled portably (std.libc: nanoseconds, 1/1).
     if name == "mach_absolute_time": return CI_LIBC_KIND_FN
     if name == "gettimeofday": return CI_LIBC_KIND_FN

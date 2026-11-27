@@ -1,0 +1,6 @@
+// The libspng .wo bundle root, written by promotion (libspng-migrate)
+// from the migrated module list:
+// one `use` per corpus module; the harness (harness) is excluded.
+use std.engines.libspng.defs
+use std.engines.libspng.spng
+use std.engines.libspng.zlib_bridge
