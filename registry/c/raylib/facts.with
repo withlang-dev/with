@@ -1,16 +1,26 @@
-// raylib 6.0 (conan-center-index recipes/raylib). An Image and a Wave are
-// passed by value and hold their buffers, so the functions that take one are
-// pointer functions (§16.2b.5); the library's source says who allocates each
-// buffer and who frees it. The proof engine follows pointers, not records
-// passed by value.
+// raylib 6.0 (conan-center-index recipes/raylib). Image, Wave, Font, Shader,
+// and AudioStream are passed by value and hold heap/device-owned buffers, so
+// the functions that take one are pointer functions (§16.2b.5); raylib's source
+// and raylib.h 6.0 state who allocates each buffer and who frees it.
 //
-// Stated here: what was read line by line in raylib 6.0's source and holds
-// for every argument a program can pass. Not stated: Sound, Music,
-// AudioStream (they read the audio device InitAudioDevice sets up), Font,
-// Shader, Mesh, Model, Material (they call into the GL context InitWindow
-// sets up), LoadSoundAlias (its buffer is the source sound's), and
-// generators such as GenImageColor (a large width*height writes through a
-// failed allocation).
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - TraceLog, TextFormat: printf-style format variadics.
+// - MemAlloc, MemRealloc, MemFree: raw untyped memory allocator.
+// - SetTraceLogCallback, SetLoadFileDataCallback, SetSaveFileDataCallback,
+//   SetLoadFileTextCallback, SetSaveFileTextCallback, AttachAudioMixedProcessor,
+//   DetachAudioMixedProcessor: global C callback hooks without userdata.
+// - LoadFileData/Text, SaveFileData/Text, CompressData, DecompressData,
+//   EncodeDataBase64, DecodeDataBase64, ComputeCRC32/MD5/SHA1/SHA256,
+//   LoadImageColors/Palette, LoadUTF8/Codepoints/TextLines: raw malloc'd byte
+//   or element arrays returned without an owned slice wrapper.
+// - rlLoadVertexBuffer/Texture/ShaderBuffer, rlSetUniform, rlUpdateTexture,
+//   rlGetProcAddress, rlLoadExtensions: low-level raw void* OpenGL upload APIs.
+// - Mesh, Model, Material, FilePathList, AutomationEventList, rlRenderBatch:
+//   multi-pointer aggregate records whose fields are mutated in place by
+//   independent allocators.
+// - LoadSoundAlias: aliases another Sound's buffer without owning it.
+// - Generators such as GenImageColor: a huge width*height writes through a
+//   failed allocation in raylib 6.0.
 c facade raylib:
     runs threads    // raudio.c 464-511, InitAudioDevice: ma_device_init(&AUDIO.System.context, &config, &AUDIO.System.device) with config.dataCallback = OnSendAudioDataToDevice, then ma_device_start; miniaudio calls OnSendAudioDataToDevice (raudio.c 2558) on its own device thread
     resource ImageData wraps Image
@@ -23,8 +33,73 @@ c facade raylib:
         of ImageData    // rtextures.c 598-609, IsImageValid: compares the record's fields, follows no pointer
     fn ExportImage
         of ImageData    // rtextures.c 619-623, ExportImage: returns at once when width or height is 0 or data is NULL (its "Security check"), then reads image.data to write the file; stores nothing
+    fn LoadTextureFromImage
+        of ImageData    // raylib.h 6.0:1442: "Texture2D LoadTextureFromImage(Image image);"; uploads image.data to GPU texture and returns Texture2D by value, retaining no pointer to image.data
+    fn LoadTextureCubemap
+        of ImageData    // raylib.h 6.0: uploads cubemap faces from image.data and returns TextureCubemap by value, retaining no pointer to image.data
+    fn GetImageAlphaBorder
+        of ImageData    // raylib.h 6.0: scans image.data and returns Rectangle by value, retaining nothing
+    fn SetWindowIcon
+        of ImageData    // raylib.h 6.0: copies icon pixels from image.data into the platform window, retaining nothing
+    resource FontData wraps Font
+        from GetFontDefault, nonnull field glyphs    // raylib.h 6.0:1489: "Font GetFontDefault(void);"; returns built-in default font; UnloadFont explicitly no-ops when font.texture.id == GetFontDefault().texture.id
+        from LoadFont, nullable field glyphs    // raylib.h 6.0:1490: "Font LoadFont(const char *fileName);"; loads font into GPU VRAM and glyph arrays, zeroed Font on failure
+        drop UnloadFont    // raylib.h 6.0:1498: "void UnloadFont(Font font);"; frees recs, glyphs, and texture; no-op on zeroed or default Font
+    fn IsFontValid
+        of FontData    // raylib.h 6.0:1494: checks font fields without storing pointers
+    fn DrawTextEx
+        of FontData    // raylib.h 6.0:1504: draws text using font atlas and glyph rects, stores nothing
+    fn DrawTextPro
+        of FontData    // raylib.h 6.0: draws rotated text using font atlas and glyph rects, stores nothing
+    fn DrawTextCodepoint
+        of FontData    // raylib.h 6.0: draws one glyph from font, stores nothing
+    fn MeasureTextEx
+        of FontData    // raylib.h 6.0: measures text dimensions using font glyph metrics, stores nothing
+    fn GetGlyphIndex
+        of FontData    // raylib.h 6.0: looks up glyph index in font.glyphs, stores nothing
+    fn GetGlyphAtlasRec
+        of FontData    // raylib.h 6.0: looks up glyph rectangle in font.recs, stores nothing
+    resource ShaderData wraps Shader
+        from LoadShader, nullable field locs    // raylib.h 6.0:1069: "Shader LoadShader(const char *vsFileName, const char *fsFileName);"; loads shader program and allocates locs array
+        from LoadShaderFromMemory, nullable field locs    // raylib.h 6.0: compiles shader program from source strings and allocates locs array
+        drop UnloadShader    // raylib.h 6.0:1078: "void UnloadShader(Shader shader);"; unloads shader program and frees locs
+    fn IsShaderValid
+        of ShaderData    // raylib.h 6.0:1071: validates shader id and locs, stores nothing
+    fn BeginShaderMode
+        of ShaderData    // raylib.h 6.0: activates shader program id for drawing, stores no pointer to locs
+    fn GetShaderLocation
+        of ShaderData    // raylib.h 6.0: queries uniform location by name, stores nothing
+    fn GetShaderLocationAttrib
+        of ShaderData    // raylib.h 6.0: queries attribute location by name, stores nothing
+    fn SetShaderValueMatrix
+        of ShaderData    // raylib.h 6.0: uploads Matrix uniform to shader, stores nothing
+    fn SetShaderValueTexture
+        of ShaderData    // raylib.h 6.0: binds Texture2D uniform to shader, stores nothing
     resource WaveData wraps Wave
         from LoadWave, nullable field data    // raylib.h 6.0: "Wave LoadWave(const char *fileName); // Load wave data from file"; raudio.c 789-803, LoadWave: the samples are decoded into a buffer the wave owns, a zeroed Wave when the file cannot be read
         drop UnloadWave    // raylib.h 6.0: "void UnloadWave(Wave wave); // Unload wave data"; raudio.c 1030-1034, UnloadWave: RL_FREE(wave.data), a no-op on the zeroed Wave
     fn IsWaveValid
         of WaveData    // raudio.c 916-927, IsWaveValid: compares the record's fields, follows no pointer
+    resource AudioStreamData wraps AudioStream
+        from LoadAudioStream, nullable field buffer    // raylib.h 6.0:1717: "AudioStream LoadAudioStream(unsigned int sampleRate, unsigned int sampleSize, unsigned int channels);"; allocates rAudioBuffer when audio device is ready, zeroed AudioStream otherwise
+        drop UnloadAudioStream    // raylib.h 6.0:1719: "void UnloadAudioStream(AudioStream stream);"; frees stream buffer, no-op when buffer is NULL
+    fn IsAudioStreamValid
+        of AudioStreamData    // raylib.h 6.0:1718: checks stream buffer and metadata, stores nothing
+    fn IsAudioStreamProcessed
+        of AudioStreamData    // raylib.h 6.0: queries whether audio stream buffers were processed, stores nothing
+    fn PlayAudioStream
+        of AudioStreamData    // raylib.h 6.0:1722: starts playing audio stream, stores nothing
+    fn PauseAudioStream
+        of AudioStreamData    // raylib.h 6.0: pauses audio stream, stores nothing
+    fn ResumeAudioStream
+        of AudioStreamData    // raylib.h 6.0: resumes paused audio stream, stores nothing
+    fn IsAudioStreamPlaying
+        of AudioStreamData    // raylib.h 6.0: queries whether audio stream is playing, stores nothing
+    fn StopAudioStream
+        of AudioStreamData    // raylib.h 6.0:1726: stops playing audio stream, stores nothing
+    fn SetAudioStreamVolume
+        of AudioStreamData    // raylib.h 6.0: sets audio stream volume, stores nothing
+    fn SetAudioStreamPitch
+        of AudioStreamData    // raylib.h 6.0: sets audio stream pitch, stores nothing
+    fn SetAudioStreamPan
+        of AudioStreamData    // raylib.h 6.0: sets audio stream pan, stores nothing

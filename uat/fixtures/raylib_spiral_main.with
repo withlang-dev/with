@@ -26,21 +26,39 @@ fn main:
         print("raylib spiral UAT failed: window not created (no OpenGL 3.3 context)")
         return 1
 
+    let font = GetFontDefault()
+    if not IsFontValid(font):
+        print("raylib spiral UAT failed: default font not valid")
+        UnloadFont(font)
+        CloseWindow()
+        return 1
+
     let bg = Color { r: 14, g: 16, b: 26, a: 255 }
+    let label_pos = Vector2 { x: 20.0 as f32, y: 20.0 as f32 }
     let cx = 450.0
     let cy = 300.0
     let t = 1.25
 
     var frame = 0
     while frame < 10:
+        let _ = IsKeyDown(KEY_SPACE)
         BeginDrawing()
         ClearBackground(bg)
         draw_spiral(cx, cy, t)
-        DrawText("with raylib spiral uat", 20, 20, 20, LIGHTGRAY)
+        DrawTextEx(font, "with raylib spiral uat", label_pos, 20.0 as f32, 1.0 as f32, LIGHTGRAY)
         EndDrawing()
         frame = frame + 1
 
     let image = LoadImageFromScreen()
+    // Upload screen capture to a GPU texture, draw it once, then unload in order.
+    let tex = LoadTextureFromImage(image)
+    if IsTextureValid(tex):
+        BeginDrawing()
+        ClearBackground(bg)
+        DrawTexture(tex, 0, 0, WHITE)
+        EndDrawing()
+    UnloadTexture(tex)
+
     var colored = 0
     var samples = 0
 
@@ -58,7 +76,18 @@ fn main:
             x = x + 6
         y = y + 6
 
+    // Exercise AudioStream lifecycle when an audio device is available on the host.
+    InitAudioDevice()
+    if IsAudioDeviceReady():
+        if let Some(stream) = LoadAudioStream(44100, 16, 1):
+            let _ = IsAudioStreamValid(stream)
+            PlayAudioStream(stream)
+            StopAudioStream(stream)
+            UnloadAudioStream(stream)
+        CloseAudioDevice()
+
     UnloadImage(image)
+    UnloadFont(font)
     CloseWindow()
 
     if samples < 4000:

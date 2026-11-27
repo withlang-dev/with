@@ -4,6 +4,9 @@
 // Zero is the foreign default on both sides. -1/-1 is a compatible pair
 // supplied by a caller whose concrete userdata type is not known here.
 type ForeignPairAlternative {
+    // Which callback/userdata pair slot this alternative describes (-1 is the
+    // baseline for every slot not yet touched on this resource).
+    slot: i32,
     callback_type: i32,
     userdata_type: i32,
     userdata_origin: i32,
@@ -35,12 +38,17 @@ type ForeignPairState {
 }
 
 fn foreign_pair_alternative_equal(a: &ForeignPairAlternative, b: &ForeignPairAlternative):
-    a.callback_type == b.callback_type and a.userdata_type == b.userdata_type and a.userdata_origin == b.userdata_origin and a.guard == b.guard and a.succeeded == b.succeeded
+    a.slot == b.slot and a.callback_type == b.callback_type and a.userdata_type == b.userdata_type and a.userdata_origin == b.userdata_origin and a.guard == b.guard and a.succeeded == b.succeeded
 
 fn foreign_pair_add(mut state: ForeignPairState, alternative: ForeignPairAlternative):
     for existing in state.alternatives:
         if foreign_pair_alternative_equal(existing, alternative): return
     state.alternatives.push(alternative)
+
+fn foreign_pair_slot_alts(state: &ForeignPairState, slot: i32) -> List[ForeignPairAlternative]:
+    let found = [a for a in state.alternatives if a.slot == slot]
+    if found.len() > 0: return found
+    [ForeignPairAlternative { slot, callback_type: a.callback_type, userdata_type: a.userdata_type, userdata_origin: a.userdata_origin, guard: a.guard, succeeded: a.succeeded } for a in state.alternatives if a.slot == -1]
 
 fn foreign_pair_hold(mut state: ForeignPairState, retention: ForeignRetention):
     for existing in state.held:
@@ -55,13 +63,21 @@ fn foreign_pair_empty() -> ForeignPairState: ForeignPairState { alternatives: []
 fn foreign_pair_initial(defaults: bool):
     var state = foreign_pair_empty()
     let ty = if defaults: 0 else: -1
-    foreign_pair_add(state, ForeignPairAlternative { callback_type: ty, userdata_type: ty, userdata_origin: -1, guard: -1, succeeded: true })
+    foreign_pair_add(state, ForeignPairAlternative { slot: -1, callback_type: ty, userdata_type: ty, userdata_origin: -1, guard: -1, succeeded: true })
     state
 
 fn foreign_pair_join(a: &ForeignPairState, b: &ForeignPairState):
     var result = foreign_pair_empty()
-    for alternative in a.alternatives: foreign_pair_add(result, alternative)
-    for alternative in b.alternatives: foreign_pair_add(result, alternative)
+    let slots = []
+    for alternative in a.alternatives:
+        if alternative.slot < 0: foreign_pair_add(result, alternative)
+        else if not slots.contains(alternative.slot): slots.push(alternative.slot)
+    for alternative in b.alternatives:
+        if alternative.slot < 0: foreign_pair_add(result, alternative)
+        else if not slots.contains(alternative.slot): slots.push(alternative.slot)
+    for slot in slots:
+        for alt in foreign_pair_slot_alts(a, slot): foreign_pair_add(result, alt)
+        for alt in foreign_pair_slot_alts(b, slot): foreign_pair_add(result, alt)
     for retention in a.held: foreign_pair_hold(result, retention)
     for retention in b.held: foreign_pair_hold(result, retention)
     result
@@ -87,10 +103,13 @@ fn foreign_pair_equal(a: &ForeignPairState, b: &ForeignPairState) -> bool:
 // A failed setter preserves the previous pair only when Sema's foreign
 // contract explicitly supplies that guarantee. Otherwise both components
 // become unknown/incompatible and a modeled reset is required.
-fn foreign_pair_set(state: &ForeignPairState, callback: bool, ty: i32, origin: i32, guard: i32, can_fail: bool, preserves_on_failure: bool):
+fn foreign_pair_set_slot(state: &ForeignPairState, slot: i32, callback: bool, ty: i32, origin: i32, guard: i32, can_fail: bool, preserves_on_failure: bool):
     var result = ForeignPairState { alternatives: [], held: foreign_pair_held_copy(state.held) }
-    for previous in state.alternatives:
+    for existing in state.alternatives:
+        if existing.slot != slot: foreign_pair_add(result, existing)
+    for previous in foreign_pair_slot_alts(state, slot):
         foreign_pair_add(result, ForeignPairAlternative {
+            slot,
             callback_type: if callback: ty else: previous.callback_type,
             userdata_type: if callback: previous.userdata_type else: ty,
             userdata_origin: if callback: previous.userdata_origin else: origin,
@@ -98,6 +117,7 @@ fn foreign_pair_set(state: &ForeignPairState, callback: bool, ty: i32, origin: i
         })
         if can_fail:
             foreign_pair_add(result, ForeignPairAlternative {
+                slot,
                 callback_type: if preserves_on_failure: previous.callback_type else: -2,
                 userdata_type: if preserves_on_failure: previous.userdata_type else: -3,
                 userdata_origin: previous.userdata_origin,
@@ -105,10 +125,14 @@ fn foreign_pair_set(state: &ForeignPairState, callback: bool, ty: i32, origin: i
             })
             if not preserves_on_failure and not callback:
                 foreign_pair_add(result, ForeignPairAlternative {
+                    slot,
                     callback_type: -2, userdata_type: -3,
                     userdata_origin: origin, guard, succeeded: false,
                 })
     result
+
+fn foreign_pair_set(state: &ForeignPairState, callback: bool, ty: i32, origin: i32, guard: i32, can_fail: bool, preserves_on_failure: bool):
+    foreign_pair_set_slot(state, 0, callback, ty, origin, guard, can_fail, preserves_on_failure)
 
 // Along a branch on a setter's status: the alternatives that outcome
 // leaves, and each release pending on that status decided — released on
@@ -157,7 +181,7 @@ pub const FOREIGN_PAIR_RETAIN: i32 = 8
 fn foreign_pair_unknown(state: &ForeignPairState):
     var result = ForeignPairState { alternatives: [], held: foreign_pair_held_copy(state.held) }
     for alternative in state.alternatives:
-        foreign_pair_add(result, ForeignPairAlternative { callback_type: -2, userdata_type: -3, userdata_origin: alternative.userdata_origin, guard: -1, succeeded: true })
+        foreign_pair_add(result, ForeignPairAlternative { slot: alternative.slot, callback_type: -2, userdata_type: -3, userdata_origin: alternative.userdata_origin, guard: -1, succeeded: true })
     result
 
 // Whether any alternative still holds a retained userdata origin, or any
@@ -171,7 +195,7 @@ fn foreign_pair_retains_any(state: &ForeignPairState) -> bool:
 
 fn foreign_pair_absent():
     var state = foreign_pair_empty()
-    foreign_pair_add(state, ForeignPairAlternative { callback_type: -4, userdata_type: -4, userdata_origin: -1, guard: -1, succeeded: true })
+    foreign_pair_add(state, ForeignPairAlternative { slot: -1, callback_type: -4, userdata_type: -4, userdata_origin: -1, guard: -1, succeeded: true })
     state
 
 // D194: the bit a retained slot occupies in a release mask (a shift count
@@ -219,7 +243,8 @@ type ForeignPairFlow {
 fn foreign_pair_transfer(state: &ForeignPairState, block: &ForeignPairBlock) -> ForeignPairState:
     let released = if block.releases != 0: foreign_pair_release(state, block.releases, block.guard) else: foreign_pair_on_edge(state, -1, true)
     if block.action == FOREIGN_PAIR_CALLBACK or block.action == FOREIGN_PAIR_USERDATA:
-        return foreign_pair_set(released, block.action == FOREIGN_PAIR_CALLBACK, block.ty, block.origin, block.guard, block.can_fail, block.preserves_on_failure)
+        let slot = if block.slot >= 0: block.slot else: 0
+        return foreign_pair_set_slot(released, slot, block.action == FOREIGN_PAIR_CALLBACK, block.ty, block.origin, block.guard, block.can_fail, block.preserves_on_failure)
     if block.action == FOREIGN_PAIR_RETAIN:
         return foreign_pair_retain(released, block.slot, block.origin, block.guard)
     if (block.action == FOREIGN_PAIR_RESET or block.action == FOREIGN_PAIR_CREATE) and state.alternatives.len() > 0:
@@ -372,12 +397,21 @@ fn foreign_pair_execute_step(places: &ForeignPairPlaces, step: &ForeignPairStep)
         panic("invalid foreign pair transfer action")
     (after, valid)
 
+fn foreign_pair_edge_reachable(before: &ForeignPairState, after: &ForeignPairState) -> bool:
+    if before.alternatives.len() > 0 and after.alternatives.len() == 0: return false
+    for a in before.alternatives:
+        var kept = false
+        for b in after.alternatives:
+            if b.slot == a.slot: kept = true
+        if not kept: return false
+    true
+
 fn foreign_pair_places_edge(source: &ForeignPairPlaces, edge: &ForeignPairEdge) -> (ForeignPairPlaces, bool):
     let result = foreign_pair_places_clone(source)
     var reachable = true
     for key in 0..result.values.len():
         result.values[key] = foreign_pair_on_edge(source.values[key], edge.guard, edge.succeeded)
-        if result.values[key].alternatives.len() == 0: reachable = false
+        if not foreign_pair_edge_reachable(source.values[key], result.values[key]): reachable = false
     (result, reachable)
 
 fn foreign_pair_place_flow(starts: &List[i32], counts: &List[i32], steps: &List[ForeignPairStep], edges: &List[ForeignPairEdge], entry: &ForeignPairPlaces) -> ForeignPairPlaceFlow:

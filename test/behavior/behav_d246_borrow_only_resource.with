@@ -1,0 +1,43 @@
+//! expect-stdout: part name=payload len=5
+//! expect-stdout: freed 1
+// D246 (#3114): a borrow-only child resource (`resource Part wraps *mut part`
+// with no `from` and no `drop`) renders `BorrowedPart[Origin]` with its `lend`
+// methods, bounded by its parent's lifetime.
+use c_import("
+#include <stdlib.h>
+#include <string.h>
+typedef struct part { const char *name; int len; } part;
+typedef struct mime { part p; } mime;
+static int g_freed = 0;
+static inline mime *mime_new(void) { return (mime *)calloc(1, sizeof(mime)); }
+static inline void mime_free(mime *m) { if (m) { g_freed++; free(m); } }
+static inline part *mime_addpart(mime *m) { return &m->p; }
+static inline void part_set(part *p, const char *name, int len) { p->name = name; p->len = len; }
+static inline int part_len(part *p) { return p->len; }
+static inline int mime_freed_count(void) { return g_freed; }
+")
+
+c contract mimes:
+    resource Mime wraps *mut mime
+        from mime_new
+        drop mime_free
+    resource Part wraps *mut part
+    fn mime_addpart
+        rename add_part
+        returns borrow Part from param 0
+    fn part_set
+        rename set
+        lend
+    fn part_len
+        rename len
+        lend
+
+fn run():
+    let Some(m) = Mime.new() else: return
+    let Some(p) = m.add_part() else: return
+    p.set("payload", 5)
+    print(f"part name=payload len={p.len()}")
+
+fn main:
+    run()
+    print(f"freed {mime_freed_count()}")

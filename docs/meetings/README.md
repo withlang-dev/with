@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D246 — Borrow-only child resources (`resource R wraps *mut T` with `returns borrow R from param N`) (delegated; #3114, #3143)](2026-11-27-D246-borrow-only-child-resource.md)
 - [D245 — `ok >= C` status predicate for non-negative-count C APIs (delegated; #3152)](2026-11-27-D245-ok-nonneg-status.md)
 - [D244 — `reads`, `fills`, and `updates` on flat C scalars (delegated; #3139, #3148, #3149, #3152)](2026-11-27-D244-scalar-reads-fills-updates.md)
 - [D243 — Writable by-value capacity buffers (`buffer param P capacity param L`) and positioned `of R(param N)` (delegated; #3138)](2026-11-27-D243-buffer-capacity-and-of-param.md)

@@ -85,4 +85,16 @@ fn main:
     assert(foreign_pair_retains_origin(uncertain_failure, 41))
     assert(foreign_pair_retains_origin(uncertain_failure, 42))
     assert(foreign_pair_can_invoke(foreign_pair_initial(false)))
+
+    // Independent callback pair slots on the same resource track their own
+    // types and retained origins without clobbering one another.
+    let s0_cb = foreign_pair_on_edge(foreign_pair_set_slot(defaults, 0, true, 17, -1, 20, true, false), 20, true)
+    let s1_cb = foreign_pair_on_edge(foreign_pair_set_slot(s0_cb, 1, true, 29, -1, 21, true, false), 21, true)
+    assert(not foreign_pair_can_invoke(s1_cb))
+    let s0_ok = foreign_pair_on_edge(foreign_pair_set_slot(s1_cb, 0, false, 17, 41, 22, true, false), 22, true)
+    assert(not foreign_pair_can_invoke(s0_ok))
+    let both_ok = foreign_pair_on_edge(foreign_pair_set_slot(s0_ok, 1, false, 29, 42, 23, true, false), 23, true)
+    assert(foreign_pair_can_invoke(both_ok))
+    assert(foreign_pair_retains_origin(both_ok, 41))
+    assert(foreign_pair_retains_origin(both_ok, 42))
     print("ok")

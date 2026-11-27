@@ -117,8 +117,8 @@ fn facade_render_block(pool: &AstPool, intern: &InternPool, facade: i32, ci: &Li
             // through a borrow is one `Borrowed<R>[_]` viewing that borrow.
             let (text, use_of_error) = facade_render_resource(pool, intern, ci, item, facade_render_lend_methods(pool, intern, ci, item, true, false) ++ text_view ++ facade_render_callback_methods(pool, intern, ci, item), facade_render_lend_methods(pool, intern, ci, item, true, false, true) ++ text_view, facade_render_lend_methods(pool, intern, ci, item, false, true))
             out = out ++ text
-            if text.len() > 0: name_ops = name_ops ++ facade_render_imported_name_ops(pool, intern, ci, item)
             let rname = intern.resolve(pool.get_data0(item as NodeId))
+            if text.starts_with("type " ++ rname ++ " "): name_ops = name_ops ++ facade_render_imported_name_ops(pool, intern, ci, item)
             names.push(rname)
             uses.push(use_of_error)
     out = out ++ facade_render_unshared_name_ops(name_ops)
@@ -1452,7 +1452,7 @@ fn facade_render_receiver(pool: &AstPool, intern: &InternPool, decl: i32) -> i32
     // not a receiver (a producer's absent parent, `param 0 fixed null`).
     if facade_render_fixed_literal(pool, intern, decl, 0).len() > 0: return 0
     let p0 = render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), 0) as NodeId)
-    let res = facade_render_received(pool, intern, p0)
+    let res = facade_render_received_param(pool, intern, decl, 0, p0)
     if res <= 0 or facade_render_received_arg(pool, intern, res, p0, "self").len() == 0:
         return 0
     res
@@ -1779,6 +1779,10 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     // resource is).
     let global_drop = if drop_fn == 0: facade_render_drop_call(pool, intern, name, 0, drop_global, repr_text, "self.repr", pinned, "            ") else: ""
     if drop_fn == 0 and global_drop.len() == 0:
+        // D246: a borrow-only child resource (no producer, init, drop, or
+        // destroyer) renders only `Borrowed<R>[Origin]` with its `lend` methods.
+        if producers.len() == 0 and init_fns.len() == 0 and destroyers.len() == 0 and destroy_globals.len() == 0:
+            return (facade_render_borrowed_type(pool, intern, ci, item, repr_text, plain_methods), facade_render_no_error_use())
         return ("", facade_render_no_error_use())
     // D209: each takes the representation at the parameter its clause
     // names; a drop with other parameters calls through its helper, which
@@ -2210,7 +2214,7 @@ fn facade_render_deps(pool: &AstPool, intern: &InternPool, item: i32, producers:
             if facade_render_buffer_of(pool, intern, decl, pi).0 == pi or facade_render_fixed_literal(pool, intern, decl, pi).len() > 0 or facade_render_discarded(pool, intern, decl, pi):
                 continue
             let ptext = render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)
-            let res = facade_render_received(pool, intern, ptext)
+            let res = facade_render_received_param(pool, intern, decl, pi, ptext)
             if res < 0 or (res > 0 and facade_render_received_arg(pool, intern, res, ptext, "p").len() == 0):
                 deps.ok = false
                 return deps
@@ -2222,7 +2226,7 @@ fn facade_render_deps(pool: &AstPool, intern: &InternPool, item: i32, producers:
                 continue
             stated = true
             let pi = facade_render_param_ref(pool, intern, decl, borrow_refs[bi])
-            let res = if pi >= 0: facade_render_received(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)) else: 0
+            let res = if pi >= 0: facade_render_received_param(pool, intern, decl, pi, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId)) else: 0
             if res <= 0:
                 deps.ok = false
                 return deps
@@ -2240,7 +2244,7 @@ fn facade_render_deps(pool: &AstPool, intern: &InternPool, item: i32, producers:
             // D214 / §16.2b.8: a fixed, discarded, or buffer-paired parameter
             // receives no parent resource.
             if facade_render_buffer_of(pool, intern, decl, pi).0 == pi or facade_render_fixed_literal(pool, intern, decl, pi).len() > 0 or facade_render_discarded(pool, intern, decl, pi): continue
-            let res = facade_render_received(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId))
+            let res = facade_render_received_param(pool, intern, decl, pi, render_type_expr(pool, intern, pool.fn_param_type(start, pi) as NodeId))
             if res > 0:
                 deps.owners.push(owner)
                 deps.params.push(pi)
@@ -2317,6 +2321,24 @@ fn facade_render_dep_values(pool: &AstPool, intern: &InternPool, deps: &FacadeDe
 // facade_param_takes_resource draws the same line). 0 when none; -1 when
 // several resources wrap it, since the facade has not assigned it
 // (§16.2b.3, Sema names the candidates).
+fn facade_render_received_param(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32, ptext: &str) -> i32:
+    let res = facade_render_received(pool, intern, ptext)
+    if res != -1: return res
+    let fn_item = facade_render_fn_item(pool, intern, decl)
+    if fn_item != 0:
+        let cstart = pool.get_data1(fn_item as NodeId)
+        for k in 0..pool.get_data2(fn_item as NodeId):
+            let clause = pool.get_extra(cstart + k)
+            if pool.get_data0(clause as NodeId) != FACADE_CLAUSE_OF: continue
+            let ops = pool.get_data1(clause as NodeId)
+            let of_sym = pool.get_extra(ops)
+            let of_at = if pool.get_data2(clause as NodeId) >= 2: facade_render_param_ref(pool, intern, decl, pool.get_extra(ops + 1)) else: 0
+            if of_at == pi:
+                let want = intern.resolve(of_sym)
+                for ritem in facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE):
+                    if intern.resolve(pool.get_data0(ritem as NodeId)) == want: return ritem
+    -1
+
 fn facade_render_received(pool: &AstPool, intern: &InternPool, ptext: &str) -> i32:
     let p = facade_render_unalias(pool, intern, ptext)
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
@@ -3219,7 +3241,7 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
         b.params = pname ++ ": Option[&str]"
         b.args = ptr
         return b
-    let res = facade_render_received(pool, intern, ptype)
+    let res = facade_render_received_param(pool, intern, decl, pi, ptype)
     if res > 0:
         if facade_render_param_consumed(pool, intern, decl, pi):
             let rname = intern.resolve(pool.get_data0(res as NodeId))

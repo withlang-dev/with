@@ -2423,7 +2423,7 @@ impl Sema:
                     // case before it also added its implied userdata case;
                     // the written position `k` named the wrong case from
                     // the second callback on ("cannot infer … 'U'").
-                    let slot = self.facade_resolve_variadic_slot(fn_sym, sig, case_node, tid, next_case)
+                    let slot = self.facade_resolve_variadic_slot(fn_sym, sig, case_node, tid, next_case, c.of_resource, c.of_param)
                     if slot.resource < 0: return c
                     c.variadic_slots.push(slot)
                     ckind = if callback_ref != 0: .Callback else: .Retained
@@ -2813,7 +2813,7 @@ impl Sema:
 
     // Resolve the trusted declaration once, before any presented call is
     // checked. A case name cannot supply a callback ABI or retaining owner.
-    mut fn facade_resolve_variadic_slot(fn_sym: i32, sig: i32, node: i32, tid: i32, case_index: i32) -> ForeignVariadicSlot:
+    mut fn facade_resolve_variadic_slot(fn_sym: i32, sig: i32, node: i32, tid: i32, case_index: i32, of_res: i32, of_param: i32) -> ForeignVariadicSlot:
         let result = ForeignVariadicSlot { case_index, clause: node, resource: -1, retainer_param: -1, callback_type: 0, callback_userdata: -1, userdata_selector: 0, userdata_value: 0, retained_form: .Callback, length_selector: 0, length_value: 0, length_tid: 0, until_syms: [] }
         let ops = self.ast.get_data1(node)
         let callback_ref = self.ast.get_extra(ops + 2)
@@ -2910,7 +2910,10 @@ impl Sema:
                     self.emit_error_with_help("a retained case and its length option need distinct selector values (§16.2b.5)", node, "name the option that sets the length, which differs from the one that sets the pointer")
                     return result
             for ui in 8..self.ast.get_data2(node): result.until_syms.push(self.ast.get_extra(ops + ui))
-        let resources = self.facade_param_receives(fn_sym, owner)
+        var resources = self.facade_param_receives(fn_sym, owner)
+        if resources.len() != 1 and of_res != 0 and owner == of_param and self.facade_resource_index.contains(of_res):
+            let of_ri: i32 = self.facade_resource_index.get(of_res).unwrap()
+            if resources.contains(of_ri): resources = [of_ri]
         if resources.len() != 1:
             self.emit_error_with_help("a retained variadic case needs one modeled resource for its retaining parameter (§16.2b.5)", node, "after 'retains by' name the parameter that receives the declared resource keeping the pointer: 'retains by param 0'")
             return result
@@ -3608,6 +3611,14 @@ impl Sema:
                 continue
             if self.facade_param_matches_repr(p as i32, repr as i32) or (pointee != 0 and self.facade_same_type(pointee, repr as i32)):
                 out.push(i as i32)
+        // §16.2b.3: when several resources wrap one representation (e.g.
+        // `*mut CURL` and `*mut CURLSH`, both `*mut c_void`), `of R` on the fn
+        // item disambiguates `of_param`.
+        if out.len() > 1 and ci >= 0 and self.foreign_contracts[ci].of_resource != 0 and pi == self.foreign_contracts[ci].of_param:
+            let of_res = self.foreign_contracts[ci].of_resource
+            if self.facade_resource_index.contains(of_res):
+                let of_ri: i32 = self.facade_resource_index.get(of_res).unwrap()
+                if out.contains(of_ri): return [of_ri]
         out
 
     // Whether a borrow `&R` of resource `ri` can hand parameter `pi` what C
@@ -4980,14 +4991,15 @@ impl Sema:
             let sig = self.get_sig(fn_sym)
             if sig < 0:
                 continue
-            // #3114: a resource is rendered from its destruction contract; one
-            // with neither a producer nor a `drop` renders nothing, and the
-            // borrowed type this item returns then named no type
-            // (`BorrowedPart` undefined, in generated code).
+            // D246 (#3114): a resource with no producer, init, drop, or
+            // destroyer is a borrow-only child resource — `FacadeRender` emits
+            // only `Borrowed<R>[Origin]` with its `lend` methods and no owned
+            // type. A resource with a producer/destroyer and no `drop` is
+            // already refused by `verify_facade_resources`.
             if self.facade_resource_index.contains(res):
                 let bri: i32 = self.facade_resource_index.get(res).unwrap()
-                if self.facade_resources[bri].drop == 0 and self.facade_resources[bri].init == 0 and self.facade_resources[bri].producers.len() == 0 and self.facade_resources[bri].destroyers.len() == 0:
-                    self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn}' borrows a resource that states no producer and no 'drop', so '{rn}' has no presented type to borrow (§16.2b.3, §16.2b.6)", node, f"state how a '{rn}' is produced and destroyed ('from <fn>' and 'drop <fn>') on the resource; a resource that is only ever borrowed is not modeled yet")
+                if self.facade_resources[bri].drop == 0 and (self.facade_resources[bri].init != 0 or self.facade_resources[bri].producers.len() > 0 or self.facade_resources[bri].destroyers.len() > 0):
+                    self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn}' borrows a resource with no 'drop', so '{rn}' has no presented type to borrow (§16.2b.3, §16.2b.6)", node, f"add 'drop <fn>' on '{rn}'")
                     continue
             let origin = self.facade_param_receives(fn_sym, from)
             let shown = self.facade_param_display(fn_sym, sig, from)

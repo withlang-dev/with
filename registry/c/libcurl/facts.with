@@ -1,0 +1,141 @@
+// libcurl 8.x (conan-center-index recipes/libcurl). Every clause cites the
+// libcurl C API manual (https://curl.se/libcurl/c/<fn>.html) or curl/curl.h.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - curl_mprintf/mfprintf/msprintf/msnprintf/mvprintf/...: printf-style variadics.
+// - curl_global_init_mem: custom malloc/free/realloc/strdup/calloc function table.
+// - curl_formadd/curl_formfree: deprecated variadic form API (replaced by curl_mime).
+// - curl_multi_*/curl_share_*/curl_ws_*/curl_url_*: secondary handles/low-level
+//   socket/websocket/URL-part APIs left raw unless explicitly modeled below.
+// - curl_easy_setopt options not listed in the variadic table (untyped raw pointers
+//   or callbacks without safe pairing).
+c facts libcurl:
+    preserves domain version_info    // curl_version_info(3): static struct invariant once initialized
+    domain version_info process written by curl_global_init, curl_global_cleanup    // curl_version_info(3): may change only at curl_global_init / curl_global_cleanup
+    resource Easy wraps *mut CURL
+        from curl_easy_init    // curl_easy_init(3): allocates CURL easy handle, NULL on failure, freed by curl_easy_cleanup
+        from curl_easy_duphandle    // curl_easy_duphandle(3): duplicates CURL easy handle independently, freed by curl_easy_cleanup
+        independent    // curl_easy_duphandle(3): duplicated handle is independent of the source handle
+        drop curl_easy_cleanup    // curl_easy_cleanup(3): closes down and frees CURL easy handle
+        abandon curl_easy_reset    // curl_easy_reset(3): resets all options without invoking transfer callbacks
+    resource HeaderList wraps *mut curl_slist
+        from curl_slist_append    // curl_slist_append(3): NULL creates a new list; non-NULL appends and returns head, NULL on OOM leaving old list intact
+        independent    // curl_slist_append(3): returned list owns its chain independently of any other handle
+        drop curl_slist_free_all    // curl_slist_free_all(3): frees an entire curl_slist chain
+    resource Mime wraps *mut curl_mime
+        from curl_mime_init    // curl_mime_init(3): creates a new empty mime structure freed by curl_mime_free
+        independent    // curl_mime_init(3): mime handle does not depend on the easy handle passed at creation
+        drop curl_mime_free    // curl_mime_free(3): frees mime structure and all its parts
+    resource Part wraps *mut curl_mimepart
+    fn curl_easy_init
+        rename new    // curl_easy_init(3): Easy.new()
+    fn curl_easy_duphandle
+        of Easy    // curl_easy_duphandle(3): param 0 is CURL * (disambiguated from CURLSH *)
+        rename dup    // curl_easy_duphandle(3): easy.dup()
+        preserves domain version_info    // curl_easy_duphandle(3): does not touch global version_info
+    fn curl_slist_append
+        rename new    // curl_slist_append(3): NULL first argument creates a new one-element HeaderList
+        param 0 fixed null    // curl_slist_append(3): NULL starts a new list
+        text param 1    // curl_slist_append(3): NUL-terminated header string copied by libcurl
+        preserves domain version_info    // curl_slist_append(3): does not touch global version_info
+    fn curl_slist_append
+        rename append    // curl_slist_append(3): consumes old list and returns updated head (or NULL with old list intact)
+        consumes param 0    // curl_slist_append(3): appends to list and returns head
+        text param 1    // curl_slist_append(3): NUL-terminated header string copied by libcurl
+        null status CURLE_OUT_OF_MEMORY    // curl_slist_append(3): NULL signals out-of-memory, leaving input list intact
+        preserves domain version_info    // curl_slist_append(3): does not touch global version_info
+    fn curl_mime_init
+        of Easy    // curl_mime_init(3): param 0 is CURL * (disambiguated from CURLSH *)
+        rename mime    // curl_mime_init(3): easy.mime()
+        preserves domain version_info    // curl_mime_init(3): does not touch global version_info
+    fn curl_mime_addpart
+        returns borrow Part from param 0    // curl_mime_addpart(3): appends a new part owned by the mime structure
+        preserves domain version_info    // curl_mime_addpart(3): does not touch global version_info
+    fn curl_mime_name
+        rename name    // curl_mime_name(3): part.name(...)
+        lend    // curl_mime_name(3): copies name string into mime part
+        ok CURLE_OK    // curl_mime_name(3): returns CURLE_OK on success
+        preserves domain version_info    // curl_mime_name(3): does not touch global version_info
+    fn curl_mime_filename
+        rename filename    // curl_mime_filename(3): part.filename(...)
+        lend    // curl_mime_filename(3): copies remote filename string into mime part
+        ok CURLE_OK    // curl_mime_filename(3): returns CURLE_OK on success
+        preserves domain version_info    // curl_mime_filename(3): does not touch global version_info
+    fn curl_mime_type
+        rename mime_type    // curl_mime_type(3): avoids reserved word `type`
+        lend    // curl_mime_type(3): copies MIME type string into mime part
+        ok CURLE_OK    // curl_mime_type(3): returns CURLE_OK on success
+        preserves domain version_info    // curl_mime_type(3): does not touch global version_info
+    fn curl_mime_data
+        rename data    // curl_mime_data(3): part.data(...)
+        buffer param 1 len param 2    // curl_mime_data(3): copies datasize bytes from data into mime part
+        lend    // curl_mime_data(3): borrows mime part
+        ok CURLE_OK    // curl_mime_data(3): returns CURLE_OK on success
+        preserves domain version_info    // curl_mime_data(3): does not touch global version_info
+    fn curl_easy_setopt
+        of Easy    // curl_easy_setopt(3): param 0 is CURL * (disambiguated from CURLSH *)
+        rename setopt    // curl_easy_setopt(3): sets options on an Easy handle
+        preserves domain version_info    // curl_easy_setopt(3): does not touch global version_info
+        callbacks none    // curl_easy_setopt(3): installs option values without invoking callbacks
+        callback_thread registering    // libcurl FAQ: callbacks always execute on the thread calling libcurl
+        ok CURLE_OK    // curl_easy_setopt(3): returns CURLE_OK on success
+        present cases stripping CURLOPT_    // curl_easy_setopt(3): typed per-option setters
+        variadic param 2 selected by param option:    // curl_easy_setopt(3): option-discriminated variadic argument
+            case CURLOPT_WRITEFUNCTION: callback param 2 as curl_write_callback userdata param CURLOPT_WRITEDATA retains by param 0    // CURLOPT_WRITEFUNCTION(3)
+            case CURLOPT_HEADERFUNCTION: callback param 2 as curl_write_callback userdata param CURLOPT_HEADERDATA retains by param 0    // CURLOPT_HEADERFUNCTION(3)
+            case CURLOPT_NOSIGNAL: c_long    // CURLOPT_NOSIGNAL(3): 1 disables signal handlers
+            case CURLOPT_URL: str    // CURLOPT_URL(3): copied NUL-terminated URL string
+            case CURLOPT_VERBOSE: c_long    // CURLOPT_VERBOSE(3): 1 enables verbose logging
+            case CURLOPT_TIMEOUT: c_long    // CURLOPT_TIMEOUT(3): total transfer timeout in seconds
+            case CURLOPT_CONNECTTIMEOUT: c_long    // CURLOPT_CONNECTTIMEOUT(3): connection phase timeout in seconds
+            case CURLOPT_FOLLOWLOCATION: c_long    // CURLOPT_FOLLOWLOCATION(3): 1 follows Location redirects
+            case CURLOPT_MAXREDIRS: c_long    // CURLOPT_MAXREDIRS(3): maximum redirect count
+            case CURLOPT_USERAGENT: str    // CURLOPT_USERAGENT(3): copied User-Agent header string
+            case CURLOPT_USERPWD: str    // CURLOPT_USERPWD(3): copied user:password string for authentication
+            case CURLOPT_HTTPAUTH: c_long    // CURLOPT_HTTPAUTH(3): HTTP authentication bitmask
+            case CURLOPT_CUSTOMREQUEST: str    // CURLOPT_CUSTOMREQUEST(3): copied custom HTTP method string
+            case CURLOPT_MAXFILESIZE_LARGE: curl_off_t    // CURLOPT_MAXFILESIZE_LARGE(3): max download size in bytes
+            case CURLOPT_POSTFIELDS: &str retains by param 0 length param CURLOPT_POSTFIELDSIZE_LARGE as curl_off_t until curl_easy_reset    // CURLOPT_POSTFIELDS(3): retained body bytes paired with length
+            case CURLOPT_HTTPHEADER: &HeaderList retains by param 0 until curl_easy_reset    // CURLOPT_HTTPHEADER(3): retained custom header list
+            case CURLOPT_MIMEPOST: &Mime retains by param 0 until curl_easy_reset    // CURLOPT_MIMEPOST(3): retained multipart form
+    fn curl_easy_getinfo
+        of Easy    // curl_easy_getinfo(3): param 0 is CURL * (disambiguated from CURLSH *)
+        rename getinfo    // curl_easy_getinfo(3): extracts information from a completed transfer
+        lend    // curl_easy_getinfo(3): borrows Easy handle
+        callbacks none    // curl_easy_getinfo(3): reads recorded transfer metrics, invokes no callbacks
+        preserves domain version_info    // curl_easy_getinfo(3): does not touch global version_info
+        ok CURLE_OK    // curl_easy_getinfo(3): returns CURLE_OK on success
+        present cases stripping CURLINFO_    // curl_easy_getinfo(3): typed per-info getters
+        variadic param 2 selected by param info:    // curl_easy_getinfo(3): info-discriminated out-pointer argument
+            case CURLINFO_RESPONSE_CODE: fills c_long    // CURLINFO_RESPONSE_CODE(3): last received HTTP/FTP/SMTP response code
+            case CURLINFO_HTTP_CONNECTCODE: fills c_long    // CURLINFO_HTTP_CONNECTCODE(3): last received proxy CONNECT code
+            case CURLINFO_REDIRECT_COUNT: fills c_long    // CURLINFO_REDIRECT_COUNT(3): number of redirects followed
+            case CURLINFO_HEADER_SIZE: fills c_long    // CURLINFO_HEADER_SIZE(3): total size of all headers received
+            case CURLINFO_REQUEST_SIZE: fills c_long    // CURLINFO_REQUEST_SIZE(3): total size of issued requests
+            case CURLINFO_SIZE_DOWNLOAD_T: fills curl_off_t    // CURLINFO_SIZE_DOWNLOAD_T(3): total bytes downloaded
+            case CURLINFO_SIZE_UPLOAD_T: fills curl_off_t    // CURLINFO_SIZE_UPLOAD_T(3): total bytes uploaded
+            case CURLINFO_TOTAL_TIME_T: fills curl_off_t    // CURLINFO_TOTAL_TIME_T(3): total transfer time in microseconds
+    fn curl_easy_perform
+        of Easy    // curl_easy_perform(3): param 0 is CURL * (disambiguated from CURLSH *)
+        rename perform    // curl_easy_perform(3): executes configured transfer
+        lend    // curl_easy_perform(3): borrows Easy handle
+        preserves domain version_info    // curl_easy_perform(3): does not touch global version_info
+    fn curl_easy_reset
+        of Easy    // curl_easy_reset(3): param 0 is CURL * (disambiguated from CURLSH *)
+        rename reset    // curl_easy_reset(3): resets Easy handle options to defaults
+        lend    // curl_easy_reset(3): borrows Easy handle
+        callbacks none    // curl_easy_reset(3): bounded to modeled options (no custom mime freefunc)
+        preserves domain version_info    // curl_easy_reset(3): does not touch global version_info
+    fn curl_version
+        returns static CStr    // curl_version(3): static human-readable version string
+        preserves domain version_info    // curl_version(3): does not touch global version_info
+    fn curl_easy_strerror
+        returns static CStr    // curl_easy_strerror(3): static string describing CURLcode
+        preserves domain version_info    // curl_easy_strerror(3): does not touch global version_info
+    fn curl_version_info
+        returns borrow curl_version_info_data from domain version_info    // curl_version_info(3): pointer into libcurl process-wide version struct
+        preserves domain version_info    // curl_version_info(3): read-only access to version_info domain
+    fn curl_global_init
+        lend    // curl_global_init(3): initializes global libcurl environment (writes version_info domain)
+    fn curl_global_cleanup
+        lend    // curl_global_cleanup(3): releases global libcurl environment (writes version_info domain)
