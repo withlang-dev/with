@@ -7,6 +7,9 @@
 //                is typed without the annotation's demand: `: T` goes.
 //   var          a `var` whose binding is never assigned again and never
 //                passed to a `mut` parameter (§3.8a): `let`.
+//   receiver     an explicit `self` parameter outside the D7 trait-body read
+//                carve-out (#727): `fn` / `mut fn` / `move fn` with `self`
+//                removed from the parameter list.
 //
 //   with fix-ceremony --report <entry.with>     # every rewrite, by file and line
 //   with fix-ceremony --apply  <entry.with>     # write them; the entry is checked
@@ -23,6 +26,8 @@ use std.builtins.eprint
 use compiler.Compilation
 use Diagnostic
 use Ast
+use Lexer
+use Token
 use Sema
 use SemaTypes
 use rt.rt_core
@@ -450,7 +455,150 @@ fn cf_inferred_return(sema: &Sema, fn_name: &str) -> str:
     let sig = sema.get_sig(sema.pool_lookup_symbol(fn_name))
     if sig < 0: "" else: sema.type_name(sema.sig_return_type(sig))
 
-fn cf_usage(): "usage: with fix-ceremony [--report|--apply] [--std] [--exclude path ...] [--check-with compiler] <entry.with>\n  --report      list every rewrite Sema proves safe, by file and line (the default)\n  --apply       write them; a file that no longer checks is restored\n  --std         rewrite lib/std too (never a migrated corpus)\n  --exclude p   leave files under p alone\n  --check-with c  re-check with compiler c after applying\nrewrites: a redundant binding annotation, a `var` never rebound, a widening cast, `List.new()` / `HashMap.new()` where its type is demanded, an index loop over one list, `.clone()` on a str, `&x` at a `&T` parameter, `Some(x)` where an Option is demanded"
+// #727 (D7): rewrite an explicit `self` parameter on a method header in
+// `text[header_start..header_end)` to the implicit keyword form (`fn` /
+// `mut fn` / `move fn`). Emits a single edit covering the header span so
+// `--report` counts one rewrite per method and `--check-with` rolls back
+// atomically.
+fn cf_push_explicit_receiver_edits(mut edits: List[CeremonyEdit], path: &str, text: &str, header_start: i32, header_end: i32, mode: ReceiverMode):
+    if header_start < 0 or header_end <= header_start or header_end > text.len(): return
+    let header = text.slice(header_start, header_end)
+    var lexer = Lexer.init(header, 0)
+    let tokens = lexer.tokenize()
+    let n = tokens.len()
+    var fn_idx = -1
+    var ti = 0
+    while ti < n:
+        if tokens.get_tag(ti) == TokenKind.TK_KW_FN:
+            fn_idx = ti
+            break
+        ti = ti + 1
+    if fn_idx < 0: return
+    // Advance past `fn <name>` and optional generic `[...]` to `(`.
+    var k = fn_idx + 2
+    if k < n and tokens.get_tag(k) == TokenKind.TK_L_BRACKET:
+        var bdepth = 0
+        while k < n:
+            let t = tokens.get_tag(k)
+            if t == TokenKind.TK_L_BRACKET: bdepth = bdepth + 1
+            else if t == TokenKind.TK_R_BRACKET:
+                bdepth = bdepth - 1
+                if bdepth == 0:
+                    k = k + 1
+                    break
+            k = k + 1
+    if k >= n or tokens.get_tag(k) != TokenKind.TK_L_PAREN: return
+    let p0 = k + 1
+    if p0 >= n: return
+    var self_tok = p0
+    let p0_tag = tokens.get_tag(p0)
+    if p0_tag == TokenKind.TK_KW_MUT or p0_tag == TokenKind.TK_KW_MOVE:
+        self_tok = p0 + 1
+    if self_tok >= n or tokens.get_tag(self_tok) != TokenKind.TK_IDENT: return
+    if header.slice(tokens.get_start(self_tok), tokens.get_end(self_tok)) != "self": return
+    // Scan to the top-level `,` or `)` ending the `self` parameter.
+    var depth = 0
+    var sep = self_tok + 1
+    while sep < n:
+        let t = tokens.get_tag(sep)
+        if t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACKET: depth = depth + 1
+        else if t == TokenKind.TK_R_BRACKET: depth = depth - 1
+        else if t == TokenKind.TK_R_PAREN:
+            if depth == 0: break
+            depth = depth - 1
+        else if t == TokenKind.TK_COMMA and depth == 0: break
+        sep = sep + 1
+    if sep >= n: return
+    let sep_tag = tokens.get_tag(sep)
+    if sep_tag != TokenKind.TK_COMMA and sep_tag != TokenKind.TK_R_PAREN: return
+    let del_start = header_start + tokens.get_start(p0)
+    var del_end = header_start + tokens.get_start(sep)
+    if sep_tag == TokenKind.TK_COMMA:
+        if sep + 1 < n and tokens.get_tag(sep + 1) != TokenKind.TK_R_PAREN:
+            del_end = header_start + tokens.get_start(sep + 1)
+        else:
+            del_end = header_start + tokens.get_end(sep)
+    let has_mut = fn_idx > 0 and tokens.get_tag(fn_idx - 1) == TokenKind.TK_KW_MUT
+    let has_move = fn_idx > 0 and tokens.get_tag(fn_idx - 1) == TokenKind.TK_KW_MOVE
+    let fn_pos = header_start + tokens.get_start(fn_idx)
+    var prefix = ""
+    var what = "explicit `self` parameter: receiver is implicit in `fn` (D7)"
+    if mode == ReceiverMode.Mut:
+        what = "explicit `mut self` parameter: use `mut fn` (D7)"
+        if not has_mut and not has_move: prefix = "mut "
+    else if mode == ReceiverMode.Move:
+        what = "explicit `move self` parameter: use `move fn` (D7)"
+        if not has_move and not has_mut: prefix = "move "
+    if prefix.len() > 0:
+        let replacement = prefix ++ text.slice(fn_pos, del_start)
+        edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: fn_pos, end: del_end, replacement, what })
+    else:
+        edits.push(CeremonyEdit { path: with_str_clone_ref(path), start: del_start, end: del_end, replacement: "", what })
+
+// #727: collect explicit `self` parameter rewrites across `impl`/`extend`
+// methods and non-read (`mut`/`move`) `trait` method declarations. The D7
+// trait-body read carve-out (`fn m(self: &Self)` in a `trait`) is kept as
+// written; top-level dotted methods (`fn T.m(self: ...)`) are reported in
+// cf_top_level_self_notes (they require relocation via `with migrate-receivers`).
+fn cf_collect_explicit_receivers(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool) -> List[CeremonyEdit]:
+    var edits = []
+    let texts: HashMap[str, str] = [:]
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        let kind = pool.kind(decl)
+        if kind == NodeKind.NK_FN_DECL:
+            if not sema.method_decl_impl_nodes.contains(di): continue
+            let meta = pool.find_fn_meta(decl)
+            if meta < 0: continue
+            let param_start = pool.fn_meta_param_start(meta)
+            let param_count = pool.fn_meta_param_count(meta)
+            let mode = sema.receiver_mode_from_param(param_start, param_count)
+            if mode != ReceiverMode.Read and mode != ReceiverMode.Mut and mode != ReceiverMode.Move: continue
+            if fn_param_is_synth_receiver(pool.fn_param_flags(param_start, 0)) != 0: continue
+            let path = sema.decl_source_path_for_index(di)
+            if not cf_rewritable(path, excludes, std_too): continue
+            if not texts.contains(path): texts.insert(with_str_clone_ref(path), with_fs_read_file(path))
+            cf_push_explicit_receiver_edits(edits, path, texts.get(path).unwrap(), pool.get_start(decl), pool.get_end(decl), mode)
+        else if kind == NodeKind.NK_TRAIT_DECL:
+            let path = sema.decl_source_path_for_index(di)
+            if not cf_rewritable(path, excludes, std_too): continue
+            let method_count = pool.trait_method_count(decl)
+            var pos = pool.trait_method_start(decl)
+            for mi in 0..method_count:
+                let param_start = pool.get_extra(pos + TRAIT_METHOD_PARAM_START)
+                let param_count = pool.get_extra(pos + TRAIT_METHOD_PARAM_COUNT)
+                let mode = sema.receiver_mode_from_param(param_start, param_count)
+                if (mode == ReceiverMode.Mut or mode == ReceiverMode.Move) and fn_param_is_synth_receiver(pool.fn_param_flags(param_start, 0)) == 0:
+                    if not texts.contains(path): texts.insert(with_str_clone_ref(path), with_fs_read_file(path))
+                    let mstart = pool.get_extra(pos + TRAIT_METHOD_SOURCE_START)
+                    let mend = pool.get_extra(pos + TRAIT_METHOD_SOURCE_END)
+                    cf_push_explicit_receiver_edits(edits, path, texts.get(path).unwrap(), mstart, mend, mode)
+                pos = pos + TRAIT_METHOD_STRIDE
+    edits
+
+fn cf_top_level_self_notes(sema: &Sema, pool: &AstPool, excludes: &List[str], std_too: bool):
+    let notes = []
+    let texts: HashMap[str, str] = [:]
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) != NodeKind.NK_FN_DECL: continue
+        if sema.method_decl_impl_nodes.contains(di): continue
+        let meta = pool.find_fn_meta(decl)
+        if meta < 0: continue
+        let param_start = pool.fn_meta_param_start(meta)
+        let param_count = pool.fn_meta_param_count(meta)
+        let mode = sema.receiver_mode_from_param(param_start, param_count)
+        if mode != ReceiverMode.Read and mode != ReceiverMode.Mut and mode != ReceiverMode.Move: continue
+        if fn_param_is_synth_receiver(pool.fn_param_flags(param_start, 0)) != 0: continue
+        let path = sema.decl_source_path_for_index(di)
+        if not cf_rewritable(path, excludes, std_too): continue
+        if not texts.contains(path): texts.insert(with_str_clone_ref(path), with_fs_read_file(path))
+        let line = cf_line_of(texts.get(path).unwrap(), pool.get_start(decl))
+        let name = sema.pool_resolve(pool.get_data0(decl))
+        notes.push(f"{path}:{line}: explicit `self` on top-level dotted method `{name}`: relocate into an `impl` block with `with migrate-receivers` (reported, not rewritten in place)")
+    notes
+
+fn cf_usage(): "usage: with fix-ceremony [--report|--apply] [--std] [--exclude path ...] [--check-with compiler] <entry.with>\n  --report      list every rewrite Sema proves safe, by file and line (the default)\n  --apply       write them; a file that no longer checks is restored\n  --std         rewrite lib/std too (never a migrated corpus)\n  --exclude p   leave files under p alone\n  --check-with c  re-check with compiler c after applying\nrewrites: a redundant binding annotation, a `var` never rebound, a widening cast, `List.new()` / `HashMap.new()` where its type is demanded, an index loop over one list, `.clone()` on a str, `&x` at a `&T` parameter, `Some(x)` where an Option is demanded, an explicit `self` receiver parameter"
 
 fn run_ceremony_fix() -> i32:
     let argv = args()
@@ -489,6 +637,7 @@ fn run_ceremony_fix() -> i32:
         eprint(f"fix-ceremony: {entry} does not check; fix it first")
         return 1
     var edits = cf_collect(comp.zcu.last_sema, pool, excludes, std_too)
+    for re in cf_collect_explicit_receivers(comp.zcu.last_sema, pool, excludes, std_too): edits.push(re)
     let fn_rets = cf_collect_fn_rets(comp.zcu.last_sema, pool, excludes, std_too)
     for fr in fn_rets: edits.push(fr.edit)
     let paths = []
@@ -502,6 +651,7 @@ fn run_ceremony_fix() -> i32:
     if not apply:
         for note in cf_len_cast_notes(comp.zcu.last_sema, pool, excludes, std_too): print(note)
         for note in cf_numbered_const_notes(comp.zcu.last_sema, pool, excludes, std_too): print(note)
+        for note in cf_top_level_self_notes(comp.zcu.last_sema, pool, excludes, std_too): print(note)
     if not apply or edits.len() == 0: return 0
     let originals: HashMap[str, str] = [:]
     for path in paths:
