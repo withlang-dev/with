@@ -1,18 +1,16 @@
-// Release UAT: libxml2 over the facade `with get` wrote from the package's
-// own evidence (D121, spec §16.2b.15). The program an application developer
-// writes after `with get c.libxml2`: no hand facade, no `unsafe`, no raw
-// pointer. The document is a resource freed by its scope; the nodes are
-// borrows of it whose origin is bound per call (D134, §16.2b.6); attribute
-// values and content are new text the caller owns, released through
-// `xmlFree` on every path (§16.2b.8); the encoding is an optional C string
-// the registry states nullable (§16.2b.15 item 3).
+// Release UAT: libxml2 over the registry facade (#3147). Zero `unsafe`, zero
+// project facade: parse from file and memory, walk nodes, XPath query,
+// serialize through XmlBuffer/XmlSaveCtxt, and validate against an XSD schema.
 use contracts.libxml2
 use std.fs
 
 fn main:
-    write_file("library.xml", "<library><book title=\"Dune\">Herbert</book><!-- a comment --><book title=\"Emma\">Austen</book></library>")
+    let xml = "<library><book title=\"Dune\">Herbert</book><!-- a comment --><book title=\"Emma\">Austen</book></library>"
+    write_file("library.xml", xml)
+
+    // 1. Parse from file and walk nodes.
     let Some(doc) = XmlDoc.read_file("library.xml", None, 0) else:
-        print("libxml2 parse failed")
+        print("libxml2 parse file failed")
         return 1
     let Some(root) = doc.get_root_element() else:
         print("libxml2 has no root element")
@@ -32,7 +30,62 @@ fn main:
         seen.push(title ++ " by " ++ author)
         book = b.next_element_sibling()
     if seen.len() != 2 or seen[0] != "Dune by Herbert" or seen[1] != "Emma by Austen":
-        print("libxml2 walk mismatch:")
-        for line in seen: print(line)
+        print("libxml2 walk mismatch")
         return 1
+
+    // 2. Parse from memory.
+    let Some(mem_doc) = XmlDoc.read_memory(xml as []u8, None, None, 0) else:
+        print("libxml2 read_memory failed")
+        return 1
+
+    // 3. XPath query over parsed document.
+    let Some(xp_ctx) = mem_doc.x_path_new_context() else:
+        print("libxml2 xpath context failed")
+        return 1
+    let Some(xp_obj) = XmlXPathObject.eval_expression("string(/library/book[2]/@title)", &xp_ctx) else:
+        print("libxml2 xpath eval failed")
+        return 1
+    let Some(xp_str) = xp_obj.cast_to_string() else:
+        print("libxml2 xpath cast failed")
+        return 1
+    if xp_str != "Emma":
+        print(f"libxml2 xpath mismatch: {xp_str}")
+        return 1
+
+    // 4. Serialize document into XmlBuffer via XmlSaveCtxt.
+    let Some(buf) = XmlBuffer.create() else:
+        print("libxml2 buffer create failed")
+        return 1
+    if true:
+        let Some(saver) = buf.save_to_buffer(None, 0) else:
+            print("libxml2 save to_buffer failed")
+            return 1
+        if saver.doc(&mem_doc) < 0:
+            print("libxml2 save doc failed")
+            return 1
+    if buf.length() == 0:
+        print("libxml2 serialized buffer empty")
+        return 1
+    let Some(ser) = buf.content() else:
+        print("libxml2 buffer content null")
+        return 1
+    if not ser.to_str_lossy().contains("Herbert"):
+        print("libxml2 serialized text mismatch")
+        return 1
+
+    // 5. Validate document against an XSD schema.
+    let xsd = "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"><xs:element name=\"library\"><xs:complexType><xs:sequence><xs:element name=\"book\" maxOccurs=\"unbounded\"><xs:complexType><xs:simpleContent><xs:extension base=\"xs:string\"><xs:attribute name=\"title\" type=\"xs:string\" use=\"required\"/></xs:extension></xs:simpleContent></xs:complexType></xs:element></xs:sequence></xs:complexType></xs:element></xs:schema>"
+    let Some(sp_ctx) = XmlSchemaParserCtxt.new_mem_parser_ctxt(xsd as []u8) else:
+        print("libxml2 schema parser ctx failed")
+        return 1
+    let Some(schema) = sp_ctx.parse() else:
+        print("libxml2 schema parse failed")
+        return 1
+    let Some(sv_ctx) = schema.new_valid_ctxt() else:
+        print("libxml2 schema valid ctx failed")
+        return 1
+    if sv_ctx.validate_doc(&mem_doc) != 0:
+        print("libxml2 schema validation failed")
+        return 1
+
     print("libxml2 UAT passed")

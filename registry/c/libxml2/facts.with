@@ -7,7 +7,7 @@
 // xmlMalloc, xmlMemStrdup: globals.c), so a parameter that reaches one is
 // not proven unretained, and a document built by the parser through its
 // context is not proven fresh: the library's own documentation states both.
-c facade libxml2:
+c facts libxml2:
     text utf8    // xmlstring.h 25-29, xmlChar: "This is a basic byte in an UTF-8 encoded string"; every xmlChar * the library hands back is UTF-8
     resource XmlDoc wraps *mut _xmlDoc
         from xmlReadFile    // parser.c 13425-13444, xmlReadFile: "Convenience function to parse an XML file … @returns the resulting document tree"; the filename is copied (parserInternals.c 1858, xmlNewInputInternal: input->filename = xmlMemStrdup(filename))
@@ -15,9 +15,30 @@ c facade libxml2:
         drop xmlFreeDoc    // tree.c 917-923, xmlFreeDoc: "Free a document including all children and associated DTDs."
     resource XmlNode wraps *mut _xmlNode
         drop xmlFreeNode    // tree.c 3409-3417, xmlFreeNode: "Free a node including all the children"; xmlFreeNodeList (3322-3327) frees "a node list", the whole sibling chain
+    resource XmlSaveCtxt wraps *mut _xmlSaveCtxt
+        from xmlSaveToBuffer    // xmlsave.h 2.15.4 lines 102 to 105: allocates XML save context targeting xmlBuffer
+        from xmlSaveToFilename    // xmlsave.h 2.15.4 lines 97 to 100: allocates XML save context targeting a file path
+        from xmlSaveToFd    // xmlsave.h 2.15.4 lines 93 to 96: allocates XML save context targeting a file descriptor
+        drop xmlSaveClose    // xmlsave.h 2.15.4: flushes and frees an xmlSaveCtxt
+        destroys xmlSaveFinish    // xmlsave.h 2.15.4: flushes and frees an xmlSaveCtxt returning status
+    resource XmlXPathObject wraps *mut _xmlXPathObject
+        from xmlXPathEvalExpression    // xpath.h 2.15.4 line 537: evaluates XPath expression and returns newly allocated xmlXPathObject freed by xmlXPathFreeObject
+        drop xmlXPathFreeObject    // xpath.h 2.15.4 line 452: frees xmlXPathObject
+    resource XmlSchemaParserCtxt wraps *mut _xmlSchemaParserCtxt
+        from xmlSchemaNewParserCtxt    // xmlschemas.h 2.15.4 line 136: allocates schema parser context from URL/path
+        from xmlSchemaNewMemParserCtxt    // xmlschemas.h 2.15.4 lines 138 to 139: allocates schema parser context from memory buffer
+        from xmlSchemaNewDocParserCtxt    // xmlschemas.h 2.15.4 line 141: allocates schema parser context from xmlDoc
+        drop xmlSchemaFreeParserCtxt    // xmlschemas.h 2.15.4 line 143: frees schema parser context
+    resource XmlSchema wraps *mut _xmlSchema
+        from xmlSchemaParse    // xmlschemas.h 2.15.4 line 166: builds compiled xmlSchema freed by xmlSchemaFree
+        drop xmlSchemaFree    // xmlschemas.h 2.15.4 line 168: frees compiled xmlSchema
+    resource XmlSchemaValidCtxt wraps *mut _xmlSchemaValidCtxt
+        from xmlSchemaNewValidCtxt    // xmlschemas.h 2.15.4 line 201: allocates schema validation context freed by xmlSchemaFreeValidCtxt
+        drop xmlSchemaFreeValidCtxt    // xmlschemas.h 2.15.4 line 203: frees schema validation context
     fn xmlReadFile
         nullable param 1    // parser.c 13440, xmlReadFile: "@param encoding  the document encoding (optional)"
     fn xmlReadMemory
+        buffer param 0 len param 1    // parser.h 2.15.4 line 1993: reads size bytes from buffer
         nullable param 2    // parser.c 13483, xmlReadMemory: "@param url  base URL (optional)"
         nullable param 3    // parser.c 13484, xmlReadMemory: "@param encoding  the document encoding (optional)"
     fn xmlGetProp
@@ -35,3 +56,29 @@ c facade libxml2:
         returns borrow XmlNode from param 0    // tree.c 3287-3320, xmlNextElementSibling: "Find the closest following sibling which is a element", "@returns the sibling or NULL if no sibling was found"; the body returns a node reached through node->next, in the tree `node` is part of
     fn xmlChildElementCount
         lend    // tree.c 3152-3185, xmlChildElementCount: "Count the number of child nodes which are elements"; the body reads parent->children and each node's type and next, and stores nothing
+    fn xmlBufferContent
+        returns borrow CStr from param 0    // tree.h 2.15.4 line 1542: returns NUL-terminated buffer content owned by buf
+        lend    // tree.h 2.15.4 line 1542: borrows const xmlBuffer
+    fn xmlSaveToBuffer
+        nullable param 1    // xmlsave.h 2.15.4 line 104: NULL uses default UTF-8 encoding
+    fn xmlSaveToFilename
+        nullable param 1    // xmlsave.h 2.15.4 line 99: NULL uses default UTF-8 encoding
+    fn xmlSaveToFd
+        nullable param 1    // xmlsave.h 2.15.4 line 95: NULL uses default UTF-8 encoding
+    fn xmlSaveDoc
+        lend    // xmlsave.h 2.15.4 line 115: serializes doc into ctxt without taking ownership
+    fn xmlSaveTree
+        lend    // xmlsave.h 2.15.4 line 118: serializes node subtree into ctxt without taking ownership
+    fn xmlXPathEvalExpression
+        text param 0    // xpath.h 2.15.4 line 537: NUL-terminated UTF-8 XPath expression string
+    fn xmlXPathCastToString
+        lend    // xpath.h 2.15.4 line 496: converts XPath result to a newly allocated xmlChar string
+        text return, owned, freed by xmlFree    // xpath.h 2.15.4 line 496: returned xmlChar * is freed with xmlFree
+    fn xmlXPathCastToNumber
+        lend    // xpath.h 2.15.4 line 485: converts XPath result to double without freeing
+    fn xmlXPathCastToBoolean
+        lend    // xpath.h 2.15.4 line 474: converts XPath result to int boolean without freeing
+    fn xmlSchemaNewMemParserCtxt
+        buffer param 0 len param 1    // xmlschemas.h 2.15.4 lines 138 to 139: reads size bytes of schema from buffer
+    fn xmlSchemaValidateDoc
+        lend    // xmlschemas.h 2.15.4 line 205: validates doc against schema in ctxt without freeing either
