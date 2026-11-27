@@ -360,7 +360,8 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
         let is_fixed = cwords.len() >= 4 and cwords[0] == "param" and cwords[2] == "fixed"
         let is_ok = cwords.len() >= 2 and cwords[0] == "ok"
         let is_static_cstr = clause == "returns static CStr"
-        if is_of_clause or is_buffer_param or is_discarded or is_fixed or is_ok or is_static_cstr:
+        let is_borrow_cstr = clause.starts_with("returns borrow CStr from param ")
+        if is_of_clause or is_buffer_param or is_discarded or is_fixed or is_ok or is_static_cstr or is_borrow_cstr:
             facts_push_unique(facts.value_fns, current_fn)
             if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
             value_item = current_fn

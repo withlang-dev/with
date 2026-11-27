@@ -1,17 +1,19 @@
-// Release UAT: zlib through its facade (D64, spec §16.2b.8). The program an
-// application developer writes over `with get c.zlib`: the facade
-// `facades.zlib` is the project's own (§16.2b.1). No `unsafe`, no pointer,
-// no length: `compress(dest, src)` takes two slices and returns the bytes it
-// wrote, `uncompress` the same, and the caller's buffers are what they were.
+// Release UAT: zlib through its registry facade (#3135). The program an
+// application developer writes over `with get c.zlib` — zero `unsafe`, zero
+// project facade: one-shot compress/uncompress, the Deflater/Inflater
+// (deflateInit2/inflateInit2) stream loop, gzip file I/O via gzopen/gzwrite/
+// gzread, and crc32/adler32 checksums.
 use contracts.zlib
 use c_import("zlib.h")
 
 fn main:
+    // 1. One-shot compress / uncompress roundtrip.
     let input = "with zlib roundtrip"
+    let bytes = input as []u8
     var compressed: [u8; 256] = [0 as u8; 256]
     var output: [u8; 128] = [0 as u8; 128]
 
-    let Ok(packed) = compress(compressed, input as []u8) else:
+    let Ok(packed) = compress(compressed, bytes) else:
         print("zlib compress failed")
         return 1
     let Ok(unpacked) = uncompress(output, compressed[..packed]) else:
@@ -21,12 +23,76 @@ fn main:
     if unpacked != input.len() as usize:
         print("zlib length mismatch")
         return 1
-    let bytes = input as []u8
     for i in 0..unpacked as i32:
         if output[i] != bytes[i]:
             print("zlib content mismatch")
             return 1
-    if zlibVersion().is_none():
-        print("zlib version missing")
+
+    // 2. Streaming deflateInit2 / deflate / inflateInit2 / inflate loop.
+    let Ok(def) = Deflater.deflateInit2(Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15, 8, Z_DEFAULT_STRATEGY) else:
+        print("zlib deflateInit2 failed")
         return 1
+    var stream_packed: [u8; 256] = [0 as u8; 256]
+    let dstep = def.deflate(bytes, stream_packed, Z_FINISH)
+    if dstep.status != Z_STREAM_END or dstep.consumed != bytes.len() as usize or dstep.produced == 0:
+        print("zlib deflate stream failed")
+        return 1
+
+    let Ok(inf) = Inflater.inflateInit2(15) else:
+        print("zlib inflateInit2 failed")
+        return 1
+    var stream_out: [u8; 128] = [0 as u8; 128]
+    let istep = inf.inflate(stream_packed[..dstep.produced], stream_out, Z_FINISH)
+    if istep.status != Z_STREAM_END or istep.produced != bytes.len() as usize:
+        print("zlib inflate stream failed")
+        return 1
+    for i in 0..istep.produced as i32:
+        if stream_out[i] != bytes[i]:
+            print("zlib stream content mismatch")
+            return 1
+
+    // 3. Gzip file write and read via gzopen / gzwrite / gzread / gzungetc / gzerror.
+    let path = "roundtrip.gz"
+    if true:
+        let Some(wf) = GzFileS.gzopen(path, "wb") else:
+            print("zlib gzopen write failed")
+            return 1
+        let nw = wf.gzwrite(bytes)
+        if nw != bytes.len() as i32:
+            print("zlib gzwrite failed")
+            return 1
+    if true:
+        let Some(rf) = GzFileS.gzopen(path, "rb") else:
+            print("zlib gzopen read failed")
+            return 1
+        let first = rf.gzgetc()
+        if first != bytes[0] as i32 or rf.gzungetc(first) != first:
+            print("zlib gzungetc failed")
+            return 1
+        var file_out: [u8; 128] = [0 as u8; 128]
+        let nr = rf.gzread(file_out)
+        if nr != bytes.len() as i32:
+            print("zlib gzread length mismatch")
+            return 1
+        for i in 0..nr:
+            if file_out[i] != bytes[i]:
+                print("zlib gzread content mismatch")
+                return 1
+        if rf.gzerror().is_none():
+            print("zlib gzerror missing")
+            return 1
+
+    // 4. Checksums (crc32 / adler32) and version.
+    let empty: [u8; 0] = []
+    let c0 = crc32(0, empty)
+    let c1 = crc32(c0, bytes)
+    let a0 = adler32(0, empty)
+    let a1 = adler32(a0, bytes)
+    if c0 != 0 or c1 == 0 or a0 != 1 or a1 <= 1:
+        print("zlib checksum mismatch")
+        return 1
+    if zlibVersion().is_none() or zError(Z_OK).is_none():
+        print("zlib version or error string missing")
+        return 1
+
     print("zlib UAT passed")

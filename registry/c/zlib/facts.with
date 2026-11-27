@@ -16,6 +16,22 @@
 // caller's stream size to the `_`-suffixed functions. Each is one call
 // that forwards its parameters, so it is imported as a function and a
 // resource names it directly.
+//
+// Functions intentionally left raw (21 of 88):
+//   - deflateInit_, inflateInit_, deflateInit2_, inflateInit2_: internal ABI
+//     version-checking functions wrapped by the presented macros above.
+//   - inflateBackInit_, inflateBack, inflateBackEnd: callback-driven raw
+//     inflate family retaining a caller-supplied 32 KiB sliding window.
+//   - deflateSetHeader, inflateGetHeader: retain caller's gz_header pointer
+//     (and its sub-pointers) inside the stream across subsequent calls.
+//   - deflateCopy, inflateCopy: copy-initialize a second z_stream in place.
+//   - deflateGetDictionary, inflateGetDictionary: write up to 32 KiB with no
+//     input capacity bound (the length parameter is output-only).
+//   - deflatePending, deflateUsed: report values only via scalar out-pointers.
+//   - uncompress2, uncompress2_z: take a second inout pointer (*sourceLen).
+//   - gzfread, gzfwrite: take two-factor product lengths (size * nitems).
+//   - gzgets: returns a char * aliasing the caller's writable output buffer.
+//   - gzprintf: printf-style format-string variadic.
 c facade zlib:
     build define ZLIB_CONST    // zconf.h 1.4 lines 245 to 249: with ZLIB_CONST, z_const is const, so the C compiler refuses a write through next_in anywhere in the library's own source
     resource GzFileS wraps *mut gzFile_s
@@ -38,3 +54,115 @@ c facade zlib:
         of Deflater    // zlib.h 1.4 line 254: deflate(z_streamp strm, int flush) works on the stream deflateInit set up; line 355: "deflate() returns Z_OK if some progress has been made"
         buffer field next_in remaining field avail_in reads    // zlib.h 1.4 lines 91 to 92; line 264: "Compress more input starting at next_in and update next_in and avail_in accordingly"
         buffer field next_out remaining field avail_out    // zlib.h 1.4 lines 95 to 96; line 269: "Generate more output starting at next_out and update next_out and avail_out accordingly"
+    fn deflateSetDictionary
+        of Deflater    // zlib.h 1.4 lines 618 to 659: initializes compression dictionary on a Deflater stream
+        lend    // zlib.h 1.4 lines 622 to 659: copies dictionary bytes into internal window without retaining dictionary pointer
+        buffer param 1 len param 2    // zlib.h 1.4 lines 619 to 620: const Bytef *dictionary, uInt dictLength
+    fn deflateReset
+        of Deflater    // zlib.h 1.4 lines 704 to 713: resets internal compression state without freeing it
+        lend    // zlib.h 1.4 lines 706 to 712: keeps stream alive and initialized
+    fn deflateResetKeep
+        of Deflater    // zlib.h 1.4 line 2051: resets compression state while preserving options
+        lend    // zlib.h 1.4 line 2051: keeps stream alive
+    fn deflateParams
+        of Deflater    // zlib.h 1.4 lines 715 to 751: dynamically updates compression level and strategy
+        lend    // zlib.h 1.4 lines 719 to 750: keeps stream alive
+    fn deflateTune
+        of Deflater    // zlib.h 1.4 lines 753 to 768: tunes internal compression parameters
+        lend    // zlib.h 1.4 lines 766 to 767: keeps stream alive
+    fn deflateBound
+        of Deflater    // zlib.h 1.4 lines 770 to 783: returns upper bound on compressed size for sourceLen bytes
+        lend    // zlib.h 1.4 lines 773 to 782: reads stream configuration without freeing it
+    fn deflateBound_z
+        of Deflater    // zlib.h 1.4 lines 771 to 786: size_t variant of deflateBound
+        lend    // zlib.h 1.4 lines 784 to 785: reads stream configuration without freeing it
+    fn deflatePrime
+        of Deflater    // zlib.h 1.4 lines 818 to 833: inserts up to 16 bits into deflate output stream
+        lend    // zlib.h 1.4 lines 822 to 832: keeps stream alive
+    fn inflateSetDictionary
+        of Inflater    // zlib.h 1.4 lines 914 to 935: initializes decompression dictionary on an Inflater stream
+        lend    // zlib.h 1.4 lines 918 to 934: copies dictionary bytes into internal window without retaining dictionary pointer
+        buffer param 1 len param 2    // zlib.h 1.4 lines 915 to 916: const Bytef *dictionary, uInt dictLength
+    fn inflateSync
+        of Inflater    // zlib.h 1.4 lines 952 to 969: skips invalid compressed data until a full flush point
+        lend    // zlib.h 1.4 lines 954 to 968: keeps stream alive
+    fn inflateReset
+        of Inflater    // zlib.h 1.4 lines 991 to 998: resets decompression state without freeing it
+        lend    // zlib.h 1.4 lines 993 to 997: keeps stream alive
+    fn inflateReset2
+        of Inflater    // zlib.h 1.4 lines 1000 to 1012: resets decompression state with new windowBits
+        lend    // zlib.h 1.4 lines 1003 to 1011: keeps stream alive
+    fn inflateResetKeep
+        of Inflater    // zlib.h 1.4 line 2050: resets decompression state while preserving history
+        lend    // zlib.h 1.4 line 2050: keeps stream alive
+    fn inflatePrime
+        of Inflater    // zlib.h 1.4 lines 1014 to 1043: inserts bits into inflate bit buffer
+        lend    // zlib.h 1.4 lines 1018 to 1042: keeps stream alive
+    fn inflateMark
+        of Inflater    // zlib.h 1.4 lines 1045 to 1071: returns bit/byte position mark in inflate stream
+        lend    // zlib.h 1.4 lines 1047 to 1070: reads stream state without modifying ownership
+    fn inflateSyncPoint
+        of Inflater    // zlib.h 1.4 line 2045: returns whether inflate is at a sync point
+        lend    // zlib.h 1.4 line 2045: reads stream state
+    fn inflateUndermine
+        of Inflater    // zlib.h 1.4 line 2047: configures inflate error checking
+        lend    // zlib.h 1.4 line 2047: keeps stream alive
+    fn inflateValidate
+        of Inflater    // zlib.h 1.4 line 2048: enables or disables inflate checksum validation
+        lend    // zlib.h 1.4 line 2048: keeps stream alive
+    fn inflateCodesUsed
+        of Inflater    // zlib.h 1.4 line 2049: returns number of code entries used by inflate
+        lend    // zlib.h 1.4 line 2049: reads stream state
+    fn compress
+        buffer param 0 capacity param 1 inout    // zlib.h 1.4 lines 1275 to 1285: dest holds capacity *destLen on entry and produced length on exit
+        buffer param 2 len param 3    // zlib.h 1.4 lines 1276 to 1281: reads sourceLen bytes from source
+        ok Z_OK    // zlib.h 1.4 lines 1287 to 1289: returns Z_OK on success
+    fn compress_z
+        buffer param 0 capacity param 1 inout    // zlib.h 1.4 lines 1277 to 1285: size_t variant of compress
+        buffer param 2 len param 3    // zlib.h 1.4 lines 1278 to 1281: reads sourceLen bytes from source
+        ok Z_OK    // zlib.h 1.4 lines 1287 to 1289: returns Z_OK on success
+    fn compress2
+        buffer param 0 capacity param 1 inout    // zlib.h 1.4 lines 1292 to 1304: dest holds capacity *destLen on entry and produced length on exit
+        buffer param 2 len param 3    // zlib.h 1.4 lines 1293 to 1301: reads sourceLen bytes from source
+        ok Z_OK    // zlib.h 1.4 lines 1306 to 1308: returns Z_OK on success
+    fn compress2_z
+        buffer param 0 capacity param 1 inout    // zlib.h 1.4 lines 1295 to 1304: size_t variant of compress2
+        buffer param 2 len param 3    // zlib.h 1.4 lines 1296 to 1301: reads sourceLen bytes from source
+        ok Z_OK    // zlib.h 1.4 lines 1306 to 1308: returns Z_OK on success
+    fn uncompress
+        buffer param 0 capacity param 1 inout    // zlib.h 1.4 lines 1319 to 1330: dest holds capacity *destLen on entry and uncompressed length on exit
+        buffer param 2 len param 3    // zlib.h 1.4 lines 1320 to 1325: reads sourceLen bytes from source
+        ok Z_OK    // zlib.h 1.4 lines 1332 to 1336: returns Z_OK on success
+    fn uncompress_z
+        buffer param 0 capacity param 1 inout    // zlib.h 1.4 lines 1321 to 1330: size_t variant of uncompress
+        buffer param 2 len param 3    // zlib.h 1.4 lines 1322 to 1325: reads sourceLen bytes from source
+        ok Z_OK    // zlib.h 1.4 lines 1332 to 1336: returns Z_OK on success
+    fn gzread
+        of GzFileS    // zlib.h 1.4 lines 1460 to 1494: reads decompressed bytes from an open gzFile
+        lend    // zlib.h 1.4 lines 1462 to 1493: reads into caller's buf during the call without retaining buf or closing file
+        buffer param 1 capacity param 2    // zlib.h 1.4 lines 1460 to 1463: writes at most len bytes into buf and returns bytes read or -1
+    fn gzwrite
+        of GzFileS    // zlib.h 1.4 lines 1526 to 1534: compresses and writes bytes to an open gzFile
+        lend    // zlib.h 1.4 lines 1528 to 1533: consumes buf during the call without retaining buf or closing file
+        buffer param 1 len param 2    // zlib.h 1.4 lines 1526 to 1529: reads len bytes from buf
+    fn gzputs
+        of GzFileS    // zlib.h 1.4 lines 1582 to 1593: compresses and writes NUL-terminated string s to file
+        lend    // zlib.h 1.4 lines 1584 to 1592: writes s without retaining it or closing file
+    fn gzungetc
+        of GzFileS(param 1)    // zlib.h 1.4 lines 1637 to 1652: pushes one byte back onto gzFile at param 1
+        lend    // zlib.h 1.4 lines 1639 to 1651: borrows file without closing it
+    fn gzerror
+        of GzFileS    // zlib.h 1.4 lines 1784 to 1800: returns error message for file
+        lend    // zlib.h 1.4 lines 1786 to 1799: borrows file without closing it
+        param 1 discarded    // zlib.h 1.4 line 1787: writes zlib error number into *errnum if non-NULL
+        returns borrow CStr from param 0    // zlib.h 1.4 lines 1793 to 1796: message is owned by file and invalidated by subsequent calls or gzclose
+    fn adler32
+        buffer param 1 len param 2    // zlib.h 1.4 lines 1819 to 1824: reads buf[0..len-1] and returns updated Adler-32 checksum (NULL/0 returns initial value 1)
+    fn adler32_z
+        buffer param 1 len param 2    // zlib.h 1.4 lines 1839 to 1844: size_t variant of adler32
+    fn crc32
+        buffer param 1 len param 2    // zlib.h 1.4 lines 1858 to 1864: reads buf[0..len-1] and returns updated CRC-32 checksum (NULL/0 returns initial value 0)
+    fn crc32_z
+        buffer param 1 len param 2    // zlib.h 1.4 lines 1876 to 1881: size_t variant of crc32
+    fn zError
+        returns static CStr    // zlib.h 1.4 line 2044 and zutil.c: returns static string literal from z_errmsg[]
