@@ -39,7 +39,9 @@ fn main:
     assert(mkdir_p(build) == 0)
     var header = "typedef struct Thing Thing;\nThing *thing_new(void);\nvoid thing_free(Thing *t);\n"
     header = header ++ "struct UserOps { void (*show)(Thing *); };\n"
-    for name in ["one", "two", "zeroed", "cast", "keep", "chain", "copied", "fwd", "nul", "reset"]: header = header ++ "void " ++ name ++ "_show(Thing *t);\n"
+    for name in ["one", "two", "zeroed", "cast", "keep", "chain", "copied", "fwd", "nul", "reset", "cyc_lend", "cyc_keep"]: header = header ++ "void " ++ name ++ "_show(Thing *t);\n"
+    header = header ++ "Thing *cyc_ungrounded_new(int n);\n"
+    header = header ++ "Thing *cyc_grounded_new(int n);\n"
     header = header ++ "struct CopyOps { void (*show)(Thing *); };\nvoid copy_set(const struct CopyOps *user);\n"
     header = header ++ "void user_show(struct UserOps *ops, Thing *t);\n"
     assert(write_file(dep ++ "/include/thing.h", header) == 0)
@@ -74,6 +76,29 @@ fn main:
     unit = unit ++ "void nul_show(Thing *t) { const struct NulOps *o = t->n ? &with_show : &without; if (o->show) o->show(t); }\n"
     unit = unit ++ "struct ResetOps { void (*show)(Thing *); };\nstatic struct ResetOps reset_ops = { show_a };\n"
     unit = unit ++ "void reset_show(Thing *t) { if (!t) reset_ops.show = NULL; else if (reset_ops.show) reset_ops.show(t); }\n"
+    // #3174 (Eric's ruling, 2026-11-25): cycles through closed function-pointer
+    // fields must use least fixed point for `retains` (a cycle with no store is
+    // a lend; a cycle with a store retains) and grounded fixed point for
+    // `owns_return` (a cycle with no fresh allocation stays unproven; a grounded
+    // table proves owned).
+    unit = unit ++ "struct CycLendOps { void (*step)(Thing *); };\nstatic void cyc_lend_a(Thing *t);\nstatic void cyc_lend_b(Thing *t);\n"
+    unit = unit ++ "static const struct CycLendOps cyc_lend_1 = { cyc_lend_a };\nstatic const struct CycLendOps cyc_lend_2 = { cyc_lend_b };\n"
+    unit = unit ++ "static void cyc_lend_a(Thing *t) { if (t->n > 0) cyc_lend_2.step(t); else shown = t->n; }\n"
+    unit = unit ++ "static void cyc_lend_b(Thing *t) { if (t->n > 1) cyc_lend_1.step(t); else shown = t->n; }\n"
+    unit = unit ++ "void cyc_lend_show(Thing *t) { (t->n ? &cyc_lend_1 : &cyc_lend_2)->step(t); }\n"
+    unit = unit ++ "struct CycKeepOps { void (*step)(Thing *); };\nstatic void cyc_keep_a(Thing *t);\nstatic void cyc_keep_b(Thing *t);\n"
+    unit = unit ++ "static const struct CycKeepOps cyc_keep_1 = { cyc_keep_a };\nstatic const struct CycKeepOps cyc_keep_2 = { cyc_keep_b };\n"
+    unit = unit ++ "static void cyc_keep_a(Thing *t) { if (t->n > 0) cyc_keep_2.step(t); }\n"
+    unit = unit ++ "static void cyc_keep_b(Thing *t) { if (t->n > 1) cyc_keep_1.step(t); else kept = t; }\n"
+    unit = unit ++ "void cyc_keep_show(Thing *t) { (t->n ? &cyc_keep_1 : &cyc_keep_2)->step(t); }\n"
+    unit = unit ++ "struct CycUngroundedOps { Thing *(*make)(int); };\nstatic Thing *cyc_ug_a(int n);\nstatic Thing *cyc_ug_b(int n);\n"
+    unit = unit ++ "static const struct CycUngroundedOps cyc_ug_1 = { cyc_ug_a };\nstatic const struct CycUngroundedOps cyc_ug_2 = { cyc_ug_b };\n"
+    unit = unit ++ "static Thing *cyc_ug_a(int n) { return n > 0 ? cyc_ug_2.make(n - 1) : NULL; }\n"
+    unit = unit ++ "static Thing *cyc_ug_b(int n) { return n > 0 ? cyc_ug_1.make(n - 1) : NULL; }\n"
+    unit = unit ++ "Thing *cyc_ungrounded_new(int n) { return (n ? &cyc_ug_1 : &cyc_ug_2)->make(n); }\n"
+    unit = unit ++ "struct CycGroundedOps { Thing *(*make)(int); };\nstatic Thing *cyc_gr_a(int n) { return (Thing *)malloc(sizeof(Thing)); }\nstatic Thing *cyc_gr_b(int n) { return cyc_gr_a(n); }\n"
+    unit = unit ++ "static const struct CycGroundedOps cyc_gr_1 = { cyc_gr_a };\nstatic const struct CycGroundedOps cyc_gr_2 = { cyc_gr_b };\n"
+    unit = unit ++ "Thing *cyc_grounded_new(int n) { return (n ? &cyc_gr_1 : &cyc_gr_2)->make(n); }\n"
     assert(write_file(src ++ "/thing.c", unit) == 0)
     let commands = "[\n{\n  \"directory\": \"" ++ src ++ "\",\n  \"command\": \"cc -I " ++ src ++ " -c thing.c\",\n  \"file\": \"thing.c\"\n}\n]\n"
     assert(write_file(build ++ "/compile_commands.json", commands) == 0)
@@ -89,6 +114,10 @@ fn main:
         "  fwd_show: lend",
         "  nul_show: lend",
         "  reset_show: lend",
+        "  cyc_lend_show: lend",
+        "  cyc_keep_show: raw: retains param 0 (passed through the function pointer field step (only ever cyc_keep_a or cyc_keep_b) to ",
+        "  cyc_ungrounded_new: raw: returns *mut Thing unproven:",
+        "  cyc_grounded_new: owned producer of Thing",
         "  copied_show: raw: retains param 0 (passed through the function pointer field show, which no unit decides: the record is assigned whole",
         "  zeroed_show: raw: retains param 0 (passed through the function pointer field show, which no unit decides: a pointer to the record is passed to memset, which the proofs cannot read",
         "  cast_show: raw: retains param 0 (passed through the function pointer field show, which no unit decides: a pointer to the record is converted to another pointer type",
