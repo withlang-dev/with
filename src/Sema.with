@@ -11500,12 +11500,16 @@ impl Sema:
         let direct: i32 = self.sig_lookup.get(name).unwrap()
         let declaring = self.extern_sig_modules.get(direct)
         if declaring.is_none():
-            // If this module itself declares an extern (e.g., via `c_import`)
-            // of the same name as a non-extern function from another module
-            // (such as `std.engines.pcre2`'s `pcre2_compile_8`), this module's
-            // own extern declaration wins.
-            let own = self.extern_decl_sites.get(self.current_module_path ++ "\n" ++ self.pool_resolve(name))
-            if own.is_some() and own.unwrap() >= 0: return own.unwrap()
+            // If `direct` is a non-extern function from a module this module
+            // did not import (e.g. `std.engines.pcre2` pulled in via prelude),
+            // and this module itself declares an extern of the same name (e.g.
+            // via `c_import`), this module's own extern wins. A non-extern
+            // function declared in this module or an imported module (such as
+            // `demo.memory.free` beside `stdlib.h`) keeps precedence.
+            let direct_mod = self.fn_symbol_source_path(name)
+            if direct_mod.len() > 0 and direct_mod != self.current_module_path and self.module_visible_no_prelude(direct_mod) == 0:
+                let own = self.extern_decl_sites.get(self.current_module_path ++ "\n" ++ self.pool_resolve(name))
+                if own.is_some() and own.unwrap() >= 0: return own.unwrap()
             return direct
         if declaring.unwrap() == self.current_module_path: return direct
         let view = self.extern_view_sig(self.pool_resolve(name))
