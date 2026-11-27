@@ -2132,8 +2132,11 @@ impl Sema:
             let shown = self.facade_param_display(fn_sym, sig, pi)
             let ptype = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
             let record = if self.get_type_kind(ptype) == TypeKind.TY_PTR: self.resolve_alias(self.get_type_d0(ptype) as TypeId) as i32 else: 0
-            if record == 0 or self.get_type_kind(record as TypeId) != TypeKind.TY_STRUCT or self.is_opaque_value_type(record):
-                self.emit_error_with_help(f"fn '{fname}': {word} {shown}: a value record is a pointer to one complete record; this is not one (§16.2b.5)", clause, "a pointer with a count is 'buffer param P len param L'; text is 'text param P'; an opaque record is a resource ('resource Name wraps *mut T')")
+            let rk = if record != 0: self.get_type_kind(self.numeric_operand_type(record)) else: TypeKind.TY_VOID
+            let is_flat_scalar = rk == TypeKind.TY_INT or rk == TypeKind.TY_FLOAT or rk == TypeKind.TY_BOOL
+            let is_complete_record = record != 0 and self.get_type_kind(record as TypeId) == TypeKind.TY_STRUCT and not self.is_opaque_value_type(record)
+            if not is_complete_record and not is_flat_scalar:
+                self.emit_error_with_help(f"fn '{fname}': {word} {shown}: a value parameter is a pointer to one complete record or scalar; this is not one (§16.2b.5)", clause, "a pointer with a count is 'buffer param P len param L'; text is 'text param P'; an opaque record is a resource ('resource Name wraps *mut T')")
                 return c
             if self.facade_param_takes_resource(fn_sym, pi):
                 self.emit_error_with_help(f"fn '{fname}': {word} {shown}: the record is a resource's representation, so the operation borrows that resource; it is not a value record (§16.2b.5)", clause, f"delete the `{word}` clause: the operation is presented on the resource and borrows it")
@@ -2141,14 +2144,15 @@ impl Sema:
             if self.facade_contract_pairs_buffer(c, pi):
                 self.emit_error_with_help(f"fn '{fname}': {word} {shown}: a pointer paired with a count is a buffer (§16.2b.8), not a value record (§16.2b.5)", clause, f"delete the `{word}` clause and keep the buffer clause")
                 return c
-            let held = self.pointer_holding_part(record, "")
-            if held.len() > 0:
-                self.emit_error_with_help(f"fn '{fname}': {word} {shown}: a value record is flat, and {held} is a pointer the program could set to any address; such a record is a resource, a buffer, or stays raw (§16.2b.5)", clause, "declare the record a resource ('resource Name wraps *mut T' with its producer and 'drop'), or leave the function raw")
-                return c
+            if is_complete_record:
+                let held = self.pointer_holding_part(record, "")
+                if held.len() > 0:
+                    self.emit_error_with_help(f"fn '{fname}': {word} {shown}: a value record is flat, and {held} is a pointer the program could set to any address; such a record is a resource, a buffer, or stays raw (§16.2b.5)", clause, "declare the record a resource ('resource Name wraps *mut T' with its producer and 'drop'), or leave the function raw")
+                    return c
             if word != "reads" and self.get_type_d1(ptype) == 0:
                 self.emit_error_with_help(f"fn '{fname}': {word} {shown}: the pointer is `const`, so the callee cannot write the record; `reads` is the clause (§16.2b.5)", clause, f"write `reads` in place of `{word}`")
                 return c
-            if word == "fills":
+            if word == "fills" and is_complete_record:
                 let culprit = self.zero_invalid_part(record, "")
                 if culprit.len() > 0:
                     self.emit_error_with_help(f"fn '{fname}': fills {shown}: With passes `{self.type_name(record)}.zeroed()`, and {culprit} has no all-zero value (§16.2b.3, §16.2b.5)", clause, "write `updates`: the caller then passes a record it built")

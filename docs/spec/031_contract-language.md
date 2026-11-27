@@ -498,9 +498,9 @@ and a call of the `drop` by its imported name consumes the resource:
 | `consumes param p` | the callee takes ownership of what `p` receives. `destroyed_by param q` names the callback C later invokes to destroy it. If registration can fail without taking ownership the contract says when transfer occurs; absent that, the caller keeps ownership. | G | observed | §16.2b.5 |
 | `detaches param p` | removes the value `p` borrows from its origin and yields it owned, dependent on that origin as a `borrows` child is. | G | | §16.2b.6 |
 | `retains param p by param q` | the value at `p` must outlive the resource at `q`; ownership stays outside C. A modeled unregister may release it. | G | a retained pointer makes the function raw | §16.2b.5 |
-| `reads param p` | `p` points to one value record the callee only reads; presents `&T`. | G | raw | §16.2b.5 |
-| `fills param p` | the callee writes the record without reading it first; presents the operation's result. With passes `T.zeroed()`, so `T` must be zero-valid. | G | raw | §16.2b.5 |
-| `updates param p` | the callee reads and writes the record; presents a `mut` parameter. | G | raw | §16.2b.5 |
+| `reads param p` | `p` points to one flat value (complete record or scalar) the callee only reads; presents `&T`. | G | raw | §16.2b.5 |
+| `fills param p` | the callee writes the flat value (record or scalar) without reading it first; presents the operation's result. With passes a zero-initialized `T` (`T.zeroed()` for a record, `0`/`false` for a scalar), so a record `T` must be zero-valid. | G | raw | §16.2b.5 |
+| `updates param p` | the callee reads and writes the flat value (record or scalar); presents a `mut` parameter. | G | raw | §16.2b.5 |
 | `nullable param p` | NULL is accepted at `p`; presents `Option`. Composes with `reads`: `Option[&T]`. | G | an input pointer the contract presents is non-null | §16.2b.8 |
 | `returns borrow R from param p` | the result is a view of the resource at `p` and cannot outlive it. `from params p, q`: of both. `from parent T of param p`: of the resource `p`'s resource itself borrows from. `from domain D`: of that foreign state. | G | the call is safe and the result is a raw pointer | §16.2b.6 |
 | `returns static T` | the result lives for the whole program. Never inferred from the absence of a visible owner. | G | the call is safe and the result is a raw pointer | §16.2b.7 |

@@ -361,7 +361,8 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
         let is_ok = cwords.len() >= 2 and cwords[0] == "ok"
         let is_static_cstr = clause == "returns static CStr"
         let is_borrow_cstr = clause.starts_with("returns borrow CStr from param ")
-        if is_of_clause or is_buffer_param or is_discarded or is_fixed or is_ok or is_static_cstr or is_borrow_cstr:
+        let is_fills_updates = cwords.len() == 3 and (cwords[0] == "fills" or cwords[0] == "updates" or cwords[0] == "detaches") and cwords[1] == "param"
+        if is_of_clause or is_buffer_param or is_discarded or is_fixed or is_ok or is_static_cstr or is_borrow_cstr or is_fills_updates:
             facts_push_unique(facts.value_fns, current_fn)
             if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
             value_item = current_fn
@@ -385,34 +386,69 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
         else if clause.starts_with("consumes param "):
             let n = clause.slice(15, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]): return Err(facts_error(path, line_no, "`consumes param N` takes a parameter index"))
-            facts.entries.push(FactsEntry { fn_name: current_fn, kind: "consumes:" ++ n, record: "", cite: cite })
+            if value_item == current_fn or facts.value_fns.contains(current_fn):
+                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
+                value_item = current_fn
+                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+            else:
+                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "consumes:" ++ n, record: "", cite: cite })
         else if clause.starts_with("returns borrow ") and clause.contains(" from param "):
             let at = clause.find(" from param ")
             let n = clause.slice(at + 12, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]): return Err(facts_error(path, line_no, "`returns borrow R from param N` takes a parameter index"))
-            facts.entries.push(FactsEntry { fn_name: current_fn, kind: "borrow:" ++ n, record: "", cite: cite })
+            if value_item == current_fn or facts.value_fns.contains(current_fn):
+                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
+                value_item = current_fn
+                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+            else:
+                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "borrow:" ++ n, record: "", cite: cite })
         else if clause.starts_with("nullable param "):
             let n = clause.slice(15, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]): return Err(facts_error(path, line_no, "`nullable param N` takes a parameter index"))
-            facts.entries.push(FactsEntry { fn_name: current_fn, kind: "nullable:" ++ n, record: "", cite: cite })
+            if value_item == current_fn or facts.value_fns.contains(current_fn):
+                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
+                value_item = current_fn
+                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+            else:
+                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "nullable:" ++ n, record: "", cite: cite })
         else if clause.starts_with("text param "):
             let n = clause.slice(11, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]): return Err(facts_error(path, line_no, "`text param N` takes a parameter index"))
-            facts.entries.push(FactsEntry { fn_name: current_fn, kind: "text_param:" ++ n, record: "", cite: cite })
+            if value_item == current_fn or facts.value_fns.contains(current_fn):
+                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
+                value_item = current_fn
+                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+            else:
+                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "text_param:" ++ n, record: "", cite: cite })
         else if clause.starts_with("text return"):
             let words = clause.replace(",", " ").fields()
             if words.len() != 6 or words[2] != "owned" or words[3] != "freed" or words[4] != "by": return Err(facts_error(path, line_no, "a text return is `text return, owned, freed by F`"))
-            facts.entries.push(FactsEntry { fn_name: current_fn, kind: "text_return:" ++ words[5], record: "", cite: cite })
+            if value_item == current_fn or facts.value_fns.contains(current_fn):
+                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
+                value_item = current_fn
+                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+            else:
+                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "text_return:" ++ words[5], record: "", cite: cite })
         else if clause.starts_with("callback param "):
             // D213: a setter of a `callback` field is described here, since
             // which thread runs the callback is a claim no proof reaches.
             let n = clause.slice(15, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]) or n.contains(" "): return Err(facts_error(path, line_no, "`callback param N` takes a parameter index (a callback with a userdata parameter is paired in a contract, not here)"))
-            facts.entries.push(FactsEntry { fn_name: current_fn, kind: "callback:" ++ n, record: "", cite: cite })
+            if value_item == current_fn or facts.value_fns.contains(current_fn):
+                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
+                value_item = current_fn
+                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+            else:
+                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "callback:" ++ n, record: "", cite: cite })
         else if clause.starts_with("retains param ") and clause.contains(" by param "):
             let words = clause.fields()
             if words.len() != 6 or not is_digit(words[2][0]) or not is_digit(words[5][0]): return Err(facts_error(path, line_no, "`retains param N by param M` takes two parameter indexes"))
-            facts.entries.push(FactsEntry { fn_name: current_fn, kind: "retains_by:" ++ words[2] ++ ":" ++ words[5], record: "", cite: cite })
+            if value_item == current_fn or facts.value_fns.contains(current_fn):
+                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
+                value_item = current_fn
+                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+            else:
+                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "retains_by:" ++ words[2] ++ ":" ++ words[5], record: "", cite: cite })
         else if clause.starts_with("variadic param ") and clause.contains(" selected by param ") and clause.ends_with(":"):
             // §16.2b.5: a variadic function's cases, stated as a contract
             // states them (libcurl's `curl_easy_setopt`): the header line,
@@ -433,10 +469,20 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             // functions ISO C and POSIX specify that way.
             let n = clause.slice(12, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]) or n.contains(" "): return Err(facts_error(path, line_no, "`reads param N` takes a parameter index"))
-            facts.entries.push(FactsEntry { fn_name: current_fn, kind: "reads:" ++ n, record: "", cite: cite })
+            if value_item == current_fn or facts.value_fns.contains(current_fn):
+                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
+                value_item = current_fn
+                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+            else:
+                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "reads:" ++ n, record: "", cite: cite })
         else if clause == "callback_thread any" or clause == "callback_thread registering":
-            facts.entries.push(FactsEntry { fn_name: current_fn, kind: "callback_thread:" ++ clause.slice(16, clause.len()), record: "", cite: cite })
-        else: return Err(facts_error(path, line_no, "an item fact is `of R[(param N)]`, `lend`, `buffer param P len|capacity param L [inout] [elements]`, `param N discarded`, `param N fixed <lit>`, `ok <CONST>`, `returns static CStr`, `consumes param N`, `returns borrow R from param N`, `nullable param N`, `text param N`, `text return, owned, freed by F`, `callback param N`, `retains param N by param M` or `callback_thread any|registering`"))
+            if value_item == current_fn or facts.value_fns.contains(current_fn):
+                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
+                value_item = current_fn
+                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+            else:
+                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "callback_thread:" ++ clause.slice(16, clause.len()), record: "", cite: cite })
+        else: return Err(facts_error(path, line_no, "an item fact is `of R[(param N)]`, `lend`, `buffer param P len|capacity param L [inout] [elements]`, `fills|updates|reads|detaches param N`, `param N discarded`, `param N fixed <lit>`, `ok <CONST>`, `returns static CStr`, `consumes param N`, `returns borrow R from param N`, `nullable param N`, `text param N`, `text return, owned, freed by F`, `callback param N`, `retains param N by param M` or `callback_thread any|registering`"))
     if ptr_header.len() > 0:
         if ptr_carry or ptr_rec_multi.contains(ptr_record):
             facts_push_unique(facts.value_resources, ptr_name)

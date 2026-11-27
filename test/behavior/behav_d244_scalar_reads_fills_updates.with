@@ -1,0 +1,46 @@
+//! expect-stdout: twice 14
+//! expect-stdout: version 1.2.3
+//! expect-stdout: pos 5 status 0
+//! expect-stdout: ok_fill 42
+// D244 (§16.2b.5): `reads`, `fills`, and `updates` on flat C scalar pointers.
+use c_import("
+#include <stddef.h>
+#define SCALAR_OK 0
+static inline int twice(const int *n) { return *n * 2; }
+static inline void get_ver(int *maj, int *min, int *pat) { *maj = 1; *min = 2; *pat = 3; }
+static inline int advance_buf(unsigned char *out, size_t *pos, size_t cap) {
+    if (*pos + 3 > cap) return -1;
+    out[*pos] = 10; out[*pos + 1] = 20; out[*pos + 2] = 30;
+    *pos += 3;
+    return SCALAR_OK;
+}
+static inline int fill_ok(int *out) { *out = 42; return SCALAR_OK; }
+")
+
+c contract scalars:
+    fn twice
+        reads param n
+    fn get_ver
+        fills param maj
+        fills param min
+        fills param pat
+    fn advance_buf
+        buffer param out capacity param cap
+        updates param pos
+    fn fill_ok
+        fills param out
+        ok SCALAR_OK
+
+fn main:
+    let v: i32 = 7
+    print(f"twice {twice(&v)}")
+    let (maj, min, pat) = get_ver()
+    print(f"version {maj}.{min}.{pat}")
+    var buf: [u8; 8] = [0 as u8; 8]
+    var pos: usize = 2
+    let st = advance_buf(buf, mut pos)
+    print(f"pos {pos} status {st}")
+    let Ok(fv) = fill_ok() else:
+        print("failed")
+        return 1
+    print(f"ok_fill {fv}")

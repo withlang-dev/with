@@ -1,10 +1,11 @@
-//! expect-check-fail: a value record is a pointer to one complete record; this is not one (§16.2b.5)
+//! expect-check-fail: a value parameter is a pointer to one complete record or scalar; this is not one (§16.2b.5)
 //! expect-check-fail: = help: a pointer with a count is 'buffer param P len param L'; text is 'text param P'; an opaque record is a resource ('resource Name wraps *mut T')
-// D198 (§16.2b.5): a value-record clause names a pointer to one complete record.
-use c_import("static inline int twice(const int *n) { return *n * 2; }")
+// D198 / D244 (§16.2b.5): a value-parameter clause names a pointer to one
+// complete flat record or scalar — never `void *`.
+use c_import("static inline int ignore_ptr(const void *n) { return n != 0; }")
 
 c contract shapes:
-    fn twice
+    fn ignore_ptr
         reads param n
 
 fn main:

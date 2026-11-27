@@ -3149,11 +3149,13 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
             b.params = pname ++ ": &" ++ record
             b.args = "(" ++ pname ++ " as " ++ ptype ++ ")"
         else if value_record == "fills":
-            // The parameter leaves the list: With passes `T.zeroed()` and
-            // the record joins what the operation presents
-            // (facade_render_bridge_body).
+            // The parameter leaves the list: With passes a zero-initialized T
+            // (`T.zeroed()` for a record, `false` for `bool`, `0 as T` for a
+            // scalar; D198/D244) and the filled value joins what the operation
+            // presents (facade_render_bridge_body).
             let local = facade_render_fresh(pname ++ "_filled", taken)
-            b.prologue = "var " ++ local ++ " = " ++ record ++ ".zeroed()\n"
+            let zero = if facade_render_is_record(pool, intern, record): record ++ ".zeroed()" else if record == "bool": "false" else: "0 as " ++ record
+            b.prologue = "var " ++ local ++ ": " ++ record ++ " = " ++ zero ++ "\n"
             b.args = "(&raw mut " ++ local ++ " as " ++ ptype ++ ")"
             b.fills = local
             b.fill_types = record
