@@ -2590,10 +2590,18 @@ impl Sema:
     // not the facade's symbol for the same name: when the symbol lookup
     // misses, find the declaration by its text, as the raw-ABI classifier does.
     fn facade_fn_decl_node(fn_sym: i32) -> i32:
+        let want = self.safe_symbol_text(fn_sym)
+        // Prefer an extern declaration from this facade's own module (e.g.
+        // `c_import`) over a same-named With function in an unrelated module.
+        for di in 0..self.ast.decl_count():
+            if di >= self.decl_is_c_import.len() or self.decl_is_c_import[di] == 0: continue
+            if di >= self.decl_source_paths.len() or self.decl_source_paths[di] != self.current_module_path: continue
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) == NodeKind.NK_EXTERN_FN and self.safe_symbol_text(self.ast.get_data0(decl)) == want:
+                return decl
         let direct = self.fn_symbol_decl_node(fn_sym)
         if direct != 0:
             return direct
-        let want = self.safe_symbol_text(fn_sym)
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             let kind = self.ast.kind(decl)

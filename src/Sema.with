@@ -11499,7 +11499,15 @@ impl Sema:
         if not self.sig_lookup.contains(name): return self.extern_view_sig(self.pool_resolve(name))
         let direct: i32 = self.sig_lookup.get(name).unwrap()
         let declaring = self.extern_sig_modules.get(direct)
-        if declaring.is_none() or declaring.unwrap() == self.current_module_path: return direct
+        if declaring.is_none():
+            // If this module itself declares an extern (e.g., via `c_import`)
+            // of the same name as a non-extern function from another module
+            // (such as `std.engines.pcre2`'s `pcre2_compile_8`), this module's
+            // own extern declaration wins.
+            let own = self.extern_decl_sites.get(self.current_module_path ++ "\n" ++ self.pool_resolve(name))
+            if own.is_some() and own.unwrap() >= 0: return own.unwrap()
+            return direct
+        if declaring.unwrap() == self.current_module_path: return direct
         let view = self.extern_view_sig(self.pool_resolve(name))
         if view >= 0: return view
         direct
