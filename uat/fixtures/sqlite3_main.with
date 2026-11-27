@@ -1,26 +1,43 @@
-// Release UAT: SQLite through its facade (D51, D92; spec §16.2b). The
-// program an application developer writes over `with get c.sqlite3`: the
-// facade `facades.sqlite3` is the project's own (§16.2b.1), and the raw
-// import names the status constants. No `unsafe`, no raw pointer, no status
-// code checked by hand: every call that can fail is a `Result` whose error
-// carries SQLite's own message, and the statement is finalized and the
-// connection closed by their scopes on every path, the statement first
-// (§16.2b.6).
+// Release UAT: SQLite through its registry facade (#3146). Zero `unsafe`, zero
+// project facade: open, transactions, sqlite3_exec, prepared statements with
+// bound parameters, step/column reads, error messages, and user-defined SQL
+// functions (create_function_v2).
 use contracts.sqlite3
 use c_import("sqlite3.h")
 
-fn total(db: &Database) -> Result[i32, SqliteError]:
-    db.exec("CREATE TABLE t(value INTEGER); INSERT INTO t(value) VALUES (40), (2);")?
-    let stmt = db.prepare("SELECT value FROM t")?
+type ScaleData { factor: i32 }
+
+fn scaled_add(ctx: Context, args: &[Value], app: &ScaleData):
+    var sum: i32 = 0
+    for i in 0..args.len() as i32:
+        sum = sum + args[i].int()
+    ctx.result_int(sum * app.factor)
+
+fn run_queries(db: &Database) -> Result[i32, SqliteError]:
+    // Transactions + sqlite3_exec.
+    db.exec("BEGIN; CREATE TABLE t(id INTEGER, value INTEGER, label TEXT); INSERT INTO t VALUES (1, 40, 'forty'), (2, 2, 'two'); COMMIT;")?
+    // Prepared statement with bound parameters + step/column reads.
+    let stmt = db.prepare("SELECT value, label FROM t WHERE id >= ?")?
+    stmt.bind_int(1, 1)?
     var sum = 0
-    while stmt.step()? == SQLITE_ROW: sum += stmt.column_int(0)
+    var labels = 0
+    while stmt.step()? == SQLITE_ROW:
+        sum += stmt.column_int(0)
+        if stmt.column_text(1).is_some(): labels += 1
+    if labels != 2: return Ok(-1)
+    // User-defined SQL function with boxed userdata.
+    db.create_function_v2("scaled_add", 2, SQLITE_UTF8, ScaleData { factor: 2 }, scaled_add, null, null)?
+    let udf_stmt = db.prepare("SELECT scaled_add(10, 11)")?
+    if udf_stmt.step()? != SQLITE_ROW: return Ok(-2)
+    let udf_res = udf_stmt.column_int(0)
+    if udf_res != 42: return Ok(-3)
     sum
 
 fn main:
     let Ok(db) = Database.open(":memory:") else:
         print("sqlite3 open failed")
         return 1
-    match total(db):
+    match run_queries(&db):
         Ok(42) => {}
         Ok(sum) =>
             print(f"sqlite3 sum mismatch: {sum}")
@@ -28,7 +45,7 @@ fn main:
         Err(e) =>
             print(f"sqlite3 failed: {e}")
             return 1
-    // A failure is a value that says what SQLite said.
+    // A failure carries SQLite's own error text.
     match db.exec("SELEC 1"):
         Err(.Failed(_, message)) =>
             if not message.contains("syntax error"):

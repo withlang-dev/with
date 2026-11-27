@@ -1,0 +1,154 @@
+// sqlite3 3.51.0 (conan-center-index recipes/sqlite3). Every clause cites
+// sqlite3.h or the SQLite C API manual.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - sqlite3_config, sqlite3_db_config, sqlite3_vtab_config, sqlite3_test_control,
+//   sqlite3_file_control: untyped variadic control interfaces whose argument
+//   types vary dynamically by op-code.
+// - sqlite3_mprintf, sqlite3_vmprintf, sqlite3_snprintf, sqlite3_vsnprintf:
+//   printf-style format variadics.
+// - sqlite3_vfs_*, sqlite3_create_module*, sqlite3_create_collation*,
+//   sqlite3_set_authorizer, sqlite3_commit_hook, sqlite3_rollback_hook,
+//   sqlite3_update_hook, sqlite3_trace_v2, sqlite3_progress_handler:
+//   callback/vtable hooks with retained raw pointers or custom allocators.
+// - sqlite3_malloc*, sqlite3_realloc*, sqlite3_free, sqlite3_msize:
+//   raw memory allocator functions.
+// - sqlite3_bind_text/blob/pointer (destructor function-pointer convention
+//   SQLITE_STATIC/SQLITE_TRANSIENT) and sqlite3_column_blob (interior raw ptr).
+// - sqlite3_get_table / sqlite3_free_table: legacy double-pointer result table.
+c facts sqlite3 error SqliteError:
+    resource Database wraps *mut sqlite3
+        from sqlite3_open(out param 1)    // sqlite3.h 3.51.0: opens database connection into *ppDb; returns SQLITE_OK on success and may still allocate *ppDb on failure
+        from sqlite3_open_v2(out param 1)    // sqlite3.h 3.51.0: opens database connection with flags and optional VFS name into *ppDb
+        drop sqlite3_close    // sqlite3.h 3.51.0: closes database connection and releases its resources
+        destroys sqlite3_close_v2    // sqlite3.h 3.51.0: closes database connection (deferring final destruction if statements remain)
+        ok SQLITE_OK    // sqlite3.h 3.51.0: SQLITE_OK indicates success
+        message sqlite3_errmsg    // sqlite3.h 3.51.0: English-language description of the most recent failed sqlite3_* API call on db
+        thread creator    // sqlite3.h 3.51.0: threading mode is runtime/open-flag configured, never inferred
+    resource Statement wraps *mut sqlite3_stmt
+        from sqlite3_prepare_v2(out param 3)    // sqlite3.h 3.51.0: compiles SQL text into prepared statement *ppStmt
+        drop sqlite3_finalize    // sqlite3.h 3.51.0: deletes prepared statement
+        borrows param 0    // sqlite3.h 3.51.0: statement depends on its database connection and must be finalized before close
+        ok SQLITE_OK    // sqlite3.h 3.51.0: SQLITE_OK indicates success
+        message sqlite3_errmsg    // sqlite3.h 3.51.0: parent connection describes prepare/statement errors
+        thread creator    // sqlite3.h 3.51.0: bound to creator thread
+    handle Context wraps *mut sqlite3_context    // sqlite3.h 3.51.0: callback-scope context passed to application-defined SQL functions
+    handle Value wraps *mut sqlite3_value    // sqlite3.h 3.51.0: callback-scope protected value object passed to application-defined SQL functions
+    fn sqlite3_open_v2
+        nullable param 3    // sqlite3.h 3.51.0: zVfs may be NULL to select the default VFS
+    fn sqlite3_prepare_v2
+        rename prepare    // sqlite3.h 3.51.0: prepares a single SQL statement
+        param nByte fixed -1    // sqlite3.h 3.51.0: negative nByte reads zSql up to the first zero terminator
+        param pzTail fixed null    // sqlite3.h 3.51.0: NULL declines tail pointer for single-statement prepare
+        lend    // sqlite3.c sqlite3ValueNew: p->db = db is db's own error value back-pointer, freed by sqlite3_close
+    fn sqlite3_errmsg
+        returns borrow CStr from param 0    // sqlite3.h 3.51.0: internally managed error text owned by db until next call
+        valid on failed    // sqlite3.h 3.51.0: valid on a handle returned by a failed sqlite3_open
+    fn sqlite3_errcode
+        lend    // sqlite3.h 3.51.0: returns numeric result code of most recent call on db
+    fn sqlite3_extended_errcode
+        lend    // sqlite3.h 3.51.0: returns extended result code of most recent call on db
+    fn sqlite3_changes
+        lend    // sqlite3.h 3.51.0: returns rows modified by most recent INSERT/UPDATE/DELETE
+    fn sqlite3_total_changes
+        lend    // sqlite3.h 3.51.0: returns total rows modified since connection opened
+    fn sqlite3_last_insert_rowid
+        lend    // sqlite3.h 3.51.0: returns rowid of most recent successful INSERT
+    fn sqlite3_get_autocommit
+        lend    // sqlite3.h 3.51.0: returns non-zero if connection is in autocommit mode
+    fn sqlite3_busy_timeout
+        lend    // sqlite3.h 3.51.0: sets busy handler timeout in milliseconds
+        ok SQLITE_OK    // sqlite3.h 3.51.0: returns SQLITE_OK on success
+    fn sqlite3_exec
+        rename exec    // sqlite3.h 3.51.0: executes one or more SQL statements without row callback
+        param 2 fixed null    // sqlite3.h 3.51.0: NULL callback ignores result rows
+        param 3 fixed null    // sqlite3.h 3.51.0: unused userdata when callback is NULL
+        param errmsg fixed null    // sqlite3.h 3.51.0: NULL declines heap errmsg; error message is read via sqlite3_errmsg
+        lend    // sqlite3.c: internally prepared statement is finalized before sqlite3_exec returns
+        ok SQLITE_OK    // sqlite3.h 3.51.0: returns SQLITE_OK on success
+    fn sqlite3_exec
+        rename exec_with    // sqlite3.h 3.51.0: executes SQL statements invoking callback per result row
+        callback param 2 userdata param 3    // sqlite3.h 3.51.0: 3rd param is row callback, 4th param is relayed userdata
+        param errmsg fixed null    // sqlite3.h 3.51.0: NULL declines heap errmsg; error message is read via sqlite3_errmsg
+        ok SQLITE_OK    // sqlite3.h 3.51.0: returns SQLITE_OK on success
+    fn sqlite3_create_function_v2
+        consumes param 4 destroyed_by param 8    // sqlite3.h 3.51.0: pApp is owned by db and destroyed by xDestroy when deleted or closed
+        retains param 5 by param 0    // sqlite3.h 3.51.0: xFunc retained by db
+        retains param 6 by param 0    // sqlite3.h 3.51.0: xStep retained by db
+        retains param 7 by param 0    // sqlite3.h 3.51.0: xFinal retained by db
+        callback param xFunc argv param 2 paired with argc param 1 as &[Value]    // sqlite3.h 3.51.0: xFunc receives (ctx, argc, argv)
+        callback param xStep argv param 2 paired with argc param 1 as &[Value]    // sqlite3.h 3.51.0: xStep receives (ctx, argc, argv)
+        nullable param xStep    // sqlite3.h 3.51.0: NULL for scalar functions
+        nullable param xFinal    // sqlite3.h 3.51.0: NULL for scalar functions
+        user_data from sqlite3_user_data as &U    // sqlite3.h 3.51.0: sqlite3_user_data returns the pApp userdata registered with the function
+        ok SQLITE_OK    // sqlite3.h 3.51.0: returns SQLITE_OK on success
+    fn sqlite3_result_int
+        of Context    // sqlite3.h 3.51.0: sets 32-bit integer result of application-defined SQL function
+    fn sqlite3_result_int64
+        of Context    // sqlite3.h 3.51.0: sets 64-bit integer result of application-defined SQL function
+    fn sqlite3_result_double
+        of Context    // sqlite3.h 3.51.0: sets floating-point result of application-defined SQL function
+    fn sqlite3_result_null
+        of Context    // sqlite3.h 3.51.0: sets NULL result of application-defined SQL function
+    fn sqlite3_value_int
+        of Value    // sqlite3.h 3.51.0: extracts 32-bit integer from protected sqlite3_value
+    fn sqlite3_value_int64
+        of Value    // sqlite3.h 3.51.0: extracts 64-bit integer from protected sqlite3_value
+    fn sqlite3_value_double
+        of Value    // sqlite3.h 3.51.0: extracts double from protected sqlite3_value
+    fn sqlite3_value_type
+        of Value    // sqlite3.h 3.51.0: returns datatype code of protected sqlite3_value
+    fn sqlite3_value_bytes
+        of Value    // sqlite3.h 3.51.0: returns byte size of protected sqlite3_value
+    fn sqlite3_step
+        lend    // sqlite3.h 3.51.0: evaluates next row of prepared statement
+        ok SQLITE_ROW, SQLITE_DONE    // sqlite3.h 3.51.0: SQLITE_ROW for row ready, SQLITE_DONE for completion
+    fn sqlite3_reset
+        lend    // sqlite3.h 3.51.0: resets prepared statement to initial state
+        ok SQLITE_OK    // sqlite3.h 3.51.0: returns SQLITE_OK on success
+    fn sqlite3_clear_bindings
+        lend    // sqlite3.h 3.51.0: resets all host parameter bindings to NULL
+        ok SQLITE_OK    // sqlite3.h 3.51.0: returns SQLITE_OK on success
+    fn sqlite3_bind_int
+        lend    // sqlite3.h 3.51.0: binds 32-bit integer parameter
+        ok SQLITE_OK    // sqlite3.h 3.51.0: returns SQLITE_OK on success
+    fn sqlite3_bind_int64
+        lend    // sqlite3.h 3.51.0: binds 64-bit integer parameter
+        ok SQLITE_OK    // sqlite3.h 3.51.0: returns SQLITE_OK on success
+    fn sqlite3_bind_double
+        lend    // sqlite3.h 3.51.0: binds double parameter
+        ok SQLITE_OK    // sqlite3.h 3.51.0: returns SQLITE_OK on success
+    fn sqlite3_bind_null
+        lend    // sqlite3.h 3.51.0: binds NULL parameter
+        ok SQLITE_OK    // sqlite3.h 3.51.0: returns SQLITE_OK on success
+    fn sqlite3_bind_parameter_count
+        lend    // sqlite3.h 3.51.0: returns index of largest SQL parameter
+        preserves param 0    // sqlite3.h 3.51.0: read-only metadata query
+    fn sqlite3_bind_parameter_index
+        lend    // sqlite3.h 3.51.0: returns index of named SQL parameter
+        preserves param 0    // sqlite3.h 3.51.0: read-only metadata query
+    fn sqlite3_column_int
+        lend    // sqlite3.h 3.51.0: returns column value as 32-bit int
+    fn sqlite3_column_int64
+        lend    // sqlite3.h 3.51.0: returns column value as 64-bit int
+    fn sqlite3_column_double
+        lend    // sqlite3.h 3.51.0: returns column value as double
+    fn sqlite3_column_count
+        lend    // sqlite3.h 3.51.0: returns number of columns in result set
+        preserves param 0    // sqlite3.h 3.51.0: metadata query, no conversion
+    fn sqlite3_column_type
+        lend    // sqlite3.h 3.51.0: returns initial datatype code of column
+        preserves param 0    // sqlite3.h 3.51.0: metadata query, no conversion
+    fn sqlite3_column_bytes
+        lend    // sqlite3.h 3.51.0: returns byte count of column text/blob
+        preserves param 0    // sqlite3.h 3.51.0: does not invalidate column_text view
+    fn sqlite3_column_text
+        returns borrow CStr from param 0    // sqlite3.h 3.51.0: NUL-terminated UTF-8 text owned by statement until step/reset/finalize
+    fn sqlite3_column_name
+        returns borrow CStr from param 0    // sqlite3.h 3.51.0: column name owned by statement until reprepare/finalize
+    fn sqlite3_libversion
+        returns static CStr    // sqlite3.h 3.51.0: static library version string
+    fn sqlite3_sourceid
+        returns static CStr    // sqlite3.h 3.51.0: static source check-in identifier string
+    fn sqlite3_errstr
+        returns static CStr    // sqlite3.h 3.51.0: static English description of result code
