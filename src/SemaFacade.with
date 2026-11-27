@@ -4127,7 +4127,7 @@ impl Sema:
     // Whether a callback, retention or consumption clause models `pi`.
     fn facade_contract_models_param(ci: i32, pi: i32) -> bool:
         let c = &self.foreign_contracts[ci]
-        c.callback_userdata_cb.contains(pi) or c.callback_userdata_of.contains(pi) or c.retains.contains(pi) or c.consumes.contains(pi) or c.consumes_destroyed_by.contains(pi) or c.callback_consumes.contains(pi)
+        c.bare_callbacks.contains(pi) or c.callback_userdata_cb.contains(pi) or c.callback_userdata_of.contains(pi) or c.retains.contains(pi) or c.consumes.contains(pi) or c.consumes_destroyed_by.contains(pi) or c.callback_consumes.contains(pi)
 
     // Sema owns the C-to-presented parameter projection. Effects and
     // callback argument indices use this same mapping; collapsing a buffer
@@ -4274,7 +4274,7 @@ impl Sema:
         let inout = self.facade_contract_inout(ci)
         let ok_const = self.foreign_contracts[ci].ok_const
         let resource_op = self.facade_fn_is_resource_op(fn_sym)
-        let contract_item = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_consumes.len() > 0 or self.foreign_contracts[ci].callback_thread_said != 0
+        let contract_item = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].bare_callbacks.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_consumes.len() > 0 or self.foreign_contracts[ci].callback_thread_said != 0
         let callback_item = self.facade_contract_is_callback_item(ci)
         // D122 (§16.2b.8): a producer's buffer-plus-length input
         // (xmlReadMemory's buffer and size) is paired like a lend's; the
