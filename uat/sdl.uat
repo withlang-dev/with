@@ -1,4 +1,4 @@
-scenario: SDL opens a window and draws from a fresh project
+scenario: SDL opens a window, polls events, and draws from a fresh project over the facade with get writes
 requires: network
 platforms: darwin, windows, linux-x86_64
 # D171: only where with get provides the whole chain cleanly. SDL's Linux
@@ -9,56 +9,8 @@ platforms: darwin, windows, linux-x86_64
 new directory
 run: with init .
 run: with get c.sdl
+expect stderr contains: facade sdl:
 write src/main.with from sdl_main.with
-write src/contracts/sdl.with:
-    // An SDL facade a game writes for itself: the window and its renderer are
-    // owned resources that SDL's own destroy calls release, the renderer before
-    // the window it draws into.
-    use c_import("SDL3/SDL.h")
-
-    c contract sdl:
-        // SDL_audio.h (SDL_AudioPostmixCallback): "This will run from a
-        // background thread owned by SDL."
-        runs threads
-        resource Window wraps *mut SDL_Window
-            from SDL_CreateWindow
-            drop SDL_DestroyWindow
-        resource Renderer wraps *mut SDL_Renderer
-            from SDL_CreateRenderer
-            drop SDL_DestroyRenderer
-            borrows param 0
-        fn SDL_CreateWindow
-            of Window
-            rename open
-        fn SDL_CreateRenderer
-            of Window
-            rename renderer
-            param name fixed null
-            lend
-        fn SDL_SetRenderDrawColor
-            of Renderer
-            rename color
-            lend
-        fn SDL_RenderClear
-            of Renderer
-            rename clear
-            lend
-        fn SDL_RenderFillRects
-            of Renderer
-            rename fill
-            lend
-            buffer param rects len param count elements
-        fn SDL_RenderPresent
-            of Renderer
-            rename present
-            lend
-        fn SDL_GetRendererName
-            of Renderer
-            rename name
-            returns borrow CStr from param 0
-        domain errors thread
-        fn SDL_GetError
-            returns borrow CStr from domain errors
 run: with check src/main.with
 expect stdout: ok
 # SDL's own off-screen video driver (built into SDL on every platform): the

@@ -1,0 +1,107 @@
+// SDL3 3.4.0 (conan-center-index recipes/sdl). Every clause cites SDL3 headers.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - Platform/GPU/Vulkan/Metal/Direct3D native handles, custom memory allocators
+//   (SDL_malloc/calloc/realloc/free/SetMemoryFunctions), printf variadics
+//   (SDL_Log*, SDL_snprintf, SDL_SetError), raw pixel pointers, and thread
+//   creation with untyped void* userdata.
+c facts sdl:
+    runs threads    // SDL_audio.h (SDL_AudioPostmixCallback): background audio device thread owned by SDL
+    domain errors thread    // SDL_error.h: SDL_GetError returns thread-local error string
+    resource Window wraps *mut SDL_Window
+        from SDL_CreateWindow    // SDL_video.h: creates window owned by caller, destroyed by SDL_DestroyWindow
+        drop SDL_DestroyWindow    // SDL_video.h: destroys window
+    resource Renderer wraps *mut SDL_Renderer
+        from SDL_CreateRenderer    // SDL_render.h: creates 2D rendering context for window
+        drop SDL_DestroyRenderer    // SDL_render.h: destroys rendering context
+        borrows param 0    // SDL_render.h: renderer depends on its window and must be destroyed before it
+    resource Surface wraps *mut SDL_Surface
+        from SDL_CreateSurface    // SDL_surface.h: allocates an SDL_Surface owned by caller
+        drop SDL_DestroySurface    // SDL_surface.h: frees an SDL_Surface
+    resource Texture wraps *mut SDL_Texture
+        from SDL_CreateTexture    // SDL_render.h: creates texture for rendering context
+        from SDL_CreateTextureFromSurface    // SDL_render.h: creates texture from existing surface
+        drop SDL_DestroyTexture    // SDL_render.h: destroys texture
+        borrows param 0    // SDL_render.h: texture belongs to its renderer
+    message Event wraps SDL_Event
+        from SDL_PollEvent(out param 0)    // SDL_events.h: polls for currently pending events into *event
+        tag type    // SDL_events.h: SDL_Event.type identifies the active union member
+        case Quit when SDL_EVENT_QUIT field quit    // SDL_events.h: quit event
+        case KeyDown when SDL_EVENT_KEY_DOWN field key    // SDL_events.h: keyboard press event
+        case KeyUp when SDL_EVENT_KEY_UP field key    // SDL_events.h: keyboard release event
+        case MouseMotion when SDL_EVENT_MOUSE_MOTION field motion    // SDL_events.h: mouse motion event
+        case MouseButtonDown when SDL_EVENT_MOUSE_BUTTON_DOWN field button    // SDL_events.h: mouse button press
+        case MouseButtonUp when SDL_EVENT_MOUSE_BUTTON_UP field button    // SDL_events.h: mouse button release
+        case WindowEvent when SDL_EVENT_WINDOW_FIRST..SDL_EVENT_WINDOW_LAST field window    // SDL_events.h: window state events
+    fn SDL_CreateWindow
+        of Window    // SDL_video.h: Window constructor
+        rename open    // SDL_video.h: Window.open
+    fn SDL_CreateRenderer
+        of Window    // SDL_render.h: creates renderer on window
+        rename renderer    // SDL_render.h: window.renderer()
+        param name fixed null    // SDL_render.h: NULL selects default rendering driver
+        lend    // SDL_render.h: borrows window
+    fn SDL_SetRenderDrawColor
+        of Renderer    // SDL_render.h: sets renderer draw color
+        rename color    // SDL_render.h: renderer.color(r, g, b, a)
+        lend    // SDL_render.h: borrows renderer
+    fn SDL_RenderClear
+        of Renderer    // SDL_render.h: clears current rendering target
+        rename clear    // SDL_render.h: renderer.clear()
+        lend    // SDL_render.h: borrows renderer
+    fn SDL_RenderFillRects
+        of Renderer    // SDL_render.h: fills array of rectangles on current target
+        rename fill    // SDL_render.h: renderer.fill(rects)
+        lend    // SDL_render.h: borrows renderer
+        buffer param rects len param count elements    // SDL_render.h: count SDL_FRect elements read from rects
+    fn SDL_RenderPresent
+        of Renderer    // SDL_render.h: updates screen with rendered frame
+        rename present    // SDL_render.h: renderer.present()
+        lend    // SDL_render.h: borrows renderer
+    fn SDL_GetRendererName
+        of Renderer    // SDL_render.h: returns renderer driver name
+        rename name    // SDL_render.h: renderer.name()
+        returns borrow CStr from param 0    // SDL_render.h: name owned by renderer
+    fn SDL_GetWindowTitle
+        of Window    // SDL_video.h: returns window title string
+        returns borrow CStr from param 0    // SDL_video.h: owned by window until next SetWindowTitle
+    fn SDL_SetWindowTitle
+        of Window    // SDL_video.h: sets window title string (copied by SDL)
+        lend    // SDL_video.h: borrows window
+    fn SDL_ShowWindow
+        of Window    // SDL_video.h: shows window
+        lend    // SDL_video.h: borrows window
+    fn SDL_HideWindow
+        of Window    // SDL_video.h: hides window
+        lend    // SDL_video.h: borrows window
+    fn SDL_GetWindowSize
+        of Window    // SDL_video.h: queries window width and height
+        fills param 1    // SDL_video.h: writes width into *w
+        fills param 2    // SDL_video.h: writes height into *h
+        lend    // SDL_video.h: borrows window
+    fn SDL_SetRenderDrawBlendMode
+        of Renderer    // SDL_render.h: sets blend mode for drawing operations
+        lend    // SDL_render.h: borrows renderer
+    fn SDL_RenderPoint
+        of Renderer    // SDL_render.h: draws a point
+        lend    // SDL_render.h: borrows renderer
+    fn SDL_RenderLine
+        of Renderer    // SDL_render.h: draws a line
+        lend    // SDL_render.h: borrows renderer
+    fn SDL_RenderRect
+        of Renderer    // SDL_render.h: draws a rectangle outline
+        reads param 1    // SDL_render.h: reads const SDL_FRect *rect
+        lend    // SDL_render.h: borrows renderer
+    fn SDL_RenderFillRect
+        of Renderer    // SDL_render.h: fills a single rectangle
+        reads param 1    // SDL_render.h: reads const SDL_FRect *rect
+        lend    // SDL_render.h: borrows renderer
+    fn SDL_RenderTexture
+        of Renderer    // SDL_render.h: copies texture to rendering target
+        reads param 2    // SDL_render.h: optional source SDL_FRect
+        nullable param 2    // SDL_render.h: NULL uses entire texture
+        reads param 3    // SDL_render.h: optional destination SDL_FRect
+        nullable param 3    // SDL_render.h: NULL fills entire target
+        lend    // SDL_render.h: borrows renderer and texture
+    fn SDL_GetError
+        returns borrow CStr from domain errors    // SDL_error.h: thread-local error string

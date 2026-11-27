@@ -1,3 +1,6 @@
+// Release UAT: SDL3 through its registry facade (#3157). Zero `unsafe`, zero
+// project facade: SDL_Init, Window, Renderer, event loop (Event.poll), drawing
+// rects/lines/textures, and clean teardown.
 use contracts.sdl
 use c_import("SDL3/SDL.h")
 
@@ -19,8 +22,15 @@ fn main:
     var bars: List[SDL_FRect] = List.new()
     for i in 0..8: bars.push(SDL_FRect { x: 40.0 + 70.0 * (i as f32), y: 200.0, w: 50.0, h: 80.0 })
 
+    var quit = false
     var drawn = 0
     for frame in 0..10:
+        for ev in Event.poll():
+            match ev:
+                .Quit(_) => quit = true
+                .KeyDown(_) => {}
+                _ => {}
+        if quit: break
         renderer.color(14, 16, 26, 255)
         renderer.clear()
         renderer.color(240, 200, 40, 255)
