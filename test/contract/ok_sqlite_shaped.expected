@@ -67,18 +67,18 @@ fn sqlite3_create_function_v2; contract:sqlite@test/contract/ok_sqlite_shaped.wi
     effect: param 1: *const c_char zName: lend, the described fn's assertion  [default:a described fn lends its resource parameters, and this is none (§31.8.1)]
     effect: param 2: i32 nArg: lend, the described fn's assertion  [default:a described fn lends its resource parameters, and this is none (§31.8.1)]
     effect: param 3: i32 eTextRep: lend, the described fn's assertion  [default:a described fn lends its resource parameters, and this is none (§31.8.1)]
-    effect: param 4: *mut c_void pApp: consumes; destroyed by the callback param 6: extern "C" fn(*mut c_void) -> Unit xDestroy  [claim: stated@test/contract/ok_sqlite_shaped.with:38]
-    effect: param 5: extern "C" fn(*mut c_void) -> Unit xFunc: callback, borrowed for the call's scope; what C passes it cannot escape  [default:callback-scope borrow (§16.2b.9)]
-    effect: param 6: extern "C" fn(*mut c_void) -> Unit xDestroy: callback, the destroy path of the consumed param 4: *mut c_void pApp  [claim: stated@test/contract/ok_sqlite_shaped.with:38]
+    effect: param 4: *mut c_void pApp: consumes; destroyed by the callback param 6: unsafe extern "C" fn(*mut c_void) -> Unit xDestroy  [claim: stated@test/contract/ok_sqlite_shaped.with:38]
+    effect: param 5: unsafe extern "C" fn(*mut c_void) -> Unit xFunc: callback, borrowed for the call's scope; what C passes it cannot escape  [default:callback-scope borrow (§16.2b.9)]
+    effect: param 6: unsafe extern "C" fn(*mut c_void) -> Unit xDestroy: callback, the destroy path of the consumed param 4: *mut c_void pApp  [claim: stated@test/contract/ok_sqlite_shaped.with:38]
     returns: i32  [default:as declared]
     preserves: domain errno  [claim: stated@test/contract/ok_sqlite_shaped.with:39]
     invalidates: Database (param 0: *mut sqlite3 db)  [default:unknown effect is invalidate (§16.2b.7)]
     presentation: Database.create_function_v2  [default:presentation sugar from the resource prefix (§16.2b.11)]
-callback param 5: extern "C" fn(*mut c_void) -> Unit xFunc of sqlite3_create_function_v2; clause:fn@test/contract/ok_sqlite_shaped.with:37
+callback param 5: unsafe extern "C" fn(*mut c_void) -> Unit xFunc of sqlite3_create_function_v2; clause:fn@test/contract/ok_sqlite_shaped.with:37
     role: used during this call only; not retained  [default:callback-scope borrow (§16.2b.9)]
     thread: any; captured With state must be Send and Sync  [stated@test/contract/ok_sqlite_shaped.with:40]
     reentrancy: the call may invoke it; its captures' origins are affected as their capture modes allow  [default:absent a facade assertion the call is reentrant (§16.2b.9)]
-callback param 6: extern "C" fn(*mut c_void) -> Unit xDestroy of sqlite3_create_function_v2; clause:fn@test/contract/ok_sqlite_shaped.with:37
+callback param 6: unsafe extern "C" fn(*mut c_void) -> Unit xDestroy of sqlite3_create_function_v2; clause:fn@test/contract/ok_sqlite_shaped.with:37
     role: destroy path of the consumed param 4: *mut c_void pApp; With destroys it through no other path  [claim: stated@test/contract/ok_sqlite_shaped.with:38]
     thread: any; captured With state must be Send and Sync  [stated@test/contract/ok_sqlite_shaped.with:40]
     reentrancy: the call may invoke it; its captures' origins are affected as their capture modes allow  [default:absent a facade assertion the call is reentrant (§16.2b.9)]
@@ -86,12 +86,12 @@ fn sqlite3_trace_v2; contract:sqlite@test/contract/ok_sqlite_shaped.with; clause
     callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut sqlite3 db: lend, the described fn's assertion; receives Database  [claim: stated@test/contract/ok_sqlite_shaped.with:41]
     effect: param 1: u32 mask: lend, the described fn's assertion  [default:a described fn lends its resource parameters, and this is none (§31.8.1)]
-    effect: param 2: extern "C" fn(u32, *mut c_void, *mut c_void, *mut c_void) -> i32 xCallback: retained by Database (param 0: *mut sqlite3 db)  [claim: stated@test/contract/ok_sqlite_shaped.with:42]
+    effect: param 2: unsafe extern "C" fn(u32, *mut c_void, *mut c_void, *mut c_void) -> i32 xCallback: retained by Database (param 0: *mut sqlite3 db)  [claim: stated@test/contract/ok_sqlite_shaped.with:42]
     effect: param 3: *mut c_void pCtx: retained by Database (param 0: *mut sqlite3 db)  [claim: stated@test/contract/ok_sqlite_shaped.with:43]
     returns: i32  [default:as declared]
     invalidates: Database (param 0: *mut sqlite3 db), domain errno  [default:unknown effect is invalidate (§16.2b.7)]
     presentation: Database.trace_v2  [default:presentation sugar from the resource prefix (§16.2b.11)]
-callback param 2: extern "C" fn(u32, *mut c_void, *mut c_void, *mut c_void) -> i32 xCallback of sqlite3_trace_v2; clause:fn@test/contract/ok_sqlite_shaped.with:41
+callback param 2: unsafe extern "C" fn(u32, *mut c_void, *mut c_void, *mut c_void) -> i32 xCallback of sqlite3_trace_v2; clause:fn@test/contract/ok_sqlite_shaped.with:41
     role: retained by Database (param 0: *mut sqlite3 db); it lives as long as its owner  [claim: stated@test/contract/ok_sqlite_shaped.with:42]
     thread: any, where the callback is retained; captured With state must be Send and Sync  [default:no `callback_thread registering` (§31.6.2)]
     reentrancy: the call may invoke it; its captures' origins are affected as their capture modes allow  [default:absent a facade assertion the call is reentrant (§16.2b.9)]
