@@ -1,0 +1,32 @@
+//! expect-stdout: ok 2
+
+// Regression test: pattern exhaustiveness checking on a wildcard binding of a
+// struct with many `List[T]` fields (such as `for (i, item) in items.enumerate():`)
+// must short-circuit all-wildcard columns instead of expanding every field and
+// branching 2^N times in `exh_missing_slice`.
+type ManyLists {
+    l01: List[i32], l02: List[i32], l03: List[i32], l04: List[i32], l05: List[i32],
+    l06: List[i32], l07: List[i32], l08: List[i32], l09: List[i32], l10: List[i32],
+    l11: List[i32], l12: List[i32], l13: List[i32], l14: List[i32], l15: List[i32],
+    l16: List[i32], l17: List[i32], l18: List[i32], l19: List[i32], l20: List[i32],
+    l21: List[i32], l22: List[i32], l23: List[i32], l24: List[i32], l25: List[i32],
+    tag: i32,
+}
+
+fn make_item(tag: i32) -> ManyLists:
+    ManyLists {
+        l01: [], l02: [], l03: [], l04: [], l05: [],
+        l06: [], l07: [], l08: [], l09: [], l10: [],
+        l11: [], l12: [], l13: [], l14: [], l15: [],
+        l16: [], l17: [], l18: [], l19: [], l20: [],
+        l21: [], l22: [], l23: [], l24: [], l25: [],
+        tag,
+    }
+
+fn main:
+    let items = [make_item(10), make_item(20)]
+    var count = 0
+    for (idx, item) in items.enumerate():
+        if idx == 0 and item.tag == 10: count += 1
+        if idx == 1 and item.tag == 20: count += 1
+    print(f"ok {count}")
