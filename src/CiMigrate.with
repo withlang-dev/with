@@ -2216,9 +2216,12 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
             return Err("registry: " ++ facts_path ++ " states facts for `" ++ registry.package ++ "`, not `" ++ facade_name ++ "`")
         project.registry_utf8 = with_str_clone_ref(registry.utf8_cite)
         project.registry_threads = with_str_clone_ref(registry.threads_cite)
+        project.registry_error_name = with_str_clone_ref(registry.error_name)
         project.registry_value_text = with_str_clone_ref(registry.value_text)
         for name in registry.value_fns: project.registry_value_fns.push(name)
         for name in registry.value_res_fns: project.registry_value_res_fns.push(name)
+        for rec in registry.value_records: project.registry_value_records.push(rec)
+        for (rec, rname) in registry.value_record_names: project.registry_value_record_names.push((rec.to_owned(), rname.to_owned()))
         for (field, role) in registry.field_roles:
             let dot = field.find(".")
             project.field_role_text = project.field_role_text ++ "//   field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ " is " ++ facts_kind(role) ++ "    // registry: " ++ facts_cite(role) ++ "\n"

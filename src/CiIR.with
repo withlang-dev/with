@@ -1185,11 +1185,14 @@ type CiProject {
     // §16.3: the registry's facade-level `runs threads` citation, "" when
     // the file states none.
     registry_threads: str,
+    registry_error_name: str,
     registry_value_text: str,
     field_role_text: str,             // the stated roles as the draft's provenance lines, in the file's order
     field_roles: HashMap[str, str],   // §16.2b.15: `Record.field` -> `role|record|cite`, from the registry
     registry_value_fns: List[str],
     registry_value_res_fns: List[str],
+    registry_value_records: List[str],
+    registry_value_record_names: List[(str, str)],
     // #3123: the typedefs of `void` the package's functions spell behind a
     // pointer (`CURL`), each an alias of `c_void` in the translation.
     void_typedefs: List[str],
@@ -1272,11 +1275,14 @@ fn CiProject.new -> CiProject:
         alloc_aliases: [],
         registry_utf8: "",
         registry_threads: "",
+        registry_error_name: "",
         registry_value_text: "",
         field_role_text: "",
         field_roles: [:],
         registry_value_fns: [],
         registry_value_res_fns: [],
+        registry_value_records: [],
+        registry_value_record_names: [],
         void_typedefs: [],
         fnptr_evidence: "",
         pointee_evidence: [],

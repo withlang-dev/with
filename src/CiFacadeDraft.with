@@ -1967,7 +1967,14 @@ impl CiProject:
         // that takes a pointer to it lends that resource.
         for record in self.fd_inplace_records():
             if not out.contains(record): out.push(record)
+        for record in self.registry_value_records:
+            if not out.contains(record): out.push(record)
         out
+
+    fn fd_named_resource(record: &str) -> str:
+        for (rec, rname) in self.registry_value_record_names:
+            if rec == record: return rname.to_owned()
+        fd_resource_name(record)
 
     // #3123: every typedef of `void` is one representation to the checker
     // (`*mut c_void`), so an operation on a handle of one names its resource:
@@ -1977,7 +1984,7 @@ impl CiProject:
         for p in self.symbols[si].param_ty:
             let pointee = fd_record_pointee(p)
             if pointee.len() > 0 and modeled.contains(pointee) and self.void_typedefs.contains(pointee):
-                return "        of " ++ fd_resource_name(pointee) ++ "    // the header spells the parameter `" ++ pointee ++ " *`\n"
+                return "        of " ++ self.fd_named_resource(pointee) ++ "    // the header spells the parameter `" ++ pointee ++ " *`\n"
         ""
 
     // The facade draft: what the proofs establish, every clause with its
@@ -1992,12 +1999,14 @@ impl CiProject:
         // fields; a proof below that says "a fresh allocation" or "frees"
         // over a call through one rests on these.
         if self.field_role_text.len() > 0: text = text ++ "// Function-pointer fields, as the registry states them:\n" ++ self.field_role_text
-        text = text ++ "c contract " ++ name ++ ":\n"
+        let header = "c contract " ++ name ++ (if self.registry_error_name.len() > 0: " error " ++ self.registry_error_name else: "") ++ ":\n"
+        text = text ++ header
         if self.registry_utf8.len() > 0: text = text ++ "    text utf8    // registry: " ++ self.registry_utf8 ++ "\n"
         if self.registry_threads.len() > 0: text = text ++ "    runs threads    // registry: " ++ self.registry_threads ++ "\n"
         self.draft_name = name
         let inplace = self.fd_inplace_records()
         for record in modeled:
+            if self.registry_value_records.contains(record): continue
             // #3173: the record itself, in storage With provides, between
             // its proven init and end.
             if inplace.contains(record):
@@ -2034,9 +2043,10 @@ impl CiProject:
         for record in modeled:
             let candidates = self.fd_borrow_candidates(record)
             for si in candidates:
+                if self.registry_value_fns.contains(self.symbols[si].name): continue
                 self.presented.push(si)
                 blocks.push(si)
-                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n        returns borrow " ++ fd_resource_name(record) ++ " from " ++ self.fd_borrow_origin_text(si) ++ "    // " ++ self.symbols[si].own_reason ++ "\n" ++ self.fd_registry_presentation_lines(si)
+                text = text ++ "    fn " ++ self.symbols[si].name ++ "\n        returns borrow " ++ self.fd_named_resource(record) ++ " from " ++ self.fd_borrow_origin_text(si) ++ "    // " ++ self.symbols[si].own_reason ++ "\n" ++ self.fd_registry_presentation_lines(si)
         // Lends are the default (§16.2b.5); stating each records the proof
         // and presents the operation on its resource.
         for si in 0..self.symbols.len():
@@ -2084,7 +2094,6 @@ impl CiProject:
         // buffer needs the domain that view borrows from declared.
         // Each is a domain of its own, written only by its function: a
         // static array of a body is named nowhere else.
-        let header = "c contract " ++ name ++ ":\n"
         var domains = ""
         for line in text.split("\n"):
             let at = line.find("returns borrow CStr from domain ")
