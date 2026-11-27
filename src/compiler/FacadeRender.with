@@ -1602,6 +1602,10 @@ fn facade_render_lend_item(pool: &AstPool, intern: &InternPool, ci: &List[i32], 
         // D102: `nullable param N` on a function-pointer parameter presents
         // `Option` of it through the bridge (facade_render_bridge_param).
         else if facade_clause_bridges(kind): li.bridged = true
+        // §16.2b.5: `consumes param N` (without `destroyed_by`) on a lend
+        // method transfers ownership of a non-receiver resource parameter into
+        // the receiver (cJSON_AddItemToObject, yaml_emitter_emit).
+        else if kind == FACADE_CLAUSE_CONSUMES and pool.get_extra(ops + 1) == 0: li.bridged = true
         // `callback_thread any` beside a variadic contract speaks of a case's
         // callback (§16.2b.10): Sema checks the userdata at the pair's setter.
         else if kind == FACADE_CLAUSE_CALLBACK_THREAD and facade_item_is_variadic(pool, item): {}
@@ -1634,6 +1638,9 @@ fn facade_render_lend_hosted(pool: &AstPool, intern: &InternPool, li: &FacadeLen
     // A parameter a `buffer` clause pairs is that buffer, never a
     // receiver (Sema: facade_param_receives draws the same line).
     if facade_render_buffer_of(pool, intern, li.decl, at).0 == at:
+        return false
+    // A function that consumes its own receiver is a destroyer, not a lend.
+    if facade_render_param_consumed(pool, intern, li.decl, at):
         return false
     let meta = pool.find_fn_meta(li.decl as NodeId)
     let p0 = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), at) as NodeId))
@@ -3051,6 +3058,18 @@ fn facade_render_buffer_of(pool: &AstPool, intern: &InternPool, decl: i32, pi: i
             return (p, l, pool.get_extra(ops + 2), pool.get_extra(ops + 3))
     (-1, -1, 0, 0)
 
+fn facade_render_param_consumed(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32) -> bool:
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0: return false
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) != FACADE_CLAUSE_CONSUMES: continue
+        let ops = pool.get_data1(clause as NodeId)
+        if pool.get_extra(ops + 1) != 0: continue
+        if facade_render_param_ref(pool, intern, decl, pool.get_extra(ops)) == pi: return true
+    false
+
 fn facade_render_empty_bridge() -> FacadeBridge:
     FacadeBridge { ok: true, params: "", args: "", prologue: "", cap_var: "", cap_type: "", cap_of: "", cap_unit: "", fills: "", fill_types: "" }
 
@@ -3189,6 +3208,17 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
         return b
     let res = facade_render_received(pool, intern, ptype)
     if res > 0:
+        if facade_render_param_consumed(pool, intern, decl, pi):
+            let rname = intern.resolve(pool.get_data0(res as NodeId))
+            let local = facade_render_fresh(pname ++ "_consumed", taken)
+            var c_arg = facade_render_received_arg(pool, intern, res, ptype, local)
+            if c_arg.len() == 0 and facade_render_unalias(pool, intern, ptype).starts_with("*mut "):
+                c_arg = "&raw mut " ++ local ++ ".repr"
+            if c_arg.len() > 0:
+                b.prologue = "var " ++ local ++ " = " ++ pname ++ "\n" ++ local ++ ".live = false\n"
+                b.params = pname ++ ": " ++ rname
+                b.args = c_arg
+                return b
         let received = facade_render_received_arg(pool, intern, res, ptype, pname)
         if received.len() > 0:
             let rname = intern.resolve(pool.get_data0(res as NodeId))

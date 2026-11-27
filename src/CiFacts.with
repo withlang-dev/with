@@ -54,6 +54,7 @@ type Facts {
     // the header (§16.2b.13).
     pub value_text: str,
     pub value_fns: List[str],
+    pub value_res_fns: List[str],
     pub value_resources: List[str],
     // §16.2b.15: the role of a function-pointer field, one per line:
     // `Record.field` and `role|Record|cite`.
@@ -161,7 +162,7 @@ fn facts_push_unique(mut list: List[str], name: &str):
     if not list.contains(name): list.push(name.to_owned())
 
 fn facts_read(path: &str, source: str) -> Result[Facts, str]:
-    var facts = Facts { package: "", entries: [], utf8_cite: "", threads_cite: "", value_text: "", value_fns: [], value_resources: [], field_roles: [], settings: [] }
+    var facts = Facts { package: "", entries: [], utf8_cite: "", threads_cite: "", value_text: "", value_fns: [], value_res_fns: [], value_resources: [], field_roles: [], settings: [] }
     var in_value = false
     var current_fn = ""
     var in_resource = false
@@ -217,6 +218,7 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
                     var pk: isize = 0
                     for cl in ptr_clauses:
                         facts_push_unique(facts.value_fns, ptr_fns[pk])
+                        facts_push_unique(facts.value_res_fns, ptr_fns[pk])
                         facts.value_text = facts.value_text ++ "        " ++ cl ++ "    // registry: " ++ ptr_cites[pk] ++ "\n"
                         pk += 1
                 else:
@@ -312,7 +314,9 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             // §16.2b.4: a by-value producer may state the field whose NULL
             // means nothing was produced: `from F, nullable field a.b`.
             if in_value and words.len() == 5 and words[0] == "from" and words[1].ends_with(",") and (words[2] == "nullable" or words[2] == "nonnull") and words[3] == "field":
-                facts_push_unique(facts.value_fns, words[1].slice(0, words[1].len() - 1))
+                let fshort = words[1].slice(0, words[1].len() - 1)
+                facts_push_unique(facts.value_fns, fshort)
+                facts_push_unique(facts.value_res_fns, fshort)
                 facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
                 continue
             // §31.8.1 (Eric, 2026-11-21, #3173 D): an in-place resource is
@@ -323,7 +327,9 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
                 let named = if words[1].ends_with(","): words[1].slice(0, words[1].len() - 1) else: words[1]
                 if not named.ends_with("(self)") or named.len() <= 6: return Err(facts_error(path, line_no, "an in-place initializer is `init F(self)`, or `init F(self), ok K` with its own success status"))
                 if words.len() > 2 and (not words[1].ends_with(",") or words[2] != "ok" or words.len() < 4): return Err(facts_error(path, line_no, "after `init F(self),` state the initializer's own success status: `ok K`"))
-                facts_push_unique(facts.value_fns, named.slice(0, named.len() - 6))
+                let ishort = named.slice(0, named.len() - 6)
+                facts_push_unique(facts.value_fns, ishort)
+                facts_push_unique(facts.value_res_fns, ishort)
                 facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
                 continue
             if in_value and words.len() >= 2 and words[0] == "ok":
@@ -334,6 +340,7 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
                 let fn_name = words[1].slice(0, words[1].len() - 6)
                 if in_value:
                     facts_push_unique(facts.value_fns, fn_name)
+                    facts_push_unique(facts.value_res_fns, fn_name)
                     facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
                     continue
                 ptr_carry = true
@@ -345,6 +352,7 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             if words.len() != 2 or not (words[0] == "from" or words[0] == "drop" or words[0] == "destroys"): return Err(facts_error(path, line_no, "a resource fact is `from F`, `drop F`, `drop F(param N)`, `destroys F` or `destroys F(param N)`; a by-value producer may add `, nullable field F` or `, nonnull field F`"))
             if in_value:
                 facts_push_unique(facts.value_fns, words[1])
+                facts_push_unique(facts.value_res_fns, words[1])
                 facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
                 continue
             ptr_clauses.push(clause.to_owned())
@@ -490,6 +498,7 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             var pk: isize = 0
             for cl in ptr_clauses:
                 facts_push_unique(facts.value_fns, ptr_fns[pk])
+                facts_push_unique(facts.value_res_fns, ptr_fns[pk])
                 facts.value_text = facts.value_text ++ "        " ++ cl ++ "    // registry: " ++ ptr_cites[pk] ++ "\n"
                 pk += 1
         else:

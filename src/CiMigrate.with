@@ -2218,6 +2218,7 @@ fn ci_facade_project(files: &List[str], facade_name: &str, gir_files: &List[str]
         project.registry_threads = with_str_clone_ref(registry.threads_cite)
         project.registry_value_text = with_str_clone_ref(registry.value_text)
         for name in registry.value_fns: project.registry_value_fns.push(name)
+        for name in registry.value_res_fns: project.registry_value_res_fns.push(name)
         for (field, role) in registry.field_roles:
             let dot = field.find(".")
             project.field_role_text = project.field_role_text ++ "//   field " ++ field.slice(dot + 1, field.len()) ++ " of " ++ field.slice(0, dot) ++ " is " ++ facts_kind(role) ++ "    // registry: " ++ facts_cite(role) ++ "\n"

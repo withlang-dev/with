@@ -1,0 +1,39 @@
+//! expect-stdout: sum 17
+//! expect-stdout: freed 2
+// §16.2b.5 (#3151): `consumes param N` on a lend method transfers ownership of
+// a non-receiver resource parameter into the receiver without double-freeing.
+use c_import("
+#include <stdlib.h>
+typedef struct Node { int v; struct Node *child; } Node;
+static int g_freed = 0;
+static inline Node *node_new(int v) {
+    Node *n = (Node *)calloc(1, sizeof(Node));
+    if (n) n->v = v;
+    return n;
+}
+static inline void node_free(Node *n) {
+    if (!n) return;
+    if (n->child) node_free(n->child);
+    g_freed++;
+    free(n);
+}
+static inline int node_add(Node *parent, Node *child) {
+    parent->child = child;
+    return parent->v + (child ? child->v : 0);
+}
+static inline int node_freed_count(void) { return g_freed; }
+")
+
+c contract tree:
+    resource TreeNode wraps *mut Node
+        from node_new
+        drop node_free
+    fn node_add
+        consumes param 1
+
+fn main:
+    if true:
+        let Some(root) = TreeNode.new(10) else: return 1
+        let Some(leaf) = TreeNode.new(7) else: return 1
+        print(f"sum {root.add(leaf)}")
+    print(f"freed {node_freed_count()}")

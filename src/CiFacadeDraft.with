@@ -1850,7 +1850,7 @@ impl CiProject:
     fn fd_producers_of(record: &str) -> List[i32]:
         let out: List[i32] = []
         for si in 0..self.symbols.len():
-            if self.symbols[si].kind == CiProjectSymbolKind.CIPS_FN and self.fd_subject(si as i32) and self.symbols[si].header_declared != 0 and self.symbols[si].owns_return != 0 and not self.registry_value_fns.contains(self.symbols[si].name) and fd_record_pointee(self.symbols[si].ret_ty) == record and self.fd_copy_source_param(si as i32) < 0: out.push(si as i32)
+            if self.symbols[si].kind == CiProjectSymbolKind.CIPS_FN and self.fd_subject(si as i32) and self.symbols[si].header_declared != 0 and self.symbols[si].owns_return != 0 and not self.registry_value_res_fns.contains(self.symbols[si].name) and fd_record_pointee(self.symbols[si].ret_ty) == record and self.fd_copy_source_param(si as i32) < 0: out.push(si as i32)
         out
 
     // The parameter through which a producer is handed another of the
@@ -1873,7 +1873,7 @@ impl CiProject:
     fn fd_destroyers_of(record: &str, unary: bool) -> List[i32]:
         let out: List[i32] = []
         for si in 0..self.symbols.len():
-            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32) or self.symbols[si].header_declared == 0 or self.registry_value_fns.contains(self.symbols[si].name): continue
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or not self.fd_subject(si as i32) or self.symbols[si].header_declared == 0 or self.registry_value_res_fns.contains(self.symbols[si].name): continue
             let count = self.symbols[si].param_destroys.len()
             for pi in 0..count:
                 if self.symbols[si].param_destroys[pi] != 0 and fd_record_pointee(self.symbols[si].param_ty[pi]) == record:
