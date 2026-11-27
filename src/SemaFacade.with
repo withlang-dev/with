@@ -5058,23 +5058,27 @@ impl Sema:
                 self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no type '{bn}' was rendered; the renderer cannot express this shape and did not say so — a compiler defect (§16.2b.6)", node, "this is a compiler bug: report it with this contract and the header it describes")
                 continue
             let host = self.pool_resolve(self.facade_resources[recv0[0]].name)
+            let host_borrow_only = self.facade_resources[recv0[0]].handle == 0 and self.facade_resources[recv0[0]].drop == 0 and self.facade_resources[recv0[0]].init == 0 and self.facade_resources[recv0[0]].producers.len() == 0 and self.facade_resources[recv0[0]].destroyers.len() == 0
             let mname = self.facade_presented(recv0[0], fname)
-            let mtext = host ++ "." ++ mname
+            let mtext = (if host_borrow_only: facade_render_borrowed_name(host) else: host) ++ "." ++ mname
             let msig: i32 = if self.sig_text_index.contains(mtext): self.sig_text_index.get(mtext).unwrap() else: -1
-            if msig < 0:
+            let msym = self.pool_lookup_symbol(mtext)
+            let mgeneric = msym != 0 and self.generic_fn_node_for_symbol(msym) != 0
+            if msig < 0 and not mgeneric:
                 self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no method '{host}.{mname}' was rendered — a compiler defect (§16.2b.6)", node, "this is a compiler bug: report it with this contract and the header it describes")
                 continue
             // D85: the parent borrow views what the argument views (its
             // parent's origin), never the argument's own storage.
             if parent != 0:
-                self.facade_declare_view_through_param(msig, from)
+                if msig >= 0: self.facade_declare_view_through_param(msig, from)
             else:
                 // D134 & D187: the result views every stated origin, on the
                 // resource and on its borrowed view.
                 let none = []
                 for orig_p in origins:
-                    self.facade_declare_view_of_param(msig, orig_p)
-                    self.facade_note_generic(facade_render_borrowed_name(host) ++ "." ++ mname, 2, fn_sym, ci, 0, none, 0, orig_p)
+                    if msig >= 0: self.facade_declare_view_of_param(msig, orig_p)
+                    else: self.facade_note_generic(mtext, 2, fn_sym, ci, 0, none, 0, orig_p)
+                    if not host_borrow_only: self.facade_note_generic(facade_render_borrowed_name(host) ++ "." ++ mname, 2, fn_sym, ci, 0, none, 0, orig_p)
 
     // ── record views (D66, spec §16.2b.6) ────────────────────────────────
     //
@@ -5191,6 +5195,7 @@ impl Sema:
                 self.facade_bridge_of.insert(fname, rendered_name)
             return
         let host = self.pool_resolve(self.facade_resources[recv0[0]].name)
+        let host_borrow_only = self.facade_resources[recv0[0]].handle == 0 and self.facade_resources[recv0[0]].drop == 0 and self.facade_resources[recv0[0]].init == 0 and self.facade_resources[recv0[0]].producers.len() == 0 and self.facade_resources[recv0[0]].destroyers.len() == 0
         let mname = self.facade_presented(recv0[0], fname)
         let hosts: List[str] = []
         hosts.push(host)
@@ -5198,10 +5203,13 @@ impl Sema:
         if self.foreign_contracts[ci].valid_on_failed != 0:
             hosts.push(facade_render_failed_name(host))
         for hi in 0..hosts.len():
+            if hi == 0 and host_borrow_only: continue
             let mtext = hosts[hi] ++ "." ++ mname
             let msig: i32 = if self.sig_text_index.contains(mtext): self.sig_text_index.get(mtext).unwrap() else: -1
             if msig < 0:
-                if hi == 0 or hi == 2:
+                let msym = self.pool_lookup_symbol(mtext)
+                let mgeneric = msym != 0 and self.generic_fn_node_for_symbol(msym) != 0
+                if (hi == 0 or hi == 2) and not mgeneric:
                     self.emit_error_with_help(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no method '{mtext}' was rendered — a compiler defect (§16.2b.6)", node, "this is a compiler bug: report it with this contract and the header it describes")
                 else if origins.len() > 0:
                     let none = []
@@ -5262,6 +5270,7 @@ impl Sema:
             self.facade_presented_syms.insert(fn_sym, 1)
             return
         let host = self.pool_resolve(self.facade_resources[recv0[0]].name)
+        let host_borrow_only = self.facade_resources[recv0[0]].handle == 0 and self.facade_resources[recv0[0]].drop == 0 and self.facade_resources[recv0[0]].init == 0 and self.facade_resources[recv0[0]].producers.len() == 0 and self.facade_resources[recv0[0]].destroyers.len() == 0
         let mname = self.facade_presented(recv0[0], fname)
         let hosts: List[str] = []
         hosts.push(host)
@@ -5270,10 +5279,13 @@ impl Sema:
         if self.foreign_contracts[ci].valid_on_failed != 0:
             hosts.push(facade_render_failed_name(host))
         for hi in 0..hosts.len():
+            if hi == 0 and host_borrow_only: continue
             let mtext = hosts[hi] ++ "." ++ mname
             let msig: i32 = if self.sig_text_index.contains(mtext): self.sig_text_index.get(mtext).unwrap() else: -1
             if msig < 0:
-                if hi == 0 or hi == 2:
+                let msym = self.pool_lookup_symbol(mtext)
+                let mgeneric = msym != 0 and self.generic_fn_node_for_symbol(msym) != 0
+                if (hi == 0 or hi == 2) and not mgeneric:
                     self.emit_error_with_help(f"fn '{fname}': '{what}' passed every facade check but no method '{mtext}' was rendered — a compiler defect (§16.2b.8)", node, "this is a compiler bug: report it with this contract and the header it describes")
                 else if origins.len() > 0:
                     let none = []
