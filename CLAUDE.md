@@ -163,8 +163,11 @@ without cited Law numbers and *Test* answers is incomplete.
   release: `:release-checks`.
 - **Changes land by pull request**; dependent ones are a `gh stack`. A PR
   is a draft until its battery is green. CI is not a merge signal (D56).
-- **Other hosts are for platform-specific work only;** when you build
-  there, the same rules apply, and leave nothing running.
+- **Other hosts (`eric-5090` Linux, `win10` Windows VM):** `eric-5090` is
+  unoccupied and available anytime for Linux or Windows builds and tests; you
+  may stop the production QuixiInfer service while using it as long as you
+  restart it when finished. Same build rules apply; leave no build jobs
+  running.
 - **Commits are authored by the human who drove the work.** Never an AI
   author, co-author or trailer.
 - One logical change at a time. Re-read a file before editing it after a

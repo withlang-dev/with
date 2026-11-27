@@ -4,10 +4,19 @@ Moved verbatim from AGENTS.md (#2374). Nothing here was reworded.
 
 ## Other hosts
 
-The Mac is the release host. Linux: `ssh eric-5090` (Eric, 2026-09-27).
-Windows: make sure the Windows VM on eric-5090 is on, then `ssh win10`. Build
-and test there as here (the pinned seed drives the battery; never `git
-stash`), and leave nothing running.
+The Mac is the release host. `eric-5090` is no longer occupied and is available
+anytime for Linux or Windows builds and tests (Eric, 2026-11-27):
+
+- **Linux:** `ssh eric-5090`.
+- **Windows:** start the Windows VM on `eric-5090` (`ssh eric-5090 virsh start win10`),
+  then `ssh win10`. Shut the VM down cleanly when finished (`ssh eric-5090 virsh shutdown win10`)
+  if it was off before you started.
+- **QuixiInfer service:** you are permitted to shut down the production
+  QuixiInfer service on `eric-5090` while building or testing, as long as you
+  restart it when you are finished.
+
+Build and test there as here (the pinned seed drives the battery; never `git
+stash`), and leave no build jobs running.
 
 
 ## Build System
