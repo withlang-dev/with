@@ -97,9 +97,13 @@ deep-debug-tool-tests, user-programs-safe) plus every test target the last
 battery measured under 60 s (a fresh worktree runs the fixed list). Every
 stack layer runs it before reporting done, and the battery runs it first.
 
-**Batch tier — one stack, one battery.** Work landing in the same window goes
-on ONE `gh stack`; ONE battery blesses the whole stack, once, on its top
-commit, after every layer is in:
+**Batch tier — one bundle or stack, one battery.** Do not run a full battery
+for one small issue at a time when sibling issues can be fixed together
+(for example, a batch of registry facades, related bug fixes, or sequential
+steps). Keep one clean commit per logical issue, verify each locally at the
+iterate tier (`:dev` + targeted tests / `with uat <name>`), and land work in
+the same window in one PR or ONE `gh stack`; ONE battery blesses the whole
+bundle or stack, once, on its top commit, after every layer is in:
 ```
 with run tools/battery.with
 ```
@@ -119,7 +123,8 @@ perturbations), the corpora's own tests on the promoted corpora, and wo-drift.
 It migrates nothing (D206): a corpus is migrated when it is promoted, never
 by a gate, a report or a seed cut. A seed is cut, and a
 release made, only from a tree whose `:release-checks` is green; `release-uat`
-depends on it. A nondeterminism or bundle break that lands on main surfaces
+depends on it. Do not run `:release-checks` on ordinary PRs — the battery is
+the PR gate. A nondeterminism or bundle break that lands on main surfaces
 here and is fixed before the cut.
 
 **A red battery:** fix every reported failure on the stack with iterate-tier
