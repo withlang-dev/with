@@ -1,0 +1,10 @@
+scenario: cjson from a fresh project
+requires: network
+
+new directory
+run: with init .
+run: with get c.cjson
+expect stderr contains: facade cjson:
+write src/main.with from cjson_main.with
+run: with run
+expect stdout: cjson UAT passed

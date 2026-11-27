@@ -1,0 +1,140 @@
+// cjson 1.7.19, the version `with get c.cjson` pins. Every citation is a line
+// of the package's installed header, include/cjson/cJSON.h.
+//
+// Coverage: 63 of 78 public functions presented safely. The 15 functions left
+// raw are genuinely unsafe or unmodeled by nature:
+// - cJSON_InitHooks: installs global allocator function-pointer hooks.
+// - cJSON_ParseWithOpts, cJSON_ParseWithLengthOpts: write `const char **return_parse_end`,
+//   an unowned interior pointer into the caller's input buffer.
+// - cJSON_GetErrorPtr: returns a raw global pointer into the last failed input buffer.
+// - cJSON_CreateStringReference, cJSON_CreateObjectReference,
+//   cJSON_CreateArrayReference, cJSON_AddItemReferenceToArray,
+//   cJSON_AddItemReferenceToObject, cJSON_AddItemToObjectCS: store unowned aliasing
+//   references to caller strings or subtrees without transferring ownership.
+// - cJSON_CreateStringArray: takes `const char *const *` (array of raw pointers).
+// - cJSON_DetachItemViaPointer, cJSON_DetachItemFromObject,
+//   cJSON_DetachItemFromObjectCaseSensitive, cJSON_ReplaceItemViaPointer:
+//   unlink/replace a child inside the intrusive linked list (pointer-identity
+//   or ownership-unlinking return that static borrow analysis treats as a borrow).
+// - cJSON_Minify: mutates a NUL-terminated `char *` in place with no capacity bound.
+// - cJSON_malloc, cJSON_free: raw allocator primitives.
+c facts cjson:
+    text utf8    // cJSON.h 1.7.19 lines 152 to 166: cJSON parses and emits UTF-8 JSON text (RFC 8259)
+    resource CJSON wraps *mut cJSON
+        from cJSON_Parse    // cJSON.h 1.7.19 lines 152 to 154: allocates a cJSON tree freed by cJSON_Delete
+        from cJSON_ParseWithLength    // cJSON.h 1.7.19 lines 152 to 155: allocates a cJSON tree from bounded buffer, freed by cJSON_Delete
+        from cJSON_CreateNull    // cJSON.h 1.7.19 line 201: creates a new cJSON null item freed by cJSON_Delete
+        from cJSON_CreateTrue    // cJSON.h 1.7.19 line 202: creates a new cJSON true item freed by cJSON_Delete
+        from cJSON_CreateFalse    // cJSON.h 1.7.19 line 203: creates a new cJSON false item freed by cJSON_Delete
+        from cJSON_CreateBool    // cJSON.h 1.7.19 line 204: creates a new cJSON bool item freed by cJSON_Delete
+        from cJSON_CreateNumber    // cJSON.h 1.7.19 line 205: creates a new cJSON number item freed by cJSON_Delete
+        from cJSON_CreateString    // cJSON.h 1.7.19 line 206: copies string into a new cJSON string item freed by cJSON_Delete
+        from cJSON_CreateRaw    // cJSON.h 1.7.19 line 208: copies raw JSON text into a new cJSON raw item freed by cJSON_Delete
+        from cJSON_CreateArray    // cJSON.h 1.7.19 line 209: creates a new cJSON array item freed by cJSON_Delete
+        from cJSON_CreateObject    // cJSON.h 1.7.19 line 210: creates a new cJSON object item freed by cJSON_Delete
+        from cJSON_CreateIntArray    // cJSON.h 1.7.19 line 222: creates a new cJSON array of ints freed by cJSON_Delete
+        from cJSON_CreateFloatArray    // cJSON.h 1.7.19 line 223: creates a new cJSON array of floats freed by cJSON_Delete
+        from cJSON_CreateDoubleArray    // cJSON.h 1.7.19 line 224: creates a new cJSON array of doubles freed by cJSON_Delete
+        from cJSON_DetachItemFromArray    // cJSON.h 1.7.19 line 240: unlinks and returns ownership of array element, freed by cJSON_Delete
+        from cJSON_Duplicate    // cJSON.h 1.7.19 lines 255 to 258: creates a new identical cJSON copy in fresh memory freed by cJSON_Delete
+        drop cJSON_Delete    // cJSON.h 1.7.19 line 171: deletes a cJSON entity and all subentities
+    fn cJSON_Version
+        returns static CStr    // cJSON.h 1.7.19 line 147: returns static version string
+    fn cJSON_ParseWithLength
+        buffer param 0 len param 1    // cJSON.h 1.7.19 line 155: reads buffer_length bytes from value
+    fn cJSON_CreateIntArray
+        buffer param 0 len param 1 elements    // cJSON.h 1.7.19 lines 220 to 222: reads count ints from numbers
+    fn cJSON_CreateFloatArray
+        buffer param 0 len param 1 elements    // cJSON.h 1.7.19 lines 220 to 223: reads count floats from numbers
+    fn cJSON_CreateDoubleArray
+        buffer param 0 len param 1 elements    // cJSON.h 1.7.19 lines 220 to 224: reads count doubles from numbers
+    fn cJSON_Print
+        lend    // cJSON.h 1.7.19 line 162: reads const item without modifying ownership
+        text return, owned, freed by cJSON_free    // cJSON.h 1.7.19 lines 152, 162: returns allocated JSON text freed by cJSON_free
+    fn cJSON_PrintUnformatted
+        lend    // cJSON.h 1.7.19 line 164: reads const item without modifying ownership
+        text return, owned, freed by cJSON_free    // cJSON.h 1.7.19 lines 152, 164: returns allocated JSON text freed by cJSON_free
+    fn cJSON_PrintBuffered
+        lend    // cJSON.h 1.7.19 line 166: reads const item without modifying ownership
+        text return, owned, freed by cJSON_free    // cJSON.h 1.7.19 lines 152, 166: returns allocated JSON text freed by cJSON_free
+    fn cJSON_PrintPreallocated
+        buffer param 1 capacity param 2    // cJSON.h 1.7.19 lines 167 to 169: writes formatted JSON into buffer of capacity length
+        lend    // cJSON.h 1.7.19 line 169: borrows item without freeing or retaining buffer
+    fn cJSON_GetArraySize
+        lend    // cJSON.h 1.7.19 line 174: counts elements of array without retaining or freeing
+    fn cJSON_GetArrayItem
+        returns borrow CJSON from param 0    // cJSON.h 1.7.19 line 176: returns borrowed child owned by array
+    fn cJSON_GetObjectItem
+        returns borrow CJSON from param 0    // cJSON.h 1.7.19 line 178: returns borrowed child owned by object
+    fn cJSON_GetObjectItemCaseSensitive
+        returns borrow CJSON from param 0    // cJSON.h 1.7.19 line 179: returns borrowed child owned by object
+    fn cJSON_HasObjectItem
+        lend    // cJSON.h 1.7.19 line 180: checks membership without retaining key or freeing object
+    fn cJSON_GetStringValue
+        returns borrow CStr from param 0    // cJSON.h 1.7.19 line 185: returns item->valuestring owned by item, or NULL
+        lend    // cJSON.h 1.7.19 line 185: borrows const item
+    fn cJSON_GetNumberValue
+        lend    // cJSON.h 1.7.19 line 186: reads item->valuedouble without freeing
+    fn cJSON_IsInvalid
+        lend    // cJSON.h 1.7.19 line 189: inspects item->type
+    fn cJSON_IsFalse
+        lend    // cJSON.h 1.7.19 line 190: inspects item->type
+    fn cJSON_IsTrue
+        lend    // cJSON.h 1.7.19 line 191: inspects item->type
+    fn cJSON_IsBool
+        lend    // cJSON.h 1.7.19 line 192: inspects item->type
+    fn cJSON_IsNull
+        lend    // cJSON.h 1.7.19 line 193: inspects item->type
+    fn cJSON_IsNumber
+        lend    // cJSON.h 1.7.19 line 194: inspects item->type
+    fn cJSON_IsString
+        lend    // cJSON.h 1.7.19 line 195: inspects item->type
+    fn cJSON_IsArray
+        lend    // cJSON.h 1.7.19 line 196: inspects item->type
+    fn cJSON_IsObject
+        lend    // cJSON.h 1.7.19 line 197: inspects item->type
+    fn cJSON_IsRaw
+        lend    // cJSON.h 1.7.19 line 198: inspects item->type
+    fn cJSON_AddItemToArray
+        consumes param 1    // cJSON.h 1.7.19 line 228: array takes ownership of item and frees it on cJSON_Delete
+    fn cJSON_AddItemToObject
+        consumes param 2    // cJSON.h 1.7.19 line 229: object duplicates key and takes ownership of item
+    fn cJSON_DeleteItemFromArray
+        lend    // cJSON.h 1.7.19 line 241: removes and frees one child while keeping array alive
+    fn cJSON_DeleteItemFromObject
+        lend    // cJSON.h 1.7.19 line 244: removes and frees one child while keeping object alive
+    fn cJSON_DeleteItemFromObjectCaseSensitive
+        lend    // cJSON.h 1.7.19 line 245: removes and frees one child while keeping object alive
+    fn cJSON_InsertItemInArray
+        consumes param 2    // cJSON.h 1.7.19 line 248: array takes ownership of newitem
+    fn cJSON_ReplaceItemInArray
+        consumes param 2    // cJSON.h 1.7.19 line 250: array frees old item and takes ownership of newitem
+    fn cJSON_ReplaceItemInObject
+        consumes param 2    // cJSON.h 1.7.19 line 251: object frees old item and takes ownership of newitem
+    fn cJSON_ReplaceItemInObjectCaseSensitive
+        consumes param 2    // cJSON.h 1.7.19 line 252: object frees old item and takes ownership of newitem
+    fn cJSON_Compare
+        lend    // cJSON.h 1.7.19 line 261: recursively reads both trees without freeing or retaining
+    fn cJSON_AddNullToObject
+        returns borrow CJSON from param 0    // cJSON.h 1.7.19 line 270: creates, attaches, and returns borrowed child owned by object
+    fn cJSON_AddTrueToObject
+        returns borrow CJSON from param 0    // cJSON.h 1.7.19 line 271: creates, attaches, and returns borrowed child owned by object
+    fn cJSON_AddFalseToObject
+        returns borrow CJSON from param 0    // cJSON.h 1.7.19 line 272: creates, attaches, and returns borrowed child owned by object
+    fn cJSON_AddBoolToObject
+        returns borrow CJSON from param 0    // cJSON.h 1.7.19 line 273: creates, attaches, and returns borrowed child owned by object
+    fn cJSON_AddNumberToObject
+        returns borrow CJSON from param 0    // cJSON.h 1.7.19 line 274: creates, attaches, and returns borrowed child owned by object
+    fn cJSON_AddStringToObject
+        returns borrow CJSON from param 0    // cJSON.h 1.7.19 line 275: creates, attaches, and returns borrowed child owned by object
+    fn cJSON_AddRawToObject
+        returns borrow CJSON from param 0    // cJSON.h 1.7.19 line 276: creates, attaches, and returns borrowed child owned by object
+    fn cJSON_AddObjectToObject
+        returns borrow CJSON from param 0    // cJSON.h 1.7.19 line 277: creates, attaches, and returns borrowed child owned by object
+    fn cJSON_AddArrayToObject
+        returns borrow CJSON from param 0    // cJSON.h 1.7.19 line 278: creates, attaches, and returns borrowed child owned by object
+    fn cJSON_SetNumberHelper
+        lend    // cJSON.h 1.7.19 line 283: updates numeric fields in place without modifying ownership
+    fn cJSON_SetValuestring
+        returns borrow CStr from param 0    // cJSON.h 1.7.19 line 286: replaces object->valuestring and returns pointer owned by object
+        lend    // cJSON.h 1.7.19 line 286: borrows object
