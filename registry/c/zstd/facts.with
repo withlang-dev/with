@@ -1,0 +1,163 @@
+// zstd 1.6.0 (conan-center-index recipes/zstd). Every clause cites zstd.h,
+// zstd_errors.h, or zdict.h installed by the package.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - ZSTD_compressStream2, ZSTD_compressStream, ZSTD_flushStream, ZSTD_endStream,
+//   ZSTD_decompressStream: take caller-owned ZSTD_inBuffer / ZSTD_outBuffer
+//   structs carrying raw pointer + size + pos fields across calls.
+// - ZSTD_createDDict_byReference, ZSTD_CCtx_refCDict, ZSTD_CCtx_refPrefix,
+//   ZSTD_DCtx_refDDict, ZSTD_DCtx_refPrefix: retain uncopied external pointers
+//   past return without transferring ownership.
+// - ZSTD_CCtx_loadDictionary_advanced, ZSTD_DCtx_loadDictionary_advanced:
+//   behavior depends on runtime ZSTD_dictLoadMethod_e (byCopy vs byRef).
+// - ZDICT_trainFromBuffer, ZDICT_finalizeDictionary: take a concatenated sample
+//   buffer whose total byte length is the sum of samplesSizes[0..nbSamples].
+// - ZSTD_getFrameHeader: writes ZSTD_frameHeader output struct.
+c facts zstd:
+    resource CCtx wraps *mut ZSTD_CCtx_s
+        from ZSTD_createCCtx    // zstd.h 1.6.0:303: allocates ZSTD_CCtx freed by ZSTD_freeCCtx
+        from ZSTD_createCStream    // zstd.h 1.6.0: allocates streaming ZSTD_CCtx freed by ZSTD_freeCStream/ZSTD_freeCCtx
+        drop ZSTD_freeCCtx    // zstd.h 1.6.0:304: frees ZSTD_CCtx (compatible with NULL)
+        destroys ZSTD_freeCStream    // zstd.h 1.6.0: frees streaming ZSTD_CCtx
+    resource DCtx wraps *mut ZSTD_DCtx_s
+        from ZSTD_createDCtx    // zstd.h 1.6.0:326: allocates ZSTD_DCtx freed by ZSTD_freeDCtx
+        from ZSTD_createDStream    // zstd.h 1.6.0: allocates streaming ZSTD_DCtx freed by ZSTD_freeDStream/ZSTD_freeDCtx
+        drop ZSTD_freeDCtx    // zstd.h 1.6.0:327: frees ZSTD_DCtx (compatible with NULL)
+        destroys ZSTD_freeDStream    // zstd.h 1.6.0: frees streaming ZSTD_DCtx
+    resource CDict wraps *mut ZSTD_CDict_s
+        from ZSTD_createCDict    // zstd.h 1.6.0:1034: copies dictBuffer into a new ZSTD_CDict freed by ZSTD_freeCDict
+        drop ZSTD_freeCDict    // zstd.h 1.6.0:1040: frees ZSTD_CDict (compatible with NULL)
+    resource DDict wraps *mut ZSTD_DDict_s
+        from ZSTD_createDDict    // zstd.h 1.6.0:1058: copies dictBuffer into a new ZSTD_DDict freed by ZSTD_freeDDict
+        drop ZSTD_freeDDict    // zstd.h 1.6.0: frees ZSTD_DDict (compatible with NULL)
+    fn ZSTD_createCCtx
+        rename new    // zstd.h 1.6.0:303: CCtx.new()
+    fn ZSTD_createDCtx
+        rename new    // zstd.h 1.6.0:326: DCtx.new()
+    fn ZSTD_getErrorString
+        returns static CStr    // zstd_errors.h 1.6.0:100: static string for ZSTD_ErrorCode
+    fn ZSTD_getErrorName
+        returns static CStr    // zstd.h 1.6.0:283: static string for size_t error code
+    fn ZDICT_getErrorName
+        returns static CStr    // zdict.h 1.6.0:272: static string for ZDICT error code
+    fn ZSTD_compress
+        buffer param 0 capacity param 1    // zstd.h 1.6.0:160: writes at most dstCapacity compressed bytes into dst
+        buffer param 2 len param 3    // zstd.h 1.6.0:161: reads srcSize bytes from src
+    fn ZSTD_decompress
+        buffer param 0 capacity param 1    // zstd.h 1.6.0:173: writes at most dstCapacity decompressed bytes into dst
+        buffer param 2 len param 3    // zstd.h 1.6.0:174: reads compressedSize bytes from src
+    fn ZSTD_getFrameContentSize
+        buffer param 0 len param 1    // zstd.h 1.6.0:205: reads srcSize header bytes from src
+    fn ZSTD_getDecompressedSize
+        buffer param 0 len param 1    // zstd.h 1.6.0:214: reads srcSize header bytes from src
+    fn ZSTD_findFrameCompressedSize
+        buffer param 0 len param 1    // zstd.h 1.6.0:227: inspects srcSize bytes from src
+    fn ZSTD_compressCCtx
+        of CCtx    // zstd.h 1.6.0:314: compresses using explicit CCtx
+        lend    // zstd.h 1.6.0:314: borrows CCtx, retains neither dst nor src
+        buffer param 1 capacity param 2    // zstd.h 1.6.0:315: writes at most dstCapacity bytes into dst
+        buffer param 3 len param 4    // zstd.h 1.6.0:316: reads srcSize bytes from src
+    fn ZSTD_compress2
+        of CCtx    // zstd.h 1.6.0:649: compresses using CCtx parameters
+        rename compress2    // zstd.h 1.6.0:649: cctx.compress2(dst, src)
+        lend    // zstd.h 1.6.0:649: borrows CCtx, retains neither dst nor src
+        buffer param 1 capacity param 2    // zstd.h 1.6.0:650: writes at most dstCapacity bytes into dst
+        buffer param 3 len param 4    // zstd.h 1.6.0:651: reads srcSize bytes from src
+    fn ZSTD_decompressDCtx
+        of DCtx    // zstd.h 1.6.0:337: decompresses using explicit DCtx
+        rename decompress    // zstd.h 1.6.0:337: dctx.decompress(dst, src)
+        lend    // zstd.h 1.6.0:337: borrows DCtx, retains neither dst nor src
+        buffer param 1 capacity param 2    // zstd.h 1.6.0:338: writes at most dstCapacity bytes into dst
+        buffer param 3 len param 4    // zstd.h 1.6.0:339: reads srcSize bytes from src
+    fn ZSTD_CCtx_setParameter
+        of CCtx    // zstd.h 1.6.0:595: configures compression parameter on CCtx
+        rename set_parameter    // zstd.h 1.6.0:595: cctx.set_parameter(param, value)
+        lend    // zstd.h 1.6.0:595: borrows CCtx
+    fn ZSTD_CCtx_setPledgedSrcSize
+        of CCtx    // zstd.h 1.6.0:612: sets pledged source size on CCtx
+        lend    // zstd.h 1.6.0:612: borrows CCtx
+    fn ZSTD_CCtx_reset
+        of CCtx    // zstd.h 1.6.0:635: resets CCtx session and/or parameters
+        lend    // zstd.h 1.6.0:635: borrows CCtx
+    fn ZSTD_initCStream
+        of CCtx    // zstd.h 1.6.0: initializes streaming session on CCtx
+        lend    // zstd.h 1.6.0: borrows CCtx
+    fn ZSTD_DCtx_setParameter
+        of DCtx    // zstd.h 1.6.0: configures decompression parameter on DCtx
+        lend    // zstd.h 1.6.0: borrows DCtx
+    fn ZSTD_DCtx_reset
+        of DCtx    // zstd.h 1.6.0: resets DCtx session and/or parameters
+        lend    // zstd.h 1.6.0: borrows DCtx
+    fn ZSTD_initDStream
+        of DCtx    // zstd.h 1.6.0: initializes streaming session on DCtx
+        lend    // zstd.h 1.6.0: borrows DCtx
+    fn ZSTD_compress_usingDict
+        of CCtx    // zstd.h 1.6.0:997: compresses with raw dictionary buffer
+        lend    // zstd.h 1.6.0:997: borrows CCtx, retains no caller buffer
+        buffer param 1 capacity param 2    // zstd.h 1.6.0:998: writes into dst[0..dstCapacity)
+        buffer param 3 len param 4    // zstd.h 1.6.0:999: reads src[0..srcSize)
+        buffer param 5 len param 6    // zstd.h 1.6.0:1000: reads dict[0..dictSize)
+    fn ZSTD_decompress_usingDict
+        of DCtx    // zstd.h 1.6.0:1011: decompresses with raw dictionary buffer
+        lend    // zstd.h 1.6.0:1011: borrows DCtx, retains no caller buffer
+        buffer param 1 capacity param 2    // zstd.h 1.6.0:1012: writes into dst[0..dstCapacity)
+        buffer param 3 len param 4    // zstd.h 1.6.0:1013: reads src[0..srcSize)
+        buffer param 5 len param 6    // zstd.h 1.6.0:1014: reads dict[0..dictSize)
+    fn ZSTD_createCDict
+        rename new    // zstd.h 1.6.0:1034: CDict.new(dict, level)
+        buffer param 0 len param 1    // zstd.h 1.6.0:1028,1034: copies dictBuffer[0..dictSize) into CDict
+    fn ZSTD_compress_usingCDict
+        of CCtx    // zstd.h 1.6.0:1047: compresses using digested CDict
+        rename compress_using_cdict    // zstd.h 1.6.0:1047: cctx.compress_using_cdict(dst, src, cdict)
+        lend    // zstd.h 1.6.0:1047: borrows CCtx and CDict, retains no caller buffer
+        buffer param 1 capacity param 2    // zstd.h 1.6.0:1048: writes into dst[0..dstCapacity)
+        buffer param 3 len param 4    // zstd.h 1.6.0:1049: reads src[0..srcSize)
+    fn ZSTD_createDDict
+        rename new    // zstd.h 1.6.0:1058: DDict.new(dict)
+        buffer param 0 len param 1    // zstd.h 1.6.0:1057: copies dictBuffer[0..dictSize) into DDict
+    fn ZSTD_decompress_usingDDict
+        of DCtx    // zstd.h 1.6.0: decompresses using digested DDict
+        rename decompress_using_ddict    // zstd.h 1.6.0: dctx.decompress_using_ddict(dst, src, ddict)
+        lend    // zstd.h 1.6.0: borrows DCtx and DDict, retains no caller buffer
+        buffer param 1 capacity param 2    // zstd.h 1.6.0: writes into dst[0..dstCapacity)
+        buffer param 3 len param 4    // zstd.h 1.6.0: reads src[0..srcSize)
+    fn ZSTD_CCtx_loadDictionary
+        of CCtx    // zstd.h 1.6.0:2722: copies dictionary into CCtx internal state
+        lend    // zstd.h 1.6.0:2743: copies dict by value, retains no caller pointer
+        buffer param 1 len param 2    // zstd.h 1.6.0:2722: reads dict[0..dictSize)
+    fn ZSTD_DCtx_loadDictionary
+        of DCtx    // zstd.h 1.6.0:2848: copies dictionary into DCtx internal state
+        lend    // zstd.h 1.6.0: copies dict by value, retains no caller pointer
+        buffer param 1 len param 2    // zstd.h 1.6.0:2848: reads dict[0..dictSize)
+    fn ZSTD_getDictID_fromDict
+        buffer param 0 len param 1    // zstd.h 1.6.0: reads dict[0..dictSize)
+    fn ZSTD_getDictID_fromFrame
+        buffer param 0 len param 1    // zstd.h 1.6.0: reads src[0..srcSize)
+    fn ZSTD_getDictID_fromCDict
+        of CDict    // zstd.h 1.6.0: reads dictID from CDict
+        lend    // zstd.h 1.6.0: borrows CDict
+    fn ZSTD_getDictID_fromDDict
+        of DDict    // zstd.h 1.6.0: reads dictID from DDict
+        lend    // zstd.h 1.6.0: borrows DDict
+    fn ZSTD_sizeof_CCtx
+        of CCtx    // zstd.h 1.6.0: returns memory size of CCtx
+        lend    // zstd.h 1.6.0: borrows CCtx
+    fn ZSTD_sizeof_CStream
+        of CCtx    // zstd.h 1.6.0: returns memory size of CStream
+        lend    // zstd.h 1.6.0: borrows CCtx
+    fn ZSTD_sizeof_DCtx
+        of DCtx    // zstd.h 1.6.0: returns memory size of DCtx
+        lend    // zstd.h 1.6.0: borrows DCtx
+    fn ZSTD_sizeof_DStream
+        of DCtx    // zstd.h 1.6.0: returns memory size of DStream
+        lend    // zstd.h 1.6.0: borrows DCtx
+    fn ZSTD_sizeof_CDict
+        of CDict    // zstd.h 1.6.0: returns memory size of CDict
+        lend    // zstd.h 1.6.0: borrows CDict
+    fn ZSTD_sizeof_DDict
+        of DDict    // zstd.h 1.6.0: returns memory size of DDict
+        lend    // zstd.h 1.6.0: borrows DDict
+    fn ZDICT_getDictID
+        buffer param 0 len param 1    // zdict.h 1.6.0:269: reads dictBuffer[0..dictSize)
+    fn ZDICT_getDictHeaderSize
+        buffer param 0 len param 1    // zdict.h 1.6.0:270: reads dictBuffer[0..dictSize)
