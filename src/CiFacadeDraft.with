@@ -863,6 +863,19 @@ impl CiProject:
             if facts_kind(line) == f"callback:{pi}": return true
         false
 
+    fn fd_is_ambiguous_record(record: &str) -> bool:
+        var count: isize = 0
+        if self.fd_drop_of(record) >= 0: count = 1
+        var first = ""
+        for (rec, rname) in self.registry_value_record_names:
+            if rec != record: continue
+            if first.len() == 0:
+                first = rname.to_owned()
+                count += 1
+            else if rname != first:
+                count += 1
+        count > 1
+
     fn fd_param_presentable(si: i32, pi: i32, modeled: &List[str]) -> bool:
         let p = with_str_clone_ref(self.symbols[si].param_ty[pi])
         if self.fd_called_only_callback(si, pi) or self.fd_registry_callback(si, pi): return true
@@ -877,7 +890,7 @@ impl CiProject:
         // D198 (§16.2b.5): a value record the proofs can describe.
         if self.fd_value_record_word(si, pi, 0).len() > 0: return true
         let rec = fd_record_pointee(p)
-        rec.len() > 0 and modeled.contains(rec)
+        rec.len() > 0 and modeled.contains(rec) and not self.fd_is_ambiguous_record(rec)
 
     // The first parameter of `si` the facade language cannot present, or
     // -1 (`repr_param` is the resource's own, handed by the rendering).

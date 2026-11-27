@@ -1163,6 +1163,7 @@ fn render_type_expr(pool: &AstPool, intern: &InternPool, node: NodeId) -> str:
         let param_count = pool.get_data1(node)
         let ret = pool.get_data2(node)
         let out = StringBuilder.new()
+        if pool.is_unsafe_fn_type_node(node): out.push_str("unsafe ")
         out.push_str("fn(")
         for pi in 0..param_count:
             if pi > 0:
@@ -1176,6 +1177,7 @@ fn render_type_expr(pool: &AstPool, intern: &InternPool, node: NodeId) -> str:
         let param_count = pool.get_data1(node)
         let ret = pool.get_data2(node)
         let out = StringBuilder.new()
+        if pool.is_unsafe_fn_type_node(node): out.push_str("unsafe ")
         out.push_str("extern \"C\" fn(")
         for pi in 0..param_count:
             if pi > 0:

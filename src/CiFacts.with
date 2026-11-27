@@ -600,6 +600,7 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             fn_cites.push(cite.to_owned())
             fn_kinds.push("reads:" ++ n)
         else if clause == "callback_thread any" or clause == "callback_thread registering":
+            fn_carry = true
             fn_clauses.push(clause.to_owned())
             fn_cites.push(cite.to_owned())
             fn_kinds.push("callback_thread:" ++ clause.slice(16, clause.len()))
