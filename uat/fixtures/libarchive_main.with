@@ -1,0 +1,90 @@
+// Release UAT: libarchive through its registry facade (#3140). Zero `unsafe`,
+// zero project facade: write a .tar.gz and .zip, read the .tar.gz entry by
+// entry, and extract to disk.
+use contracts.libarchive
+use c_import("archive.h")
+use c_import("archive_entry.h")
+use std.fs
+
+fn write_archive(path: &str, as_zip: bool, entry_name: &str, content: &str) -> bool:
+    let Some(w) = ArchiveWriter.new() else: return false
+    if as_zip:
+        if w.write_set_format_zip() != ARCHIVE_OK: return false
+    else:
+        if w.write_add_filter_gzip() != ARCHIVE_OK: return false
+        if w.write_set_format_pax_restricted() != ARCHIVE_OK: return false
+    if w.write_open_filename(Some(path)) != ARCHIVE_OK: return false
+    let Some(entry) = ArchiveEntry.new() else: return false
+    entry.set_pathname(entry_name)
+    entry.set_size(content.len() as i64)
+    entry.set_filetype(AE_IFREG as u32)
+    entry.set_perm(0o644)
+    if w.write_header(&entry) != ARCHIVE_OK: return false
+    let bytes = content as []u8
+    if w.write_data(bytes) != bytes.len() as i64: return false
+    w.write_close() == ARCHIVE_OK
+
+fn main:
+    let tar_path = "/tmp/with-libarchive-uat.tar.gz"
+    let zip_path = "/tmp/with-libarchive-uat.zip"
+    let extracted_path = "/tmp/with-libarchive-uat-out.txt"
+    let body = "hello from with libarchive UAT!\n"
+
+    if not write_archive(tar_path, false, "hello.txt", body):
+        print("libarchive write tar.gz failed")
+        return 1
+    if not write_archive(zip_path, true, "hello.txt", body):
+        print("libarchive write zip failed")
+        return 1
+
+    // Read the .tar.gz entry by entry and extract to disk.
+    let Some(r) = ArchiveReader.new() else:
+        print("libarchive ArchiveReader.new failed")
+        return 1
+    if r.read_support_filter_all() != ARCHIVE_OK:
+        print("libarchive filter_all failed")
+        return 1
+    if r.read_support_format_all() != ARCHIVE_OK:
+        print("libarchive format_all failed")
+        return 1
+    if r.read_open_filename(Some(tar_path), 10240) != ARCHIVE_OK:
+        print("libarchive open tar.gz failed")
+        return 1
+    let Some(entry) = ArchiveEntry.new() else:
+        print("libarchive ArchiveEntry.new failed")
+        return 1
+    if r.read_next_header2(&entry) != ARCHIVE_OK:
+        print("libarchive next_header2 failed")
+        return 1
+    let name = entry.pathname().map(it.to_str_lossy()) ?? ""
+    if name != "hello.txt" or entry.size() != body.len() as i64:
+        print(f"libarchive entry mismatch: {name}")
+        return 1
+    var buf: [u8; 64] = [0 as u8; 64]
+    let nread = r.read_data(buf)
+    if nread != body.len() as i64:
+        print("libarchive read_data length mismatch")
+        return 1
+    let _ = r.read_close()
+
+    // Extract to disk using ArchiveWriter.disk_new.
+    let Some(disk) = ArchiveWriter.disk_new() else:
+        print("libarchive ArchiveWriter.disk_new failed")
+        return 1
+    entry.set_pathname(extracted_path)
+    if disk.write_header(&entry) != ARCHIVE_OK:
+        print("libarchive disk write_header failed")
+        return 1
+    if disk.write_data(buf[..nread]) != nread:
+        print("libarchive disk write_data failed")
+        return 1
+    let _ = disk.write_finish_entry()
+    let _ = disk.write_close()
+
+    let Ok(read_back) = read_file(extracted_path) else:
+        print("libarchive could not read extracted file")
+        return 1
+    if read_back != body:
+        print("libarchive extracted file mismatch")
+        return 1
+    print("libarchive UAT passed")
