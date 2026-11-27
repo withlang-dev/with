@@ -1,0 +1,10 @@
+scenario: xz_utils from a fresh project
+requires: network
+
+new directory
+run: with init .
+run: with get c.xz_utils
+expect stderr contains: facade xz_utils:
+write src/main.with from xz_utils_main.with
+run: with run
+expect stdout: xz_utils UAT passed

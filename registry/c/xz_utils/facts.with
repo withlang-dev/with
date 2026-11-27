@@ -1,5 +1,5 @@
 // xz_utils 5.8.4 (liblzma), the version `with get c.xz_utils` pins. Every
-// citation is a line of the package's installed headers, include/lzma.
+// citation is a line of the package's installed headers, include/lzma/*.h.
 //
 // An lzma_stream is initialized in place by any of several coders, and one
 // function ends them all. The storage begins zeroed, which is what the
@@ -9,8 +9,88 @@
 // initializer that fails leaves nothing to end: base.h line 501, "If the
 // initialization function fails, no memory is left allocated that would
 // require freeing with lzma_end()".
-c facade xz_utils:
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - lzma_stream_header_encode/decode, lzma_stream_footer_encode/decode: take
+//   an uncounted 12-byte pointer with no length parameter.
+// - lzma_raw_*, lzma_filters_*, lzma_properties_*, lzma_filter_flags_*,
+//   lzma_str_*_filters, lzma_lzma_preset, lzma_stream_encoder,
+//   lzma_stream_encoder_mt*, lzma_stream_decoder_mt, lzma_mt_block_size,
+//   lzma_alone_encoder, lzma_stream_buffer_encode, lzma_microlzma_encoder,
+//   lzma_block_*: pass pointer-holding option/filter-chain/block structs
+//   (lzma_filter, lzma_options_lzma, lzma_mt, lzma_block) or custom
+//   lzma_allocator tables containing raw pointers and callbacks.
+// - lzma_index_*, lzma_index_hash_*, lzma_file_info_decoder: take custom
+//   lzma_allocator * on destroy/append or retain cross-object pointers
+//   (lzma_index_iter, lzma_index_cat).
+c facts xz_utils:
     resource Stream wraps lzma_stream
         init lzma_easy_encoder(self), ok LZMA_OK    // lzma/container.h 5.8.4 line 318: "LZMA_OK: Initialization succeeded."
         init lzma_stream_decoder(self), ok LZMA_OK    // lzma/container.h 5.8.4 line 737: "LZMA_OK: Initialization was successful."
+        init lzma_auto_decoder(self), ok LZMA_OK    // lzma/container.h 5.8.4 line 808: "LZMA_OK: Initialization was successful."
+        init lzma_alone_decoder(self), ok LZMA_OK    // lzma/container.h 5.8.4 line 834: "LZMA_OK"
+        init lzma_lzip_decoder(self), ok LZMA_OK    // lzma/container.h 5.8.4 line 891: "LZMA_OK: Initialization was successful."
+        init lzma_microlzma_decoder(self), ok LZMA_OK    // lzma/container.h 5.8.4 line 988: "LZMA_OK"
         drop lzma_end    // lzma/base.h 5.8.4 line 641: "Free memory allocated for the coder data structures"; line 643: "After lzma_end(strm), strm->internal is guaranteed to be NULL."
+    fn lzma_code
+        of Stream    // lzma/base.h 5.8.4 lines 617 to 637: encodes or decodes on an initialized lzma_stream
+        buffer field next_in remaining field avail_in reads    // lzma/base.h 5.8.4 lines 522 to 523: `const uint8_t *next_in`, `size_t avail_in`
+        buffer field next_out remaining field avail_out    // lzma/base.h 5.8.4 lines 526 to 527: `uint8_t *next_out`, `size_t avail_out`
+    fn lzma_get_progress
+        of Stream    // lzma/base.h 5.8.4 lines 676 to 677: reads progress counters from strm
+        lend    // lzma/base.h 5.8.4 line 676: borrows strm without freeing
+        fills param 1    // lzma/base.h 5.8.4 line 673: writes progress_in
+        fills param 2    // lzma/base.h 5.8.4 line 674: writes progress_out
+    fn lzma_memusage
+        of Stream    // lzma/base.h 5.8.4 lines 680 to 705: queries allocated decoder memory for strm
+        lend    // lzma/base.h 5.8.4 line 705: reads const strm
+    fn lzma_memlimit_get
+        of Stream    // lzma/base.h 5.8.4 lines 710 to 725: returns current decoder memory limit
+        lend    // lzma/base.h 5.8.4 line 725: reads const strm
+    fn lzma_memlimit_set
+        of Stream    // lzma/base.h 5.8.4 lines 730 to 748: updates decoder memory limit
+        lend    // lzma/base.h 5.8.4 line 748: borrows strm without freeing
+    fn lzma_get_check
+        of Stream    // lzma/check.h 5.8.4 lines 152 to 163: returns integrity check ID from strm
+        lend    // lzma/check.h 5.8.4 line 162: reads const strm
+    fn lzma_easy_buffer_encode
+        param 2 fixed null    // lzma/container.h 5.8.4 line 344: "Set to NULL to use malloc() and free()"
+        buffer param 3 len param 4    // lzma/container.h 5.8.4 lines 345 to 346: reads in_size bytes from in
+        buffer param 5 capacity param 7    // lzma/container.h 5.8.4 lines 347 to 351: writes at most out_size bytes into out
+        updates param 6    // lzma/container.h 5.8.4 lines 348 to 349: updates *out_pos to end of written bytes
+        ok LZMA_OK    // lzma/container.h 5.8.4 line 354: "LZMA_OK: Encoding was successful."
+    fn lzma_stream_buffer_decode
+        updates param 0    // lzma/container.h 5.8.4 lines 904 to 907: reads/updates *memlimit
+        param 2 fixed null    // lzma/container.h 5.8.4 line 914: "Set to NULL to use malloc() and free()"
+        buffer param 3 len param 5    // lzma/container.h 5.8.4 lines 915 to 919: reads in_size bytes from in
+        updates param 4    // lzma/container.h 5.8.4 lines 916 to 917: updates *in_pos
+        buffer param 6 capacity param 8    // lzma/container.h 5.8.4 lines 920 to 924: writes at most out_size bytes into out
+        updates param 7    // lzma/container.h 5.8.4 lines 921 to 922: updates *out_pos
+        ok LZMA_OK    // lzma/container.h 5.8.4 line 927: "LZMA_OK: Decoding was successful."
+    fn lzma_vli_encode
+        param 1 fixed null    // lzma/vli.h 5.8.4 line 90: "To use single-call encoding, set vli_pos to NULL."
+        buffer param 2 capacity param 4    // lzma/vli.h 5.8.4 lines 91 to 94: writes into out[0..out_size]
+        updates param 3    // lzma/vli.h 5.8.4 line 92: updates *out_pos
+        ok LZMA_OK    // lzma/vli.h 5.8.4 line 100: "LZMA_OK: Integer successfully encoded."
+    fn lzma_vli_decode
+        fills param 0    // lzma/vli.h 5.8.4 lines 122 to 124: writes decoded VLI into *vli
+        param 1 fixed null    // lzma/vli.h 5.8.4 line 128: "To use single-call decoding, set vli_pos to NULL."
+        buffer param 2 len param 4    // lzma/vli.h 5.8.4 lines 129 to 132: reads from in[0..in_size]
+        updates param 3    // lzma/vli.h 5.8.4 line 130: updates *in_pos
+        ok LZMA_OK    // lzma/vli.h 5.8.4 line 138: "LZMA_OK: Integer successfully decoded."
+    fn lzma_crc32
+        buffer param 0 len param 1    // lzma/check.h 5.8.4 lines 116 to 127: reads size bytes from buf
+    fn lzma_crc64
+        buffer param 0 len param 1    // lzma/check.h 5.8.4 lines 137 to 148: reads size bytes from buf
+    fn lzma_bcj_arm64_encode
+        buffer param 1 capacity param 2    // lzma/bcj.h 5.8.4 lines 113 to 123: filters size bytes of buf in place
+    fn lzma_bcj_arm64_decode
+        buffer param 1 capacity param 2    // lzma/bcj.h 5.8.4 lines 126 to 133: filters size bytes of buf in place
+    fn lzma_bcj_riscv_encode
+        buffer param 1 capacity param 2    // lzma/bcj.h 5.8.4 lines 144 to 154: filters size bytes of buf in place
+    fn lzma_bcj_riscv_decode
+        buffer param 1 capacity param 2    // lzma/bcj.h 5.8.4 lines 157 to 164: filters size bytes of buf in place
+    fn lzma_bcj_x86_encode
+        buffer param 1 capacity param 2    // lzma/bcj.h 5.8.4 lines 175 to 185: filters size bytes of buf in place
+    fn lzma_bcj_x86_decode
+        buffer param 1 capacity param 2    // lzma/bcj.h 5.8.4 lines 188 to 195: filters size bytes of buf in place
