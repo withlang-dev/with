@@ -576,6 +576,16 @@ impl Parser:
         self.advance()
         self.intern.intern((if negative: "-" else: "") ++ digits)
 
+    // D245 (§16.2b.4): a single status constant/literal, or a lower-bound
+    // predicate `>= C` (interned as `>=C`).
+    mut fn parse_facade_ok_entry() -> i32:
+        if self.peek() == TokenKind.TK_GT_EQ:
+            self.advance()
+            let bound = self.parse_facade_status()
+            if bound == 0: return 0
+            return self.intern.intern(">=" ++ self.intern.resolve(bound))
+        self.parse_facade_status()
+
     fn intern_current() -> i32:
         let s = self.current_start()
         let e = self.current_end()
@@ -5481,12 +5491,12 @@ impl Parser:
                     self.emit_error("after 'init <fn>(self),' write the initializer's own success status: 'ok <CONST>' (§16.2b.4)")
                     return 0
                 self.advance()
-                let first = self.parse_facade_status()
+                let first = self.parse_facade_ok_entry()
                 if first == 0: return 0
                 ops.push(first)
                 while self.peek() == TokenKind.TK_COMMA:
                     self.advance()
-                    let more = self.parse_facade_status()
+                    let more = self.parse_facade_ok_entry()
                     if more == 0: return 0
                     ops.push(more)
         else if word == "drop":
@@ -5512,16 +5522,16 @@ impl Parser:
                     return 0
                 ops.push(0)
         else if word == "ok":
-            // `ok C` or `ok C1, C2, …` (§16.2b.4, ruling Amendment 1): any
-            // listed constant is success. Sema verifies each and where a
-            // list is allowed.
+            // `ok C`, `ok C1, C2, …`, or `ok >= C` (§16.2b.4, D245): any
+            // listed constant or lower-bound predicate is success. Sema
+            // verifies each and where each form is allowed.
             kind = FACADE_CLAUSE_OK
-            let c = self.parse_facade_status()
+            let c = self.parse_facade_ok_entry()
             if c == 0: return 0
             ops.push(c)
             while self.peek() == TokenKind.TK_COMMA:
                 self.advance()
-                let more = self.parse_facade_status()
+                let more = self.parse_facade_ok_entry()
                 if more == 0: return 0
                 ops.push(more)
         else if word == "null":

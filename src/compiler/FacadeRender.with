@@ -2447,26 +2447,39 @@ fn facade_render_init(pool: &AstPool, intern: &InternPool, name: &str, repr_text
         return out ++ " -> (" ++ status_type ++ ", " ++ name ++ "):\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", " ++ made ++ ")\n"
     let err = if shared.len() > 0: shared else: facade_render_error_name(name)
     let failed_args = if shared_message: status ++ ", \"\"" else: status
-    out ++ " -> Result[" ++ facade_render_ok_type(ok_syms, status_type, name) ++ ", " ++ err ++ "]:\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    if " ++ facade_render_not_ok(intern, ok_syms, status) ++ ": return Err(" ++ err ++ ".Failed(" ++ failed_args ++ "))\n    Ok(" ++ facade_render_ok_value(ok_syms, status, made) ++ ")\n"
+    out ++ " -> Result[" ++ facade_render_ok_type(intern, ok_syms, status_type, name) ++ ", " ++ err ++ "]:\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    if " ++ facade_render_not_ok(intern, ok_syms, status) ++ ": return Err(" ++ err ++ ".Failed(" ++ failed_args ++ "))\n    Ok(" ++ facade_render_ok_value(intern, ok_syms, status, made) ++ ")\n"
 
-// The failure test of `ok C1, C2, …` over the status local (§16.2b.4, ruling
-// Amendment 1): any listed constant is success, so failure is none of them.
+// D245 (§16.2b.4): one status failure test — `status < C` for `ok >= C`,
+// `status != C` for `ok C`.
+fn facade_render_status_test(status: &str, ok_text: &str) -> str:
+    if ok_text.starts_with(">="): status ++ " < " ++ ok_text.slice(2, ok_text.len())
+    else: status ++ " != " ++ ok_text
+
+// Whether `ok` matches more than one value (a list `ok C1, C2` or a lower
+// bound `ok >= C`), so the `Ok` side carries the matched status.
+fn facade_render_ok_carries_status(intern: &InternPool, ok_syms: &List[i32]) -> bool:
+    if ok_syms.len() > 1: return true
+    ok_syms.len() == 1 and intern.resolve(ok_syms[0]).starts_with(">=")
+
+// The failure test of `ok C1, C2, …` or `ok >= C` over the status local
+// (§16.2b.4, ruling Amendment 1, D245): any listed constant or bound is
+// success, so failure is none of them.
 fn facade_render_not_ok(intern: &InternPool, ok_syms: &List[i32], status: &str):
     var out = ""
     for k in 0..ok_syms.len():
-        out = out ++ (if k > 0: " and " else: "") ++ status ++ " != " ++ intern.resolve(ok_syms[k])
+        out = out ++ (if k > 0: " and " else: "") ++ facade_render_status_test(status, intern.resolve(ok_syms[k]))
     out
 
 // What the `Ok` side carries (§16.2b.4): the produced value — and, when
-// `ok` lists several success statuses, the status that matched beside it,
-// as `(status, R)`: the order of the pair the facade renders without `ok`
-// (`(status, Option[R])`, an in-place `(status, R)`). One success status
-// needs no carrying: it is the constant.
-fn facade_render_ok_type(ok_syms: &List[i32], status_type: &str, name: &str) -> str:
-    if ok_syms.len() > 1: "(" ++ status_type ++ ", " ++ name ++ ")" else: name
+// `ok` lists several success statuses or a lower bound `>= C`, the status
+// that matched beside it, as `(status, R)`: the order of the pair the facade
+// renders without `ok` (`(status, Option[R])`, an in-place `(status, R)`).
+// One exact success status needs no carrying: it is the constant.
+fn facade_render_ok_type(intern: &InternPool, ok_syms: &List[i32], status_type: &str, name: &str) -> str:
+    if facade_render_ok_carries_status(intern, ok_syms): "(" ++ status_type ++ ", " ++ name ++ ")" else: name
 
-fn facade_render_ok_value(ok_syms: &List[i32], status: &str, made: &str) -> str:
-    if ok_syms.len() > 1: "(" ++ status ++ ", " ++ made ++ ")" else: made
+fn facade_render_ok_value(intern: &InternPool, ok_syms: &List[i32], status: &str, made: &str) -> str:
+    if facade_render_ok_carries_status(intern, ok_syms): "(" ++ status ++ ", " ++ made ++ ")" else: made
 
 // An out-parameter producer's constructor (ruling §16, spec §16.2b.4). The
 // physical commitment: initialize the slot to NULL, call, inspect the slot —
@@ -2536,7 +2549,7 @@ fn facade_render_out_producer(pool: &AstPool, intern: &InternPool, name: &str, r
         let result = "(" ++ status_type ++ ", Option[" ++ name ++ "])"
         return (head ++ " -> " ++ result ++ ":\n" ++ null_slot ++ "    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", if " ++ slot_var ++ " == null: None else: Some(" ++ made ++ "))\n", result)
     let err = if shared.len() > 0: shared else: facade_render_error_name(name)
-    let result = "Result[" ++ facade_render_ok_type(ok_syms, status_type, name) ++ ", " ++ err ++ "]"
+    let result = "Result[" ++ facade_render_ok_type(intern, ok_syms, status_type, name) ++ ", " ++ err ++ "]"
     var out = head ++ " -> " ++ result ++ ":\n" ++ null_slot ++ "    let " ++ status ++ " = " ++ call ++ "\n"
     out = out ++ "    if " ++ facade_render_not_ok(intern, ok_syms, status) ++ ":\n"
     // The text is read first: destroying what a failure produced is another
@@ -2558,7 +2571,7 @@ fn facade_render_out_producer(pool: &AstPool, intern: &InternPool, name: &str, r
     else:
         out = out ++ "        return Err(" ++ err ++ "." ++ facade_render_failed_with_name(name, shared.len() > 0) ++ "(" ++ status ++ ", " ++ facade_render_failed_name(name) ++ " { repr: " ++ slot_var ++ " }))\n"
     out = out ++ "    if " ++ slot_var ++ " == null: return Err(" ++ err ++ ".NothingProduced(" ++ status ++ "))\n"
-    (out ++ "    Ok(" ++ facade_render_ok_value(ok_syms, status, made) ++ ")\n", result)
+    (out ++ "    Ok(" ++ facade_render_ok_value(intern, ok_syms, status, made) ++ ")\n", result)
 
 // The names the Result projection renders beside a resource `R`: its error
 // type and the type of a resource a failed producer still produced. Sema
@@ -3341,30 +3354,24 @@ fn facade_render_bridge_body(pool: &AstPool, intern: &InternPool, decl: i32, b: 
                 return (" -> " ++ filled_type, indent ++ call ++ "\n" ++ indent ++ filled ++ "\n")
             return (" -> (" ++ status_type ++ ", " ++ b.fill_types ++ ")", indent ++ "let " ++ fill_status ++ " = " ++ call ++ "\n" ++ indent ++ "(" ++ fill_status ++ ", " ++ b.fills ++ ")\n")
         let (fill_err, fill_empty_message) = facade_render_op_error(pool, intern, decl, presented)
-        var fill_failed = ""
-        for ok_const in fill_oks:
-            if fill_failed.len() > 0: fill_failed = fill_failed ++ " and "
-            fill_failed = fill_failed ++ fill_status ++ " != " ++ intern.resolve(ok_const)
+        let fill_failed = facade_render_not_ok(intern, fill_oks, fill_status)
         let fill_checked = indent ++ "let " ++ fill_status ++ " = " ++ call ++ "\n" ++ facade_render_failed(fill_err, fill_status, fill_failed, message_call, facade_render_param_names(pool, intern, decl), indent, fill_empty_message)
-        if fill_oks.len() == 1:
+        if not facade_render_ok_carries_status(intern, fill_oks):
             return (" -> Result[" ++ filled_type ++ ", " ++ fill_err ++ "]", fill_checked ++ indent ++ filled ++ "\n")
         return (" -> Result[(" ++ status_type ++ ", " ++ b.fill_types ++ "), " ++ fill_err ++ "]", fill_checked ++ indent ++ "(" ++ fill_status ++ ", " ++ b.fills ++ ")\n")
     if b.cap_var.len() == 0:
-        // A status-returning operation under `ok` (ruling Amendment 3,
-        // §16.2b.4): `Result[T, <Fn>Error]`. One constant: the status is the
-        // whole return, so `T` is `Unit`. Several: `T` is the status that
-        // matched.
+        // A status-returning operation under `ok` (ruling Amendment 3, D245,
+        // §16.2b.4): `Result[T, <Fn>Error]`. One exact constant: the status is
+        // the whole return, so `T` is `Unit`. Several or `>= C`: `T` is the
+        // status that matched.
         let oks = facade_render_fn_oks(pool, intern, decl)
         if oks.len() == 0:
             return (facade_render_return(pool, intern, decl), indent ++ call ++ "\n")
         let (op_err, empty_message) = facade_render_op_error(pool, intern, decl, presented)
         let op_status = facade_render_fresh("status", facade_render_param_names(pool, intern, decl))
-        var failed = ""
-        for k in 0..oks.len():
-            if k > 0: failed = failed ++ " and "
-            failed = failed ++ op_status ++ " != " ++ intern.resolve(oks[k])
+        let failed = facade_render_not_ok(intern, oks, op_status)
         let checked = indent ++ "let " ++ op_status ++ " = " ++ call ++ "\n" ++ facade_render_failed(op_err, op_status, failed, message_call, facade_render_param_names(pool, intern, decl), indent, empty_message)
-        if oks.len() == 1:
+        if not facade_render_ok_carries_status(intern, oks):
             return (" -> Result[Unit, " ++ op_err ++ "]", checked ++ indent ++ "()\n")
         let status_type = facade_render_return(pool, intern, decl)
         return (" -> Result[" ++ status_type.slice(4, status_type.len()) ++ ", " ++ op_err ++ "]", checked ++ indent ++ op_status ++ "\n")
@@ -3376,7 +3383,7 @@ fn facade_render_bridge_body(pool: &AstPool, intern: &InternPool, decl: i32, b: 
     let (err, empty_message) = facade_render_op_error(pool, intern, decl, presented)
     let status = facade_render_fresh("status", facade_render_param_names(pool, intern, decl))
     var body = indent ++ "let " ++ status ++ " = " ++ call ++ "\n"
-    body = body ++ facade_render_failed(err, status, status ++ " != " ++ intern.resolve(ok_sym), message_call, facade_render_param_names(pool, intern, decl), indent, empty_message)
+    body = body ++ facade_render_failed(err, status, facade_render_status_test(status, intern.resolve(ok_sym)), message_call, facade_render_param_names(pool, intern, decl), indent, empty_message)
     (" -> Result[usize, " ++ err ++ "]", body ++ check ++ result)
 
 // Every constant of the `ok` an fn item states for the declaration; none

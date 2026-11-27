@@ -161,11 +161,33 @@ fn facts_read_file(path: &str) -> Result[Facts, str]:
 fn facts_push_unique(mut list: List[str], name: &str):
     if not list.contains(name): list.push(name.to_owned())
 
+fn facts_flush_fn(mut facts: Facts, fn_name: &str, carry: bool, clauses: &List[str], cites: &List[str], kinds: &List[str]):
+    if fn_name.len() == 0 or clauses.len() == 0: return
+    if carry:
+        facts_push_unique(facts.value_fns, fn_name)
+        facts.value_text = facts.value_text ++ "    fn " ++ fn_name ++ "\n"
+        var fk: isize = 0
+        for cl in clauses:
+            facts.value_text = facts.value_text ++ "        " ++ cl ++ "    // registry: " ++ cites[fk] ++ "\n"
+            fk += 1
+    else:
+        var fk: isize = 0
+        for k in kinds:
+            facts.entries.push(FactsEntry { fn_name: fn_name.to_owned(), kind: k.to_owned(), record: "", cite: cites[fk].to_owned() })
+            fk += 1
+
 fn facts_read(path: &str, source: str) -> Result[Facts, str]:
     var facts = Facts { package: "", entries: [], utf8_cite: "", threads_cite: "", value_text: "", value_fns: [], value_res_fns: [], value_resources: [], field_roles: [], settings: [] }
     var in_value = false
     var current_fn = ""
     var in_resource = false
+    // Buffer each `fn` stanza until its end so clause order inside one `fn`
+    // block never splits its clauses across `facts.entries` and
+    // `facts.value_text`.
+    var fn_carry = false
+    var fn_clauses = []
+    var fn_cites = []
+    var fn_kinds = []
     // A pointer resource block is buffered until its end so a resource using
     // D209 positioned destroyers (`drop f(param N)`) or sharing a C record
     // with another resource in this file is carried verbatim as a named
@@ -211,6 +233,11 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             continue
         if facts.package.len() == 0: return Err(facts_error(path, line_no, "`c facts NAME:` must come first"))
         if stripped.starts_with("resource ") or stripped.starts_with("fn "):
+            facts_flush_fn(mut facts, current_fn, fn_carry, fn_clauses, fn_cites, fn_kinds)
+            fn_carry = false
+            fn_clauses = []
+            fn_cites = []
+            fn_kinds = []
             if ptr_header.len() > 0:
                 if ptr_carry or ptr_rec_multi.contains(ptr_record):
                     facts_push_unique(facts.value_resources, ptr_name)
@@ -264,6 +291,7 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             continue
         if stripped.starts_with("fn "):
             current_fn = stripped.slice(3, stripped.len()).trim()
+            fn_carry = facts.value_fns.contains(current_fn)
             variadic_item = ""
             in_resource = false
             if current_fn.len() == 0 or current_fn.contains(" "): return Err(facts_error(path, line_no, "an item is `fn NAME`"))
@@ -277,6 +305,11 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             // `field F of R is allocator|reallocator|deallocator|context|callback`
             let words = clause.fields()
             if words.len() != 6 or words[2] != "of" or words[4] != "is" or not (words[5] == "allocator" or words[5] == "reallocator" or words[5] == "deallocator" or words[5] == "context" or words[5] == "callback"): return Err(facts_error(path, line_no, "a field's role is `field F of R is allocator`, `reallocator`, `deallocator`, `context` or `callback`"))
+            facts_flush_fn(mut facts, current_fn, fn_carry, fn_clauses, fn_cites, fn_kinds)
+            fn_carry = false
+            fn_clauses = []
+            fn_cites = []
+            fn_kinds = []
             in_resource = false
             current_fn = ""
             facts.field_roles.push((words[3] ++ "." ++ words[1], words[5] ++ "|" ++ words[3] ++ "|" ++ cite))
@@ -371,92 +404,67 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
         let is_borrow_cstr = clause.starts_with("returns borrow CStr from param ")
         let is_fills_updates = cwords.len() == 3 and (cwords[0] == "fills" or cwords[0] == "updates" or cwords[0] == "detaches") and cwords[1] == "param"
         if is_of_clause or is_buffer_param or is_discarded or is_fixed or is_ok or is_static_cstr or is_borrow_cstr or is_fills_updates:
-            facts_push_unique(facts.value_fns, current_fn)
-            if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
-            value_item = current_fn
-            facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
-        else if clause.starts_with("buffer field ") and clause.contains(" remaining field ") and facts.value_fns.contains(current_fn):
+            fn_carry = true
+            fn_clauses.push(clause.to_owned())
+            fn_cites.push(cite.to_owned())
+            fn_kinds.push("")
+        else if clause.starts_with("buffer field ") and clause.contains(" remaining field "):
             // D210: a step function of a by-value resource reads and writes
             // through fields of the record (zlib's `deflate` through
-            // `next_in`/`avail_in` and `next_out`/`avail_out`). Carried as
-            // written, after the `of R` that makes the function the
-            // resource's.
-            if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
-            value_item = current_fn
-            facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
+            // `next_in`/`avail_in` and `next_out`/`avail_out`).
+            fn_carry = true
+            fn_clauses.push(clause.to_owned())
+            fn_cites.push(cite.to_owned())
+            fn_kinds.push("")
         else if clause == "lend":
-            if value_item == current_fn or facts.value_fns.contains(current_fn):
-                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
-                value_item = current_fn
-                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
-            else:
-                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "lend", record: "", cite: cite })
+            fn_clauses.push(clause.to_owned())
+            fn_cites.push(cite.to_owned())
+            fn_kinds.push("lend")
         else if clause.starts_with("consumes param "):
             let n = clause.slice(15, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]): return Err(facts_error(path, line_no, "`consumes param N` takes a parameter index"))
-            if value_item == current_fn or facts.value_fns.contains(current_fn):
-                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
-                value_item = current_fn
-                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
-            else:
-                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "consumes:" ++ n, record: "", cite: cite })
+            fn_clauses.push(clause.to_owned())
+            fn_cites.push(cite.to_owned())
+            fn_kinds.push("consumes:" ++ n)
         else if clause.starts_with("returns borrow ") and clause.contains(" from param "):
             let at = clause.find(" from param ")
             let n = clause.slice(at + 12, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]): return Err(facts_error(path, line_no, "`returns borrow R from param N` takes a parameter index"))
-            if value_item == current_fn or facts.value_fns.contains(current_fn):
-                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
-                value_item = current_fn
-                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
-            else:
-                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "borrow:" ++ n, record: "", cite: cite })
+            fn_clauses.push(clause.to_owned())
+            fn_cites.push(cite.to_owned())
+            fn_kinds.push("borrow:" ++ n)
         else if clause.starts_with("nullable param "):
             let n = clause.slice(15, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]): return Err(facts_error(path, line_no, "`nullable param N` takes a parameter index"))
-            if value_item == current_fn or facts.value_fns.contains(current_fn):
-                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
-                value_item = current_fn
-                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
-            else:
-                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "nullable:" ++ n, record: "", cite: cite })
+            fn_clauses.push(clause.to_owned())
+            fn_cites.push(cite.to_owned())
+            fn_kinds.push("nullable:" ++ n)
         else if clause.starts_with("text param "):
             let n = clause.slice(11, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]): return Err(facts_error(path, line_no, "`text param N` takes a parameter index"))
-            if value_item == current_fn or facts.value_fns.contains(current_fn):
-                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
-                value_item = current_fn
-                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
-            else:
-                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "text_param:" ++ n, record: "", cite: cite })
+            fn_clauses.push(clause.to_owned())
+            fn_cites.push(cite.to_owned())
+            fn_kinds.push("text_param:" ++ n)
         else if clause.starts_with("text return"):
             let words = clause.replace(",", " ").fields()
             if words.len() != 6 or words[2] != "owned" or words[3] != "freed" or words[4] != "by": return Err(facts_error(path, line_no, "a text return is `text return, owned, freed by F`"))
-            if value_item == current_fn or facts.value_fns.contains(current_fn):
-                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
-                value_item = current_fn
-                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
-            else:
-                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "text_return:" ++ words[5], record: "", cite: cite })
+            fn_clauses.push(clause.to_owned())
+            fn_cites.push(cite.to_owned())
+            fn_kinds.push("text_return:" ++ words[5])
         else if clause.starts_with("callback param "):
             // D213: a setter of a `callback` field is described here, since
             // which thread runs the callback is a claim no proof reaches.
             let n = clause.slice(15, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]) or n.contains(" "): return Err(facts_error(path, line_no, "`callback param N` takes a parameter index (a callback with a userdata parameter is paired in a contract, not here)"))
-            if value_item == current_fn or facts.value_fns.contains(current_fn):
-                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
-                value_item = current_fn
-                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
-            else:
-                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "callback:" ++ n, record: "", cite: cite })
+            fn_clauses.push(clause.to_owned())
+            fn_cites.push(cite.to_owned())
+            fn_kinds.push("callback:" ++ n)
         else if clause.starts_with("retains param ") and clause.contains(" by param "):
             let words = clause.fields()
             if words.len() != 6 or not is_digit(words[2][0]) or not is_digit(words[5][0]): return Err(facts_error(path, line_no, "`retains param N by param M` takes two parameter indexes"))
-            if value_item == current_fn or facts.value_fns.contains(current_fn):
-                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
-                value_item = current_fn
-                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
-            else:
-                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "retains_by:" ++ words[2] ++ ":" ++ words[5], record: "", cite: cite })
+            fn_clauses.push(clause.to_owned())
+            fn_cites.push(cite.to_owned())
+            fn_kinds.push("retains_by:" ++ words[2] ++ ":" ++ words[5])
         else if clause.starts_with("variadic param ") and clause.contains(" selected by param ") and clause.ends_with(":"):
             // §16.2b.5: a variadic function's cases, stated as a contract
             // states them (libcurl's `curl_easy_setopt`): the header line,
@@ -477,20 +485,15 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             // functions ISO C and POSIX specify that way.
             let n = clause.slice(12, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]) or n.contains(" "): return Err(facts_error(path, line_no, "`reads param N` takes a parameter index"))
-            if value_item == current_fn or facts.value_fns.contains(current_fn):
-                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
-                value_item = current_fn
-                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
-            else:
-                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "reads:" ++ n, record: "", cite: cite })
+            fn_clauses.push(clause.to_owned())
+            fn_cites.push(cite.to_owned())
+            fn_kinds.push("reads:" ++ n)
         else if clause == "callback_thread any" or clause == "callback_thread registering":
-            if value_item == current_fn or facts.value_fns.contains(current_fn):
-                if value_item != current_fn: facts.value_text = facts.value_text ++ "    fn " ++ current_fn ++ "\n"
-                value_item = current_fn
-                facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
-            else:
-                facts.entries.push(FactsEntry { fn_name: current_fn, kind: "callback_thread:" ++ clause.slice(16, clause.len()), record: "", cite: cite })
+            fn_clauses.push(clause.to_owned())
+            fn_cites.push(cite.to_owned())
+            fn_kinds.push("callback_thread:" ++ clause.slice(16, clause.len()))
         else: return Err(facts_error(path, line_no, "an item fact is `of R[(param N)]`, `lend`, `buffer param P len|capacity param L [inout] [elements]`, `fills|updates|reads|detaches param N`, `param N discarded`, `param N fixed <lit>`, `ok <CONST>`, `returns static CStr`, `consumes param N`, `returns borrow R from param N`, `nullable param N`, `text param N`, `text return, owned, freed by F`, `callback param N`, `retains param N by param M` or `callback_thread any|registering`"))
+    facts_flush_fn(mut facts, current_fn, fn_carry, fn_clauses, fn_cites, fn_kinds)
     if ptr_header.len() > 0:
         if ptr_carry or ptr_rec_multi.contains(ptr_record):
             facts_push_unique(facts.value_resources, ptr_name)

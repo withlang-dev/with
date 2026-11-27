@@ -882,6 +882,7 @@ impl CiProject:
     // The first parameter of `si` the facade language cannot present, or
     // -1 (`repr_param` is the resource's own, handed by the rendering).
     fn fd_unpresentable_param(si: i32, repr_param: i32, modeled: &List[str]) -> i32:
+        if self.registry_value_fns.contains(self.symbols[si].name): return -1
         for pi in 0..self.symbols[si].param_ty.len():
             if pi as i32 == repr_param: continue
             if not self.fd_param_presentable(si, pi as i32, modeled): return pi as i32

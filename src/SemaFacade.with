@@ -2768,12 +2768,21 @@ impl Sema:
 
     // A status constant is a c_import `let` (or a `const`) with a literal
     // initializer: a materialized compile-time value, never a runtime read.
+    // D245: `ok >= C` interns `>=C`; validate `C`.
     fn facade_status_constant_ok(sym: i32) -> bool:
-        // An integer literal is its own value (§16.2b.4: `ok 0`).
-        if facade_status_is_literal(self.pool_resolve(sym)): return true
+        let raw = self.pool_resolve(sym)
+        let is_ge = raw.starts_with(">=")
+        let text = if is_ge: raw.slice(2, raw.len()) else: raw
+        // An integer literal is its own value (§16.2b.4: `ok 0`, `ok >= 0`).
+        if facade_status_is_literal(text): return true
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
-            if self.ast.kind(decl) != NodeKind.NK_LET_DECL or self.ast.get_data0(decl) != sym:
+            if self.ast.kind(decl) != NodeKind.NK_LET_DECL:
+                continue
+            let decl_sym = self.ast.get_data0(decl)
+            if is_ge:
+                if self.pool_resolve(decl_sym) != text: continue
+            else if decl_sym != sym:
                 continue
             var value = self.ast.get_data1(decl)
             if value != 0 and self.ast.kind(value) == NodeKind.NK_COMPTIME:
@@ -4311,6 +4320,9 @@ impl Sema:
         if self.foreign_contracts[ci].ok_count > 1 and (inout >= 0 or self.foreign_contracts[ci].variadic_node != 0):
             let shape = if inout >= 0: "a copied-back length is presented under one success status" else: "a variadic setter has one success status"
             self.emit_error_with_help(f"fn '{fname}': 'ok' lists several success statuses, and {shape} (§16.2b.4)", node, "list one success status: 'ok <CONST>'")
+            return
+        if ok_const != 0 and self.foreign_contracts[ci].variadic_node != 0 and self.pool_resolve(ok_const).starts_with(">="):
+            self.emit_error_with_help(f"fn '{fname}': a variadic setter's 'ok' names one equality status constant, not a lower bound (§16.2b.4, §16.2b.5)", node, "state the setter's single success constant: 'ok <CONST>'")
             return
         // A resource's own operation renders as its constructor or destroyer,
         // a callback contract as its callback method (stage 9): their

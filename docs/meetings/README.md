@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D245 — `ok >= C` status predicate for non-negative-count C APIs (delegated; #3152)](2026-11-27-D245-ok-nonneg-status.md)
 - [D244 — `reads`, `fills`, and `updates` on flat C scalars (delegated; #3139, #3148, #3149, #3152)](2026-11-27-D244-scalar-reads-fills-updates.md)
 - [D243 — Writable by-value capacity buffers (`buffer param P capacity param L`) and positioned `of R(param N)` (delegated; #3138)](2026-11-27-D243-buffer-capacity-and-of-param.md)
 - [D242 — Variadic `ok` presents `Result` unconditionally; `present cases [stripping PREFIX]` presents typed per-option setters (delegated; #3128)](2026-11-26-D242-variadic-ok-result-and-present-cases.md)
