@@ -31,6 +31,6 @@ That is where a chain's build system decides.
 
 | Scenario | Platforms | Why |
 |---|---|---|
-| `libcurl.uat` | darwin, linux-x86_64 | openssl's build needs Perl wherever it is built from source |
+| `libcurl.uat` | darwin, linux | linux-aarch64 selects mbedtls (3.6) from source (#2757); Windows not yet enabled |
 | `libxml2.uat` | darwin, linux-x86_64 | libiconv's build is autotools wherever it is built from source |
 | `sdl.uat` | darwin, windows, linux-x86_64 | dbus (SDL's Linux chain) is a meson build, Python, where it is built from source: linux-aarch64 (#2903) |

@@ -26,6 +26,9 @@ type ProjectConfig {
     dep_constraints: List[str],
     c_dep_metadata_names: List[str],
     manual_c_dep_names: List[str],
+    // Pinned Conan recipe options from `[deps.options.c.<name>]`, stored as
+    // `"<name>:<key>=<value>"`.
+    c_dep_options: List[str],
     feature_default: List[str],
     feature_names: List[str],
     feature_values: List[str],
@@ -64,6 +67,7 @@ fn project_config_default -> ProjectConfig:
         dep_constraints: [],
         c_dep_metadata_names: [],
         manual_c_dep_names: [],
+        c_dep_options: [],
         feature_default: [],
         feature_names: [],
         feature_values: [],
@@ -113,6 +117,7 @@ fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
         dep_constraints: project_config_clone_str_list(cfg.dep_constraints),
         c_dep_metadata_names: project_config_clone_str_list(cfg.c_dep_metadata_names),
         manual_c_dep_names: project_config_clone_str_list(cfg.manual_c_dep_names),
+        c_dep_options: project_config_clone_str_list(cfg.c_dep_options),
         feature_default: project_config_clone_str_list(cfg.feature_default),
         feature_names: project_config_clone_str_list(cfg.feature_names),
         feature_values: project_config_clone_str_list(cfg.feature_values),
@@ -205,6 +210,9 @@ fn project_config_load_for_source(source_path_raw: &str) -> ProjectConfig:
     cfg
 
 fn project_config_apply_manifest_entry(cfg: ProjectConfig, section: &str, key: &str, value: &str) -> ProjectConfig:
+    let option_c_dep = project_config_c_dep_options_name(section)
+    if option_c_dep.len() > 0:
+        return project_config_apply_c_dep_option_entry(cfg, option_c_dep, key, value)
     let manual_c_dep = project_config_manual_c_dep_name(section)
     if manual_c_dep.len() > 0:
         return project_config_apply_manual_c_dep_entry(cfg, manual_c_dep, key, value)
@@ -423,6 +431,54 @@ fn project_config_list_contains(values: &List[str], needle: &str) -> bool:
             return true
     false
 
+fn project_config_c_dep_options_name(section: &str) -> str:
+    if not section.starts_with("deps.options.c."):
+        return ""
+    if section.len() <= 15:
+        return ""
+    section.slice(15, section.len())
+
+fn project_config_parse_c_dep_option_value(value: &str) -> str:
+    let text = project_config_trim(value)
+    if project_config_is_quoted_string_value(text):
+        return project_config_strip_quotes(text)
+    if text == "true":
+        return "True"
+    if text == "false":
+        return "False"
+    ""
+
+fn project_config_apply_c_dep_option_entry(cfg: ProjectConfig, dep_name: &str, key: &str, value: &str) -> ProjectConfig:
+    let out = cfg
+    let parsed = project_config_parse_c_dep_option_value(value)
+    if parsed.len() == 0:
+        if out.manifest_error.len() == 0:
+            out.manifest_error = "option '" ++ key ++ "' in [deps.options.c." ++ dep_name ++ "] must be a quoted string or boolean"
+        return out
+    out.c_dep_options.push(dep_name ++ ":" ++ key ++ "=" ++ parsed)
+    out
+
+// Reads every `[deps.options.c.<name>]` entry from a `with.toml` text as
+// `"<name>:<key>=<value>"` without requiring installed dependency metadata.
+fn project_config_c_dep_options_from_toml(toml: &str) -> List[str]:
+    let out = []
+    var section = ""
+    for raw in toml.split("\n"):
+        let line = project_config_trim(project_config_strip_comment(raw))
+        if line.len() == 0: continue
+        if line[0] == 91 and line[line.len() - 1] == 93:
+            section = project_config_trim(line.slice(1, line.len() - 1))
+            continue
+        let dep_name = project_config_c_dep_options_name(section)
+        if dep_name.len() == 0: continue
+        let eq = project_config_find_char(line, 61)
+        if eq <= 0: continue
+        let key = project_config_trim(line.slice(0, eq))
+        let val = project_config_parse_c_dep_option_value(line.slice(eq + 1, line.len()))
+        if key.len() > 0 and val.len() > 0:
+            out.push(dep_name ++ ":" ++ key ++ "=" ++ val)
+    out
+
 fn project_config_manual_c_dep_name(section: &str) -> str:
     if not section.starts_with("deps.c."):
         return ""
@@ -638,6 +694,8 @@ fn project_config_wants_key(section: &str, key: &str) -> bool:
     if section == "target" and key == "default":
         return true
     if manual_c_dep.len() > 0:
+        return true
+    if project_config_c_dep_options_name(section).len() > 0:
         return true
     if section == "deps":
         return true
