@@ -274,7 +274,7 @@ pub const FACADE_CLAUSE_RETAINS: i32 = 11          // [param_ref, by_ref]
 pub const FACADE_CLAUSE_RETURNS_BORROW: i32 = 12   // [resource_sym|CStr, from_ref|0, domain_sym|0, parent_sym|0, from_ref2] — parent: `from parent P of param N` (D85); from_ref2 (present only for `from params N, M`, D187): the second origin
 pub const FACADE_CLAUSE_RETURNS_STATIC: i32 = 13   // [type(node)]
 pub const FACADE_CLAUSE_PRESERVES: i32 = 14        // [param_ref|0, domain_sym|0]
-pub const FACADE_CLAUSE_OF: i32 = 15               // [resource_sym]
+pub const FACADE_CLAUSE_OF: i32 = 15               // [resource_sym] or [resource_sym, param_ref] (`of R` or `of R(param N)`)
 pub const FACADE_CLAUSE_RENAME: i32 = 16           // [new_sym]
 pub const FACADE_CLAUSE_THREAD: i32 = 17           // [capability_sym...]
 pub const FACADE_CLAUSE_CALLBACK_THREAD: i32 = 18  // [sym]  (`any` | `registering`)
@@ -284,7 +284,7 @@ pub const FACADE_CLAUSE_CALLBACK: i32 = 44          // [callback_ref]  (`callbac
 pub const FACADE_CLAUSE_CALLBACK_USERDATA: i32 = 21 // [callback_ref, userdata_ref]  (`callback param N userdata param M`, §16.2b.9)
 pub const FACADE_CLAUSE_VALID_ON_FAILED: i32 = 22  // []  (`valid on failed`: presented on the failed-state resource too, §16.2b.4)
 pub const FACADE_CLAUSE_NULLABLE: i32 = 23         // [param_ref]  (`nullable param N`: the facade establishes nullability, §16.2b.8)
-pub const FACADE_CLAUSE_BUFFER: i32 = 24           // [ptr_ref, len_ref, capacity(0|1), elements(0|1)] (D64 §16.2b.8)
+pub const FACADE_CLAUSE_BUFFER: i32 = 24           // [ptr_ref, len_ref, mode(0=len|1=capacity-inout|2=capacity), elements(0|1)] (D64/D243 §16.2b.8)
 pub const FACADE_CLAUSE_FIXED: i32 = 25            // [param_ref, literal(node)]  (`param N fixed <literal>`, D64 §16.2b.11)
 pub const FACADE_CLAUSE_VARIADIC: i32 = 26         // [vararg_ref, selector_ref, case(node)...]  (`variadic param N selected by param P:`, D66 §16.2b.5)
 pub const FACADE_CLAUSE_VARIADIC_CASE: i32 = 27    // [selector_sym, type(node), callback_ref|0, userdata_selector_ref|0, retainer_ref|0, length_ref|0, length_type(node)|0, until_sym...] (D194: the last three; d2 is the count, so the `until` names are extras 7..d2)

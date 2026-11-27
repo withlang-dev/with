@@ -12,6 +12,19 @@
 // 165 to 166, 505 to 506). An initializer that fails has stored no state in
 // the stream: it returns before `strm->state = s` (lines 203 and 511), after
 // freeing what it allocated (lines 182 to 185).
+//
+// High-level FILE*-backed streams (BZ2_bzReadOpen / BZ2_bzWriteOpen) return
+// the same opaque `BZFILE *` as BZ2_bzopen / BZ2_bzdopen, but have distinct
+// lifecycles: they borrow the caller's `FILE *` without closing it and are
+// released by BZ2_bzReadClose / BZ2_bzWriteClose (taking the stream at param
+// 1 with an error out-pointer at param 0). Each is therefore stated as its
+// own resource (`ReadStream`, `WriteStream`) beside the auto-drafted
+// `BZFILEHandle` (`BZ2_bzopen`/`BZ2_bzdopen`/`BZ2_bzclose`).
+//
+// The one function intentionally left raw is BZ2_bzReadGetUnused (lines 1221
+// to 1238): it writes an internal borrowed pointer and byte count through
+// two out-parameters (`void **unused`, `int *nUnused`), a borrowed-slice
+// out-parameter shape not modeled by the contract language.
 c facade bzip2:
     resource Compressor wraps bz_stream
         init BZ2_bzCompressInit(self), ok BZ_OK    // bzlib.c 1.0.8 line 210: "return BZ_OK;" is the one success return, after the state is stored (line 203); lines 157, 162, 169 and 186 return an error
@@ -19,3 +32,67 @@ c facade bzip2:
     resource Decompressor wraps bz_stream
         init BZ2_bzDecompressInit(self), ok BZ_OK    // bzlib.c 1.0.8 line 527: "return BZ_OK;" is the one success return, after the state is stored (line 511); lines 499, 501 to 503 and 509 return an error
         drop BZ2_bzDecompressEnd    // bzlib.c 1.0.8 lines 870 to 875: frees tt, ll16, ll4 and the state, then sets strm->state to NULL
+    fn BZ2_bzCompress
+        of Compressor    // bzlib.c 1.0.8 lines 407 to 464: operates on the bz_stream initialized by BZ2_bzCompressInit
+        buffer field next_in remaining field avail_in    // bzlib.c 1.0.8 lines 281 to 326: copy_input_until_stop reads bytes from strm->next_in and decrements strm->avail_in (next_in stays writable because bzlib.c:1237 exposes strm.next_in through BZ2_bzReadGetUnused)
+        buffer field next_out remaining field avail_out    // bzlib.c 1.0.8 lines 329 to 362: copy_output_until_stop writes compressed bytes to strm->next_out and decrements strm->avail_out
+    fn BZ2_bzDecompress
+        of Decompressor    // bzlib.c 1.0.8 lines 808 to 858: operates on the bz_stream initialized by BZ2_bzDecompressInit
+        buffer field next_in remaining field avail_in    // bzlib.c 1.0.8 lines 841 to 851 and decompress.c: BZ2_decompress reads compressed bytes from strm->next_in and decrements strm->avail_in (next_in stays writable because bzlib.c:1237 exposes strm.next_in through BZ2_bzReadGetUnused)
+        buffer field next_out remaining field avail_out    // bzlib.c 1.0.8 lines 819 to 839: unRLE_obuf_to_output_FAST/SMALL writes decompressed bytes to strm->next_out and decrements strm->avail_out
+    resource ReadStream wraps *mut BZFILE
+        from BZ2_bzReadOpen    // bzlib.c 1.0.8 lines 1087 to 1139: allocates bzFile (line 1110), borrows caller's FILE *f (line 1117), returns NULL on error after freeing bzf (line 1132)
+        drop BZ2_bzReadClose(param 1)    // bzlib.c 1.0.8 lines 1143 to 1157: ends decompression stream (line 1155) and frees bzf (line 1156) without closing caller's FILE *
+    fn BZ2_bzReadOpen
+        param 0 discarded    // bzlib.c 1.0.8 lines 1098 to 1137: writes error code into *bzerror if non-NULL; failure is also signaled by returning NULL
+        buffer param 4 len param 5    // bzlib.c 1.0.8 lines 1124 to 1128: copies nUnused bytes out of unused into bzf->buf without modifying or retaining unused
+    fn BZ2_bzReadClose
+        param 0 discarded    // bzlib.c 1.0.8 lines 1147 to 1152: writes status code into *bzerror
+    fn BZ2_bzRead
+        of ReadStream(param 1)    // bzlib.c 1.0.8 lines 1161 to 1217: reads decompressed bytes from a BZ2_bzReadOpen stream
+        lend    // bzlib.c 1.0.8 lines 1181 to 1213: uses bzf->strm.next_out only during the call and does not free or retain b or buf past return
+        param 0 discarded    // bzlib.c 1.0.8 lines 1170 to 1212: writes status code into *bzerror
+        buffer param 2 capacity param 3    // bzlib.c 1.0.8 lines 1181 to 1212: writes at most len bytes into buf[0..len) and returns bytes written
+    resource WriteStream wraps *mut BZFILE
+        from BZ2_bzWriteOpen    // bzlib.c 1.0.8 lines 916 to 959: allocates bzFile (line 937), borrows caller's FILE *f (line 944), returns NULL on error after freeing bzf (line 954)
+        drop BZ2_bzWriteClose(param 1)    // bzlib.c 1.0.8 lines 1009 to 1018 and 1081 to 1082: finishes stream, flushes FILE *, ends compression and frees bzf without closing FILE *
+        destroys BZ2_bzWriteClose64(param 1)    // bzlib.c 1.0.8 lines 1021 to 1083: finishes or abandons stream and frees bzf without closing FILE *
+    fn BZ2_bzWriteOpen
+        param 0 discarded    // bzlib.c 1.0.8 lines 926 to 954: writes error code into *bzerror; failure is also signaled by returning NULL
+    fn BZ2_bzWrite
+        of WriteStream(param 1)    // bzlib.c 1.0.8 lines 964 to 1005: writes compressed bytes to a BZ2_bzWriteOpen stream
+        lend    // bzlib.c 1.0.8 lines 984 to 1004: consumes all len bytes of buf before returning and does not free b or retain buf past return
+        param 0 discarded    // bzlib.c 1.0.8 lines 973 to 1003: writes status code into *bzerror
+        buffer param 2 len param 3    // bzlib.c 1.0.8 lines 984 to 1004: reads len bytes from buf[0..len) without modifying buf
+    fn BZ2_bzWriteClose
+        param 0 discarded    // bzlib.c 1.0.8 lines 1016 to 1017 and 1034 to 1080: writes status code into *bzerror
+        param 2 fixed 0    // bzlib.c 1.0.8 lines 1045 to 1069: abandon=0 finishes and flushes the compressed stream on Drop
+        param 3 discarded    // bzlib.c 1.0.8 lines 1016 and 1071 to 1072: writes total input bytes into *nbytes_in
+        param 4 discarded    // bzlib.c 1.0.8 lines 1017 and 1075 to 1076: writes total output bytes into *nbytes_out
+    fn BZ2_bzWriteClose64
+        param 0 discarded    // bzlib.c 1.0.8 lines 1034 to 1080: writes status code into *bzerror
+        param 3 discarded    // bzlib.c 1.0.8 lines 1040 and 1071 to 1072: writes low 32 bits of input byte count into *nbytes_in_lo32
+        param 4 discarded    // bzlib.c 1.0.8 lines 1041 and 1073 to 1074: writes high 32 bits of input byte count into *nbytes_in_hi32
+        param 5 discarded    // bzlib.c 1.0.8 lines 1042 and 1075 to 1076: writes low 32 bits of output byte count into *nbytes_out_lo32
+        param 6 discarded    // bzlib.c 1.0.8 lines 1043 and 1077 to 1078: writes high 32 bits of output byte count into *nbytes_out_hi32
+    fn BZ2_bzBuffToBuffCompress
+        buffer param 0 capacity param 1 inout    // bzlib.c 1.0.8 lines 1247 to 1295: compresses into dest[0..*destLen) and writes produced length back to *destLen on BZ_OK (line 1284)
+        buffer param 2 len param 3    // bzlib.c 1.0.8 lines 1274 to 1279: reads source[0..sourceLen) into local bz_stream without modifying or retaining source
+        ok BZ_OK    // bzlib.c 1.0.8 line 1286: returns BZ_OK after updating *destLen and ending local stream
+    fn BZ2_bzBuffToBuffDecompress
+        buffer param 0 capacity param 1 inout    // bzlib.c 1.0.8 lines 1299 to 1348: decompresses into dest[0..*destLen) and writes produced length back to *destLen on BZ_OK (line 1332)
+        buffer param 2 len param 3    // bzlib.c 1.0.8 lines 1322 to 1327: reads source[0..sourceLen) into local bz_stream without modifying or retaining source
+        ok BZ_OK    // bzlib.c 1.0.8 line 1334: returns BZ_OK after updating *destLen and ending local stream
+    fn BZ2_bzread
+        of BZFILEHandle    // bzlib.c 1.0.8 lines 1478 to 1488: reads decompressed bytes from a BZ2_bzopen/BZ2_bzdopen handle
+        lend    // bzlib.c 1.0.8 lines 1481 to 1487: delegates to BZ2_bzRead without closing b or retaining buf past return
+        buffer param 1 capacity param 2    // bzlib.c 1.0.8 line 1482: writes at most len bytes into buf[0..len) and returns bytes read or -1
+    fn BZ2_bzwrite
+        of BZFILEHandle    // bzlib.c 1.0.8 lines 1492 to 1502: writes bytes to a BZ2_bzopen/BZ2_bzdopen handle
+        lend    // bzlib.c 1.0.8 line 1496: delegates to BZ2_bzWrite without closing b or retaining buf past return
+        buffer param 1 len param 2    // bzlib.c 1.0.8 line 1496: reads len bytes from buf[0..len) without modifying buf
+    fn BZ2_bzerror
+        of BZFILEHandle    // bzlib.c 1.0.8 lines 1559 to 1566: reads lastErr from a BZ2_bzopen/BZ2_bzdopen handle
+        lend    // bzlib.c 1.0.8 lines 1561 to 1565: reads b->lastErr without modifying or freeing b
+        param 1 discarded    // bzlib.c 1.0.8 line 1564: writes error integer into *errnum
+        returns static CStr    // bzlib.c 1.0.8 lines 1539 to 1565: returns a string literal from static const char *bzerrorstrings[]

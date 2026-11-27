@@ -167,7 +167,7 @@ origin_clause   = "preserves" param_ref | "preserves" "domain" name
 text_clause     = "text" param_ref
                 | "text" "return" "," "owned" "," "freed" "by" c_name
                 | "text" "return" "bytes"
-buffer_clause   = "buffer" param_ref ( "len" param_ref | "capacity" param_ref "inout" ) [ "elements" ]
+buffer_clause   = "buffer" param_ref ( "len" param_ref | "capacity" param_ref [ "inout" ] ) [ "elements" ]
                 | "buffer" "field" name "remaining" "field" name [ "reads" ]
 callback_clause = "callback" param_ref
                 | "callback" "consumes" param_ref
@@ -183,7 +183,7 @@ retention       = "retains" "by" param_ref
                   [ "length" "param" CONST "as" type ]
                   [ "until" name { "," name } ]
 domain_clause   = "establishes" "domain" name | "ends" "domain" name | "requires" "domain" name
-presentation    = "of" TypeName | "rename" name | param_ref "fixed" fixed_value | param_ref "discarded"
+presentation    = "of" TypeName [ "(" param_ref ")" ] | "rename" name | param_ref "fixed" fixed_value | param_ref "discarded"
                 | "present" "cases" [ "stripping" name ]
 fixed_value     = literal | CONST | "sizeof" "(" type ")"
 
@@ -508,7 +508,7 @@ and a call of the `drop` by its imported name consumes the resource:
 | `text param p` | `p` is input text read to its NUL and not kept. | G | bytes | §16.2b.8 |
 | `text return, owned, freed by f` | the result is new text the caller owns, released with `f`. | G | the call is safe and the result is a raw pointer | §16.2b.8 |
 | `text return bytes` | under `text utf8`, this result stays bytes. | R | | §16.2b.8 |
-| `buffer param b len param n` | `b` and `n` are one input slice C only reads. `capacity param n inout`: one writable slice whose length C writes back. `elements`: the count is in elements, not bytes. Never inferred from the C types. | G | two unrelated parameters; the pointer is raw | §16.2b.8 |
+| `buffer param b len param n` | `b` and `n` are one input slice C only reads. `capacity param n`: one writable slice whose capacity `n` is passed by value. `capacity param n inout`: one writable slice whose length C writes back through `n`. `elements`: the count is in elements, not bytes. Never inferred from the C types. | G | two unrelated parameters; the pointer is raw | §16.2b.8 |
 | `buffer field p remaining field n` | fields `p` and `n` of the lent resource's record are one slice for the call: stored before it, the count read back and both cleared after it. C keeps no copy of the pointer. | G | raw | §16.2b.8 |
 | `buffer field p remaining field n reads` | C only reads through `p`; the slice is `[]u8`. From a facts file it applies only where the check against the package's source ran and passed; a store through the pointer in any unit contradicts it. | G | the slice is writable | §16.2b.8 |
 | `callback param c` | `c` has no userdata parameter: a function or a closure that captures nothing is passed. A retained one states `callback_thread`. | G | raw | §16.2b.9 |
@@ -526,7 +526,7 @@ and a call of the `drop` by its imported name consumes the resource:
 | `ok C` | this operation's status convention. | G | none | §16.2b.4 |
 | `null status C` | status carried in `FailedWithResource` when a consuming same-type pointer producer returns `NULL` (returning the input resource intact in a good state). Required with `consumes param N` on such a producer; the facade never invents a status. | G | none | §16.2b.4 |
 | `valid on failed` | the operation may be called on a resource whose production failed. | G | an operation needs a produced resource | §16.2b.4 |
-| `of R` | the operation is presented on resource `R`. Required when its resource parameter's representation is wrapped by more than one resource. | P | the one resource that wraps the representation | §16.2b.3 |
+| `of R` / `of R(param p)` | the operation is presented on resource `R`, receiving it at parameter `p` (parameter 0 when the parentheses are absent). Required when its resource parameter's representation is wrapped by more than one resource, or when the resource parameter is not parameter 0. | P | the one resource that wraps parameter 0's representation | §16.2b.3 |
 | `rename n` | the With name of the operation. | P | the convention's shortening of the C name | §16.2b.11 |
 | `param p fixed V` | the presented operation omits `p` and always passes `V`: a literal, a named constant of the library, or `sizeof(T)`. | P | | §16.2b.11 |
 | `param p discarded` | `p` is an out-pointer fixed as discarded: the wrapper passes scratch storage and ignores what C writes. | P | | §16.2b.11 |

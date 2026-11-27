@@ -1,0 +1,75 @@
+//! expect-stdout: wrote 5
+//! expect-stdout: read 5 104 111
+//! expect-stdout: elems 3 10 20 30
+//! expect-stdout: closed 1
+
+// #3138, D243 (§16.2b.3, §16.2b.8): writable by-value capacity buffers
+// (`buffer param P capacity param L [elements]`) and lend operations whose
+// resource is not parameter 0 (`of R(param 1)` beside `param 0 discarded`),
+// plus a producer with `param 0 discarded` borrowing a parent at param 1.
+use c_import("typedef struct { int id; char data[32]; int len; } Backing;
+typedef void Stream;
+static Backing g_back;
+static int g_closed;
+static inline Backing *backing_open(void) { g_back.id = 1; g_back.len = 0; g_closed = 0; return &g_back; }
+static inline void backing_close(Backing *b) { (void)b; g_closed++; }
+static inline Stream *stream_open(int *err, Backing *b) { *err = 0; return (Stream *)b; }
+static inline void stream_close(int *err, Stream *s) { (void)s; *err = 0; }
+static inline int stream_write(int *err, Stream *s, void *buf, int len) {
+    Backing *b = (Backing *)s;
+    *err = 0;
+    for (int i = 0; i < len && b->len < 32; i++) b->data[b->len++] = ((const char *)buf)[i];
+    return len;
+}
+static inline int stream_read(int *err, Stream *s, void *buf, int len) {
+    Backing *b = (Backing *)s;
+    *err = 0;
+    int n = len < b->len ? len : b->len;
+    for (int i = 0; i < n; i++) ((char *)buf)[i] = b->data[i];
+    return n;
+}
+static inline int fill_ints(int *out, int cap) {
+    int n = cap < 3 ? cap : 3;
+    for (int i = 0; i < n; i++) out[i] = (i + 1) * 10;
+    return n;
+}
+static inline int closed_count(void) { return g_closed; }
+")
+
+c contract demo:
+    resource Back wraps *mut Backing
+        from backing_open
+        drop backing_close
+    resource IoStream wraps *mut Stream
+        from stream_open
+        drop stream_close(param 1)
+    fn stream_open
+        param 0 discarded
+    fn stream_close
+        param 0 discarded
+    fn stream_write
+        of IoStream(param 1)
+        lend
+        param 0 discarded
+        buffer param 2 len param 3
+    fn stream_read
+        of IoStream(param 1)
+        lend
+        param 0 discarded
+        buffer param 2 capacity param 3
+    fn fill_ints
+        buffer param 0 capacity param 1 elements
+
+fn main:
+    if true:
+        let b = Back.open().unwrap()
+        let s = IoStream.open(&b).unwrap()
+        let nw = s.write("hello" as []u8)
+        print(f"wrote {nw}")
+        var out: [u8; 16] = [0 as u8; 16]
+        let nr = stream_read(&s, out)
+        print(f"read {nr} {out[0]} {out[4]}")
+    var nums: [i32; 4] = [0; 4]
+    let ne = fill_ints(nums)
+    print(f"elems {ne} {nums[0]} {nums[1]} {nums[2]}")
+    print(f"closed {closed_count()}")

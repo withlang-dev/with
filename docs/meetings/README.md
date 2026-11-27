@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D243 — Writable by-value capacity buffers (`buffer param P capacity param L`) and positioned `of R(param N)` (delegated; #3138)](2026-11-27-D243-buffer-capacity-and-of-param.md)
 - [D242 — Variadic `ok` presents `Result` unconditionally; `present cases [stripping PREFIX]` presents typed per-option setters (delegated; #3128)](2026-11-26-D242-variadic-ok-result-and-present-cases.md)
 - [D241 — Consuming same-type pointer producer (`consumes param N` + `null status CONST`) (delegated; #3121)](2026-11-26-D241-consuming-same-type-pointer-producer.md)
 - [D240 — Retained variadic case naming a pointer-wrapping facade resource `&R` (delegated; #3120)](2026-11-26-D240-retained-variadic-resource-borrow.md)

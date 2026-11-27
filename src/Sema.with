@@ -577,6 +577,7 @@ type ForeignContract {
     preserves_params: List[i32],
     preserves_domains: List[i32],
     of_resource: i32,
+    of_param: i32,                  // D243: `of R(param N)` parameter index receiving the resource (0 when omitted)
     rename: i32,
     callback_thread_said: i32,   // the `callback_thread` clause: 0 none (a retained callback may run on any thread, §31.6.2), 1 `any`, 2 `registering`
     callbacks_none: i32,             // clause node; 0 means conservatively reentrant
@@ -599,7 +600,7 @@ type ForeignContract {
     bridged: i32,                      // #2223: a clause makes the function render through a bridge (Ast.facade_clause_bridges) — the one owner the renderer's lend item and facade_contract_presented read
     buffer_ptr: List[i32],              // D64 §16.2b.8: each `buffer param P …` pairing's pointer parameter …
     buffer_len: List[i32],              // … its length parameter (parallel) …
-    buffer_inout: List[i32],            // … and 1 for `capacity param L inout`, 0 for `len param L` (parallel)
+    buffer_inout: List[i32],            // … and 0 for `len param L`, 1 for `capacity param L inout`, 2 for `capacity param L` (parallel)
     buffer_elements: List[i32],         // explicit element count; otherwise bytes (D64)
     fixed_params: List[i32],            // D64 §16.2b.11: each `param N fixed <literal>` parameter …
     fixed_literals: List[i32],          // … and its literal node (parallel)

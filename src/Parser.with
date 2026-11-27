@@ -5682,6 +5682,15 @@ impl Parser:
             let res = self.expect_ident()
             if res == 0: return 0
             ops.push(res)
+            // `of R(param N)` (D243 §16.2b.3): when the resource parameter is
+            // not parameter 0, name it beside the resource, paralleling
+            // `drop f(param N)` and `destroys f(param N)` (D209).
+            if self.peek() == TokenKind.TK_L_PAREN:
+                self.advance()
+                let pref = self.parse_facade_param_ref()
+                if pref == 0: return 0
+                if self.expect(TokenKind.TK_R_PAREN) == 0: return 0
+                ops.push(pref)
         else if word == "rename":
             kind = FACADE_CLAUSE_RENAME
             // The presented name is a member name, and a member name may be a
@@ -5889,34 +5898,35 @@ impl Parser:
             else:
                 ops.push(0)
         else if word == "buffer":
-            // `buffer param P len param L` / `buffer param P capacity param L
-            // inout` (D64, §16.2b.8): the pointer and the integer that
-            // carries its byte length are one byte slice. The pairing is
-            // stated, never inferred from the C types.
+            // `buffer param P len param L` / `buffer param P capacity param L`
+            // / `buffer param P capacity param L inout` (D64/D243, §16.2b.8):
+            // the pointer and the integer that carries its byte length are one
+            // byte slice. The pairing is stated, never inferred from the C types.
             kind = FACADE_CLAUSE_BUFFER
             let p = self.parse_facade_param_ref()
             if p == 0: return 0
             let is_len = self.current_ident_is("len")
             let is_cap = self.current_ident_is("capacity")
             if not is_len and not is_cap:
-                self.emit_error("a buffer pairing is written 'buffer param <P> len param <L>' or 'buffer param <P> capacity param <L> inout' (§16.2b.8)")
+                self.emit_error("a buffer pairing is written 'buffer param <P> len param <L>', 'buffer param <P> capacity param <L>' or 'buffer param <P> capacity param <L> inout' (§16.2b.8)")
                 return 0
             self.advance()
             let l = self.parse_facade_param_ref()
             if l == 0: return 0
+            var mode: i32 = 0
             if self.current_ident_is("inout"):
                 if is_len:
                     self.emit_error("'len' pairs an input buffer, which C only reads; the length C writes back is 'capacity param <L> inout' (§16.2b.8)")
                     return 0
                 self.advance()
+                mode = 1
             else if is_cap:
-                // The ruling pairs a capacity that C reads and writes back;
-                // an output-only length is not ruled (D64).
-                self.emit_error("a capacity is read on entry and written back: 'buffer param <P> capacity param <L> inout' (§16.2b.8)")
-                return 0
+                // D243 (§16.2b.8): writable output buffer with a by-value
+                // capacity (`BZ2_bzread`, `read`, `gzread`).
+                mode = 2
             ops.push(p)
             ops.push(l)
-            ops.push((is_cap) as i32)
+            ops.push(mode)
             let elements = self.current_ident_is("elements")
             if elements: self.advance()
             ops.push((elements) as i32)

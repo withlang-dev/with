@@ -1,8 +1,9 @@
-//! expect-check-fail: a capacity is read on entry and written back
+//! expect-check-fail: which is not an integer
+//! expect-check-fail: write 'capacity param 1 inout'
 
-// D64 §16.2b.8: the ruling pairs a capacity C reads and writes back; an
-// output-only length is not ruled, so `capacity` without `inout` is a
-// parse error, not a silent input pairing.
+// D64/D243 §16.2b.8: `capacity param L` without `inout` pairs a by-value
+// integer capacity; when C reads and writes back through a pointer (`*dstLen`),
+// omitting `inout` is still an error guiding to `capacity param 1 inout`.
 use c_import("static inline int fill(unsigned char *dst, unsigned long *dstLen) { *dstLen = 0; return 0; }\n")
 
 c contract fills:
