@@ -759,7 +759,8 @@ impl[T: Copy] SlotMapSlot[T]:
     pub fn get() -> T:
         let slot = with_slotmap_get_ptr(self.map_ptr as *mut u8, self.index, self.generation) as *const T
         if slot == null: panic("SlotMapSlot.get requires a valid handle")
-        unsafe { *slot }
+        let v: &T = unsafe { &*slot }
+        *v
 
 impl[T] SlotMapSlot[T]:
     /// Replace the value stored in this slot, dropping the previous occupant.
@@ -800,9 +801,76 @@ pub type Atomic[T]  {
 ///       s.set(v + 1)
 pub type ListSlot[T] ephemeral { data_ptr: i64, index: i64 }
 
+impl[T: Copy] ListSlot[T]:
+    /// Copy out the element at this slot. Requires `T: Copy`.
+    pub fn get() -> T:
+        let slot = (self.data_ptr + self.index * sizeof[T]()) as *const T
+        let v: &T = unsafe { &*slot }
+        *v
+
+impl[T] ListSlot[T]:
+    /// Replace the element at this slot, dropping the previous occupant.
+    pub fn set(value: T):
+        let slot = (self.data_ptr + self.index * sizeof[T]()) as *mut T
+        let _old: T = unsafe { *slot }
+        unsafe { *slot = value }
+
+/// Scoped range handle over a contiguous sub-slice of a List, array, or slice.
+/// Obtain via `xs.range(start..end)`, `xs.split_at(mid)`, or `xs.split_at_mut(mid)`.
+pub type ListRange[T] ephemeral { data_ptr: i64, offset: i64, len: i64 }
+
+impl[T: Copy] ListRange[T]:
+    /// Copy out the element at `index`. Requires `T: Copy`.
+    pub fn get(index: isize) -> T:
+        let idx = index as i64
+        if idx < 0 or idx >= self.len: panic("ListRange.get index out of bounds")
+        let slot = (self.data_ptr + (self.offset + idx) * sizeof[T]()) as *const T
+        let v: &T = unsafe { &*slot }
+        *v
+
+impl[T] ListRange[T]:
+    /// Replace the element at `index`, dropping the previous occupant.
+    pub fn set(index: isize, value: T):
+        let idx = index as i64
+        if idx < 0 or idx >= self.len: panic("ListRange.set index out of bounds")
+        let slot = (self.data_ptr + (self.offset + idx) * sizeof[T]()) as *mut T
+        let _old: T = unsafe { *slot }
+        unsafe { *slot = value }
+
+    pub fn len() -> isize: self.len as isize
+    pub fn len32() -> i32: self.len as i32
+    pub fn len64() -> i64: self.len
+    pub fn ulen32() -> u32: self.len as u32
+    pub fn is_empty() -> bool: self.len == 0
+
+    @[iter_of_self]
+    pub fn split_at(mid: isize) -> (ListRange[T], ListRange[T]):
+        let idx = mid as i64
+        if idx < 0 or idx > self.len: panic("split_at index out of bounds")
+        (
+            ListRange { data_ptr: self.data_ptr, offset: self.offset, len: idx },
+            ListRange { data_ptr: self.data_ptr, offset: self.offset + idx, len: self.len - idx },
+        )
+
+    @[iter_of_self]
+    pub mut fn split_at_mut(mid: isize) -> (ListRange[T], ListRange[T]):
+        let idx = mid as i64
+        if idx < 0 or idx > self.len: panic("split_at index out of bounds")
+        (
+            ListRange { data_ptr: self.data_ptr, offset: self.offset, len: idx },
+            ListRange { data_ptr: self.data_ptr, offset: self.offset + idx, len: self.len - idx },
+        )
+
 /// Iterator yielding ListSlot[T] handles for in-place element mutation (§19.5).
 /// Obtain via `vec.iter_place()`. Each `.next()` returns `Option[ListSlot[T]]`.
 pub type ListIterPlace[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
+
+impl[T] ListIterPlace[T]:
+    pub mut fn next() -> Option[ListSlot[T]]:
+        if self.idx >= self.len: return None
+        let i = self.idx
+        self.idx = i + 1
+        Some(ListSlot { data_ptr: self.data_ptr, index: i })
 
 /// Scoped handle to a HashMap entry (mut.md Rev 8 §10).
 /// Obtain via `map.entry(key)`. Use with `with`:

@@ -10158,23 +10158,8 @@ impl Sema:
         if type_name == "FixedString" or type_name.starts_with("FixedString__"):
             if method_name == "new": return MirIntrinsic.FIXED_STRING_NEW
             return MirIntrinsic.NONE
-        if type_name == "ListSlot":
-            if method_name == "get": return MirIntrinsic.VECSLOT_GET
-            if method_name == "set": return MirIntrinsic.VECSLOT_SET
-            return MirIntrinsic.NONE
         if type_name == "SlotMap":
             if method_name == "new": return MirIntrinsic.SLOTMAP_NEW
-            return MirIntrinsic.NONE
-        if type_name == "ListRange":
-            if method_name == "get": return MirIntrinsic.VECRANGE_GET
-            if method_name == "set": return MirIntrinsic.VECRANGE_SET
-            if method_name == "split_at": return MirIntrinsic.SPLIT_AT
-            if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
-            let listrange_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VECRANGE_LEN, method_name)
-            if listrange_len_intrinsic != MirIntrinsic.NONE: return listrange_len_intrinsic
-            return MirIntrinsic.NONE
-        if type_name == "ListIterPlace":
-            if method_name == "next": return MirIntrinsic.VECITERPLACE_NEXT
             return MirIntrinsic.NONE
         if type_name == "HashMap":
             if method_name == "new": return MirIntrinsic.MAP_NEW
@@ -28983,12 +28968,7 @@ impl Sema:
                 return true
             if fixed_method_name == "len_i32" or fixed_method_name == "len_i64" or fixed_method_name == "capacity" or fixed_method_name == "is_empty" or fixed_method_name == "clear" or fixed_method_name == "push_byte" or fixed_method_name == "push_str" or fixed_method_name == "as_view" or fixed_method_name == "equals":
                 return true
-        if owner_sym == self.syms.listslot or owner_sym == self.syms.listrange:
-            if field == self.syms.get or self.pool_resolve(field) == "set" or self.is_collection_len_method(field):
-                return true
         if owner_sym == self.syms.listiterplace:
-            if field == self.syms.next:
-                return true
             if field == self.syms.fold or field == self.syms.reduce or field == self.syms.sum or field == self.syms.count or field == self.syms.partition or field == self.syms.collect:
                 return true
         false
@@ -37261,14 +37241,8 @@ impl Sema:
                     update_params.push(update_value_ty)
                     return self.ensure_fn_type(update_params, 1, update_value_ty as TypeId) as i32
         // #669: storing methods (mirror method_arg_stores_value) must publish the
-        // stored element type, or a contextual enum arg (`slot.set(Some(x))`)
+        // stored element type, or a contextual enum arg (`entry.set(Some(x))`)
         // never learns its enum and codegen has no aggregate destination.
-        if owner_sym == self.syms.listslot:
-            if method_name == "set" and arg_index == 0:
-                return self.get_generic_inst_arg(resolved as i32, 0)
-        if owner_sym == self.syms.listrange:
-            if method_name == "set" and arg_index == 1:
-                return self.get_generic_inst_arg(resolved as i32, 0)
         if owner_sym == self.syms.hashmapentry:
             if (method_name == "set" or method_name == "or_insert") and arg_index == 0:
                 return self.get_generic_inst_arg(resolved as i32, 1)
@@ -38090,9 +38064,6 @@ impl Sema:
         if type_name_sym == self.syms.list:
             if field == self.syms.iter or field == self.syms.keys or field == self.syms.iter_place or field == self.syms.iter_ref or field == self.syms.range_method or field == self.syms.split_at or field == self.syms.split_at_mut:
                 return true
-        if type_name_sym == self.syms.listrange:
-            if field == self.syms.split_at or field == self.syms.split_at_mut:
-                return true
         false
 
     // Builtin methods have no declared signature node, so their receiver mode
@@ -38110,9 +38081,6 @@ impl Sema:
             // `fn`'s, a slot let a read-only method or a `&T` parameter
             // overwrite an element a caller held a view of.
             if field == self.syms.slot or field == self.syms.iter_place or field == self.syms.get_disjoint:
-                return ReceiverMode.Mut
-        if type_name_sym == self.syms.listrange:
-            if field == self.syms.split_at_mut:
                 return ReceiverMode.Mut
         if type_name_sym == self.syms.hashmap:
             if field == self.syms.insert or field == self.syms.remove or field == self.syms.clear:
@@ -39643,7 +39611,7 @@ impl Sema:
                     if a0_ty != 0:
                         let index_ty = self.ty_i64 as i32
                         self.check_builtin_method_call_arg(mc_call_name, 0, index_ty, a0_ty, self.ast.get_extra(extra_start))
-            else if (type_name_sym == self.syms.list or type_name_sym == self.syms.listrange) and (field == self.syms.split_at or field == self.syms.split_at_mut):
+            else if type_name_sym == self.syms.list and (field == self.syms.split_at or field == self.syms.split_at_mut):
                 if arg_count != 1:
                     self.emit_error(mc_method_name_raw ++ "() expects exactly one index argument", node)
                 else:
@@ -39762,34 +39730,6 @@ impl Sema:
                     return self.list_sequence_return_type(recv_type, mc_resolved_arg_count, node)
                 if field == self.syms.traverse:
                     return self.list_traverse_return_type(recv_type, arg_types, mc_resolved_arg_count, node)
-            if type_name_sym == self.syms.listslot:
-                if field == self.syms.get:
-                    return self.check_slot_get_copy("ListSlot.get", self.get_generic_inst_arg(recv_type, 0), node)
-                if mc_method_name_raw == "set":
-                    return self.ty_void as i32
-            if type_name_sym == self.syms.listrange:
-                if field == self.syms.get:
-                    return self.check_slot_get_copy("ListRange.get", self.get_generic_inst_arg(recv_type, 0), node)
-                if mc_method_name_raw == "set":
-                    return self.ty_void as i32
-                if generic_len_ret != 0:
-                    return generic_len_ret
-                if field == self.syms.split_at or field == self.syms.split_at_mut:
-                    return self.ensure_listrange_pair_type_for(self.get_generic_inst_arg(recv_type, 0))
-            if type_name_sym == self.syms.listiterplace:
-                if field == self.syms.next:
-                    let ip_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    var vs_tid = self.find_generic_inst(self.syms.listslot, ip_elem_ty)
-                    if vs_tid == 0:
-                        let vs_args: List[i32] = []
-                        vs_args.push(ip_elem_ty)
-                        vs_tid = self.ensure_generic_inst_type(self.syms.listslot, vs_args, 1) as i32
-                    let opt_tid = self.find_generic_inst(self.syms.option, vs_tid)
-                    if opt_tid != 0:
-                        return opt_tid
-                    let opt_args: List[i32] = []
-                    opt_args.push(vs_tid)
-                    return self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
             if type_name_sym == self.syms.hashmap:
                 if field == self.syms.insert or field == self.syms.clear:
                     return self.ty_void as i32

@@ -1,0 +1,47 @@
+// #3483 / #1159: ListSlot, ListRange, and SlotMapSlot .get() / .set() with
+// a Copy struct carrying a refcounted str must retain on .get(), drop the
+// replaced occupant on .set(), and exit with zero leaks and zero double-frees.
+
+use std.collections.SlotMap
+
+type Courier {
+    name: str,
+    n: i32,
+}
+
+fn heap_str(tag: &str, k: i32) -> str:
+    f"heap-{tag}-{k}-payload"
+
+fn main:
+    var xs: List[Courier] = List.new()
+    xs.push(Courier { name: heap_str("slot", 1), n: 10 })
+    with xs.slot(0) as mut s:
+        let c1 = s.get()
+        assert(c1.name == "heap-slot-1-payload" and c1.n == 10)
+        s.set(Courier { name: heap_str("slot", 2), n: 20 })
+        let c2 = s.get()
+        assert(c2.name == "heap-slot-2-payload" and c2.n == 20)
+    assert(xs[0].name == "heap-slot-2-payload" and xs[0].n == 20)
+
+    var rs: List[Courier] = List.new()
+    rs.push(Courier { name: heap_str("range", 1), n: 1 })
+    rs.push(Courier { name: heap_str("range", 2), n: 2 })
+    with rs.range(0..2) as mut r:
+        let g0 = r.get(0)
+        let g1 = r.get(1)
+        assert(g0.name == "heap-range-1-payload" and g1.name == "heap-range-2-payload")
+        r.set(0, Courier { name: heap_str("range", 3), n: 3 })
+        let (left, right) = r.split_at_mut(1)
+        assert(left.get(0).name == "heap-range-3-payload")
+        right.set(0, Courier { name: heap_str("range", 4), n: 4 })
+    assert(rs[0].name == "heap-range-3-payload" and rs[1].name == "heap-range-4-payload")
+
+    var sm: SlotMap[Courier] = SlotMap.new()
+    let h = sm.insert(Courier { name: heap_str("sm", 1), n: 100 })
+    with sm.slot(h) as mut ss:
+        let sc1 = ss.get()
+        assert(sc1.name == "heap-sm-1-payload" and sc1.n == 100)
+        ss.set(Courier { name: heap_str("sm", 2), n: 200 })
+        let sc2 = ss.get()
+        assert(sc2.name == "heap-sm-2-payload" and sc2.n == 200)
+    assert(sm.get(h).unwrap().name == "heap-sm-2-payload")
