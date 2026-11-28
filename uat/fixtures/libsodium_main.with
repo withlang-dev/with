@@ -1,0 +1,73 @@
+// Zero-unsafe UAT for c.libsodium (#3142): sodium_init, randombytes_buf,
+// crypto_secretbox, crypto_box keypair/seal/open, crypto_sign_detached/verify,
+// and crypto_pwhash.
+use contracts.libsodium
+use c_import("sodium.h")
+
+fn main:
+    assert(sodium_init() >= 0)
+    assert(sodium_version_string().unwrap().to_str_lossy().len() > 0)
+
+    // 1. randombytes_buf
+    var nonce: [u8; 24] = [0 as u8; 24]
+    randombytes_buf(nonce)
+    assert(sodium_is_zero(nonce[..]) == 0)
+
+    // 2. crypto_secretbox (keygen + easy + open_easy + tamper rejection)
+    var sbox_key: [u8; 32] = [0 as u8; 32]
+    crypto_secretbox_keygen(sbox_key)
+    let msg = "secret message for libsodium" as []u8
+    var sbox_ct: [u8; 44] = [0 as u8; 44]
+    assert(msg.len() == 28)
+    crypto_secretbox_easy(sbox_ct, msg, nonce[..], sbox_key[..]).unwrap()
+
+    var sbox_pt: [u8; 28] = [0 as u8; 28]
+    crypto_secretbox_open_easy(sbox_pt, sbox_ct[..], nonce[..], sbox_key[..]).unwrap()
+    for i in 0..msg.len():
+        assert(sbox_pt[i] == msg[i])
+
+    // Flip a byte -> open must reject.
+    sbox_ct[0] = sbox_ct[0] ^ (1 as u8)
+    assert(crypto_secretbox_open_easy(sbox_pt, sbox_ct[..], nonce[..], sbox_key[..]).is_err())
+
+    // 3. crypto_box keypair + seal + seal_open
+    var pk: [u8; 32] = [0 as u8; 32]
+    var sk: [u8; 32] = [0 as u8; 32]
+    crypto_box_keypair(pk, sk).unwrap()
+
+    var sealed: [u8; 76] = [0 as u8; 76]
+    crypto_box_seal(sealed, msg, pk[..]).unwrap()
+
+    var unsealed: [u8; 28] = [0 as u8; 28]
+    crypto_box_seal_open(unsealed, sealed[..], pk[..], sk[..]).unwrap()
+    for i in 0..msg.len():
+        assert(unsealed[i] == msg[i])
+
+    // 4. crypto_sign keypair + detached + verify_detached
+    var sign_pk: [u8; 32] = [0 as u8; 32]
+    var sign_sk: [u8; 64] = [0 as u8; 64]
+    crypto_sign_keypair(sign_pk, sign_sk).unwrap()
+
+    var sig: [u8; 64] = [0 as u8; 64]
+    let sig_len = crypto_sign_detached(sig, msg, sign_sk[..]).unwrap()
+    assert(sig_len == 64)
+    crypto_sign_verify_detached(sig[..], msg, sign_pk[..]).unwrap()
+
+    sig[0] = sig[0] ^ (1 as u8)
+    assert(crypto_sign_verify_detached(sig[..], msg, sign_pk[..]).is_err())
+
+    // 5. crypto_pwhash (Argon2id with minimum limits for fast deterministic UAT)
+    var salt: [u8; 16] = [0 as u8; 16]
+    randombytes_buf(salt)
+    let passwd = "correct horse battery staple" as []u8
+    var dk1: [u8; 32] = [0 as u8; 32]
+    var dk2: [u8; 32] = [0 as u8; 32]
+    crypto_pwhash(dk1, passwd, salt[..], crypto_pwhash_opslimit_min() as u64, crypto_pwhash_memlimit_min(), crypto_pwhash_alg_default()).unwrap()
+    crypto_pwhash(dk2, passwd, salt[..], crypto_pwhash_opslimit_min() as u64, crypto_pwhash_memlimit_min(), crypto_pwhash_alg_default()).unwrap()
+    for i in 0..32:
+        assert(dk1[i] == dk2[i])
+
+    // Zero secret key material before exit.
+    sodium_memzero(sbox_key)
+    assert(sodium_is_zero(sbox_key[..]) == 1)
+    print("libsodium ok")

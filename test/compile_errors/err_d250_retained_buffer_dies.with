@@ -1,0 +1,24 @@
+//! expect-check-fail: dies while 'Pipe' still holds it as the storage 'Pipe.set_in' set (§16.2b.9)
+
+// D250 (§16.2b.9): a buffer retained by a resource cannot drop before the
+// resource does.
+
+use c_import("#include <stddef.h>\ntypedef struct { const unsigned char *in_ptr; size_t in_len; } pipe_t;\nstatic inline int pipe_init(pipe_t *p) { p->in_ptr = NULL; p->in_len = 0; return 1; }\nstatic inline void pipe_delete(pipe_t *p) { p->in_ptr = NULL; }\nstatic inline void pipe_set_in(pipe_t *p, const unsigned char *buf, size_t len) { p->in_ptr = buf; p->in_len = len; }\nstatic inline int pipe_len(pipe_t *p) { return (int)p->in_len; }\n")
+
+c contract d250_die:
+    resource Pipe wraps pipe_t
+        init pipe_init(self), ok 1
+        drop pipe_delete
+    fn pipe_set_in
+        lend
+        buffer param 1 len param 2
+        retains param 1 by param 0
+    fn pipe_len
+        lend
+
+fn main:
+    let p = Pipe.init().unwrap()
+    if true:
+        let short_lived: [u8; 4] = [65, 66, 67, 68]
+        p.set_in(short_lived[..])
+    print(p.len())

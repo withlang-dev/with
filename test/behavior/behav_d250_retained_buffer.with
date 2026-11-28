@@ -1,0 +1,38 @@
+//! expect-stdout: read=5 written=5 first=65
+//! expect-stdout: ok
+
+// D250 (§16.2b.9): `retains param N by param 0` on paired buffer and
+// `updates` scalar parameters keeps the caller storage alive until the
+// retaining resource drops.
+
+use c_import("#include <stddef.h>\ntypedef struct { const unsigned char *in_ptr; size_t in_len; unsigned char *out_ptr; size_t out_cap; size_t *written; } pipe_t;\nstatic inline int pipe_init(pipe_t *p) { p->in_ptr = NULL; p->in_len = 0; p->out_ptr = NULL; p->out_cap = 0; p->written = NULL; return 1; }\nstatic inline void pipe_delete(pipe_t *p) { p->in_ptr = NULL; p->out_ptr = NULL; p->written = NULL; }\nstatic inline void pipe_set_in(pipe_t *p, const unsigned char *buf, size_t len) { p->in_ptr = buf; p->in_len = len; }\nstatic inline void pipe_set_out(pipe_t *p, unsigned char *buf, size_t cap, size_t *written) { p->out_ptr = buf; p->out_cap = cap; p->written = written; }\nstatic inline int pipe_run(pipe_t *p) { size_t n = p->in_len < p->out_cap ? p->in_len : p->out_cap; for (size_t i = 0; i < n; i++) p->out_ptr[i] = (unsigned char)(p->in_ptr[i] - 32); if (p->written) *p->written = n; return (int)n; }\n")
+
+c contract d250_ret:
+    resource Pipe wraps pipe_t
+        init pipe_init(self), ok 1
+        drop pipe_delete
+    fn pipe_set_in
+        lend
+        buffer param 1 len param 2
+        retains param 1 by param 0
+    fn pipe_set_out
+        lend
+        buffer param 1 capacity param 2
+        updates param 3
+        retains param 1 by param 0
+        retains param 3 by param 0
+    fn pipe_run
+        lend
+
+fn main:
+    let src: [u8; 5] = [97, 98, 99, 100, 101]
+    var dst: [u8; 8] = [0 as u8; 8]
+    var written: usize = 0
+    var n: i32 = 0
+    if true:
+        let p = Pipe.init().unwrap()
+        p.set_in(src[..])
+        p.set_out(dst, mut written)
+        n = p.run()
+    print(f"read={n} written={written} first={dst[0]}")
+    print("ok")

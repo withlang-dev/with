@@ -1,0 +1,11 @@
+scenario: c.libyaml parses events, emits a document, and round-trips a YAML config without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: with get c.libyaml
+write src/main.with from libyaml_main.with
+run: with run
+expect exit: 0
+expect stdout contains: libyaml ok

@@ -1,0 +1,102 @@
+// Zero-unsafe UAT for c.libyaml (#3149): parse events (yaml_parser_parse loop),
+// emit a document (yaml_emitter_emit / yaml_emitter_dump), and round-trip a YAML config.
+use contracts.libyaml
+use c_import("yaml.h")
+
+fn bytes_contain(hay: []u8, needle: &str) -> bool:
+    let nb = needle.as_bytes()
+    if nb.len() == 0: return true
+    if nb.len() > hay.len(): return false
+    for i in 0..(hay.len() - nb.len() + 1):
+        var ok = true
+        for j in 0..nb.len():
+            if hay[i + j] != nb[j]:
+                ok = false
+                break
+        if ok: return true
+    false
+
+fn main:
+    // 1. Version check.
+    let ver = yaml_get_version_string().unwrap().to_str().unwrap()
+    let (maj, min, pat) = yaml_get_version()
+    if maj != 0 or min != 2 or pat != 5:
+        panic(f"unexpected libyaml version: {ver} ({maj}.{min}.{pat})")
+
+    // 2. Parse a YAML config into events and re-emit every event into an output buffer.
+    let cfg = "service: with-registry\nport: 8080\nfeatures:\n  - safety\n  - interop\n"
+    let cfg_bytes = cfg.as_bytes()
+    var emitted_buf: [u8; 512] = [0 as u8; 512]
+    var emitted_len: usize = 0
+    let first_events: List[i32] = []
+
+    if true:
+        let parser = Parser.initialize().unwrap()
+        parser.set_input_string(cfg_bytes)
+        parser.set_encoding(YAML_UTF8_ENCODING)
+
+        let emitter = Emitter.initialize().unwrap()
+        emitter.set_output_string(emitted_buf, mut emitted_len)
+        emitter.set_encoding(YAML_UTF8_ENCODING)
+        emitter.set_unicode(1)
+
+        var done = false
+        while not done:
+            let ev = Event.parser_parse(&parser).unwrap()
+            let kind = ev.type as i32
+            first_events.push(kind)
+            if ev.type == YAML_STREAM_END_EVENT:
+                done = true
+            emitter.emit(ev).unwrap()
+        emitter.flush().unwrap()
+
+    if emitted_len == 0:
+        panic("round-trip emitted 0 bytes")
+    let rt_bytes = emitted_buf[0..emitted_len]
+    if not bytes_contain(rt_bytes, "with-registry") or not bytes_contain(rt_bytes, "8080") or not bytes_contain(rt_bytes, "safety") or not bytes_contain(rt_bytes, "interop"):
+        panic("round-trip bytes missing expected keys/values")
+
+    // 3. Re-parse the emitted config and verify exact event-sequence round-trip.
+    let second_events: List[i32] = []
+    if true:
+        let parser2 = Parser.initialize().unwrap()
+        parser2.set_input_string(emitted_buf[0..emitted_len])
+        var done2 = false
+        while not done2:
+            let ev2 = Event.parser_parse(&parser2).unwrap()
+            second_events.push(ev2.type as i32)
+            if ev2.type == YAML_STREAM_END_EVENT:
+                done2 = true
+
+    if first_events.len() != second_events.len():
+        panic(f"event count mismatch: {first_events.len()} != {second_events.len()}")
+    for i in 0..first_events.len():
+        if first_events[i] != second_events[i]:
+            panic(f"event mismatch at {i}: {first_events[i]} != {second_events[i]}")
+
+    // 4. Construct and emit a fresh YAML document via Document + yaml_emitter_dump.
+    var doc_buf: [u8; 512] = [0 as u8; 512]
+    var doc_len: usize = 0
+    if true:
+        let doc = Document.initialize(None, 1, 1).unwrap()
+        let root = doc.add_mapping(None, YAML_BLOCK_MAPPING_STYLE)
+        let k1 = doc.add_scalar(None, "mode".as_bytes(), YAML_PLAIN_SCALAR_STYLE)
+        let v1 = doc.add_scalar(None, "native".as_bytes(), YAML_PLAIN_SCALAR_STYLE)
+        doc.append_mapping_pair(root, k1, v1).unwrap()
+        let k2 = doc.add_scalar(None, "safe".as_bytes(), YAML_PLAIN_SCALAR_STYLE)
+        let v2 = doc.add_scalar(None, "true".as_bytes(), YAML_PLAIN_SCALAR_STYLE)
+        doc.append_mapping_pair(root, k2, v2).unwrap()
+
+        let em = Emitter.initialize().unwrap()
+        em.set_output_string(doc_buf, mut doc_len)
+        em.open().unwrap()
+        em.dump(doc).unwrap()
+        em.close().unwrap()
+        em.flush().unwrap()
+
+    let doc_bytes = doc_buf[0..doc_len]
+    if not bytes_contain(doc_bytes, "mode: native") or not bytes_contain(doc_bytes, "safe: true"):
+        panic("emitted document missing expected entries")
+
+    print(f"libyaml {ver}: events={first_events.len()} rt_bytes={emitted_len} doc_bytes={doc_len}")
+    print("libyaml ok")

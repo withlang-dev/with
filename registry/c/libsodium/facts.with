@@ -1,0 +1,177 @@
+// libsodium cci.20220430 (1.0.18, conan-center-index recipes/libsodium).
+// Every clause cites the installed sodium/*.h headers.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - sodium_malloc, sodium_allocarray, sodium_free, sodium_mprotect_*: raw
+//   guard-page allocator / memory-protection pointers with no typed size.
+// - sodium_set_misuse_handler, randombytes_set_implementation: process-global
+//   custom allocator/RNG callback tables.
+// - Legacy NaCl padded APIs (crypto_secretbox, crypto_box) requiring leading
+//   zero-padding bytes, and low-level curve/core/stream primitives whose
+//   multi-pointer contracts are algorithm-specific.
+c facts libsodium:
+    // ── Version & primitives ──
+    fn sodium_version_string
+        returns static CStr    // sodium/version.h 1.0.18:18: static library version string
+    fn randombytes_implementation_name
+        returns static CStr    // sodium/randombytes.h 1.0.18:60: static implementation name
+    fn crypto_secretbox_primitive
+        returns static CStr    // sodium/crypto_secretbox.h 1.0.18:30: static primitive name
+    fn crypto_box_primitive
+        returns static CStr    // sodium/crypto_box.h 1.0.18:49: static primitive name
+    fn crypto_sign_primitive
+        returns static CStr    // sodium/crypto_sign.h 1.0.18:50: static primitive name
+    fn crypto_pwhash_primitive
+        returns static CStr    // sodium/crypto_pwhash.h 1.0.18:140: static primitive name
+    fn crypto_pwhash_strprefix
+        returns static CStr    // sodium/crypto_pwhash.h 1.0.18:55: static argon2id prefix string
+    fn crypto_generichash_primitive
+        returns static CStr    // sodium/crypto_generichash.h 1.0.18:42: static primitive name
+
+    // ── Random bytes (sodium/randombytes.h) ──
+    fn randombytes_buf
+        buffer param 0 capacity param 1    // sodium/randombytes.h 1.0.18:35: fills buf[0..size) with unpredictable bytes
+    fn randombytes_buf_deterministic
+        buffer param 0 capacity param 1    // sodium/randombytes.h 1.0.18:39: fills buf[0..size) deterministically from 32-byte seed
+        buffer param 2 len 32    // sodium/randombytes.h 1.0.18:30,40: randombytes_SEEDBYTES == 32
+    fn randombytes
+        buffer param 0 capacity param 1    // sodium/randombytes.h 1.0.18:65: fills buf[0..buf_len)
+
+    // ── Secret-key authenticated encryption (sodium/crypto_secretbox.h) ──
+    fn crypto_secretbox_keygen
+        buffer param 0 capacity 32    // sodium/crypto_secretbox.h 1.0.18:16,65: crypto_secretbox_KEYBYTES == 32
+    fn crypto_secretbox_easy
+        buffer param 0 capacity param 2 + 16    // sodium/crypto_secretbox.h 1.0.18:24,37: writes mlen + crypto_secretbox_MACBYTES (16) bytes into c
+        buffer param 1 len param 2    // sodium/crypto_secretbox.h 1.0.18:37: reads m[0..mlen)
+        buffer param 3 len 24    // sodium/crypto_secretbox.h 1.0.18:20,38: crypto_secretbox_NONCEBYTES == 24
+        buffer param 4 len 32    // sodium/crypto_secretbox.h 1.0.18:16,39: crypto_secretbox_KEYBYTES == 32
+        ok 0    // sodium/crypto_secretbox.h 1.0.18:37: 0 on success
+    fn crypto_secretbox_open_easy
+        buffer param 0 capacity param 2 - 16    // sodium/crypto_secretbox.h 1.0.18:24,42: writes clen - crypto_secretbox_MACBYTES (16) bytes into m
+        buffer param 1 len param 2    // sodium/crypto_secretbox.h 1.0.18:42: reads c[0..clen)
+        buffer param 3 len 24    // sodium/crypto_secretbox.h 1.0.18:20,43: crypto_secretbox_NONCEBYTES == 24
+        buffer param 4 len 32    // sodium/crypto_secretbox.h 1.0.18:16,44: crypto_secretbox_KEYBYTES == 32
+        ok 0    // sodium/crypto_secretbox.h 1.0.18:42: 0 on authentication success, -1 on failure
+    fn crypto_secretbox_detached
+        buffer param 0 capacity param 3 + 0    // sodium/crypto_secretbox.h 1.0.18:48: writes mlen ciphertext bytes into c
+        buffer param 1 capacity 16    // sodium/crypto_secretbox.h 1.0.18:24,48: writes crypto_secretbox_MACBYTES (16) tag into mac
+        buffer param 2 len param 3    // sodium/crypto_secretbox.h 1.0.18:49: reads m[0..mlen)
+        buffer param 4 len 24    // sodium/crypto_secretbox.h 1.0.18:20,51: crypto_secretbox_NONCEBYTES == 24
+        buffer param 5 len 32    // sodium/crypto_secretbox.h 1.0.18:16,52: crypto_secretbox_KEYBYTES == 32
+        ok 0    // sodium/crypto_secretbox.h 1.0.18:48: 0 on success
+    fn crypto_secretbox_open_detached
+        buffer param 0 capacity param 3 + 0    // sodium/crypto_secretbox.h 1.0.18:56: writes clen plaintext bytes into m
+        buffer param 1 len param 3    // sodium/crypto_secretbox.h 1.0.18:57: reads c[0..clen)
+        buffer param 2 len 16    // sodium/crypto_secretbox.h 1.0.18:24,58: reads crypto_secretbox_MACBYTES (16) tag
+        buffer param 4 len 24    // sodium/crypto_secretbox.h 1.0.18:20,60: crypto_secretbox_NONCEBYTES == 24
+        buffer param 5 len 32    // sodium/crypto_secretbox.h 1.0.18:16,61: crypto_secretbox_KEYBYTES == 32
+        ok 0    // sodium/crypto_secretbox.h 1.0.18:56: 0 on authentication success, -1 on failure
+
+    // ── Public-key authenticated & sealed encryption (sodium/crypto_box.h) ──
+    fn crypto_box_keypair
+        buffer param 0 capacity 32    // sodium/crypto_box.h 1.0.18:27,57: crypto_box_PUBLICKEYBYTES == 32
+        buffer param 1 capacity 32    // sodium/crypto_box.h 1.0.18:31,57: crypto_box_SECRETKEYBYTES == 32
+        ok 0    // sodium/crypto_box.h 1.0.18:57: 0 on success
+    fn crypto_box_seed_keypair
+        buffer param 0 capacity 32    // sodium/crypto_box.h 1.0.18:27,52: crypto_box_PUBLICKEYBYTES == 32
+        buffer param 1 capacity 32    // sodium/crypto_box.h 1.0.18:31,52: crypto_box_SECRETKEYBYTES == 32
+        buffer param 2 len 32    // sodium/crypto_box.h 1.0.18:23,53: crypto_box_SEEDBYTES == 32
+        ok 0    // sodium/crypto_box.h 1.0.18:52: 0 on success
+    fn crypto_box_easy
+        buffer param 0 capacity param 2 + 16    // sodium/crypto_box.h 1.0.18:39,61: writes mlen + crypto_box_MACBYTES (16) bytes into c
+        buffer param 1 len param 2    // sodium/crypto_box.h 1.0.18:61: reads m[0..mlen)
+        buffer param 3 len 24    // sodium/crypto_box.h 1.0.18:35,62: crypto_box_NONCEBYTES == 24
+        buffer param 4 len 32    // sodium/crypto_box.h 1.0.18:27,63: crypto_box_PUBLICKEYBYTES == 32
+        buffer param 5 len 32    // sodium/crypto_box.h 1.0.18:31,63: crypto_box_SECRETKEYBYTES == 32
+        ok 0    // sodium/crypto_box.h 1.0.18:61: 0 on success
+    fn crypto_box_open_easy
+        buffer param 0 capacity param 2 - 16    // sodium/crypto_box.h 1.0.18:39,67: writes clen - crypto_box_MACBYTES (16) bytes into m
+        buffer param 1 len param 2    // sodium/crypto_box.h 1.0.18:67: reads c[0..clen)
+        buffer param 3 len 24    // sodium/crypto_box.h 1.0.18:35,68: crypto_box_NONCEBYTES == 24
+        buffer param 4 len 32    // sodium/crypto_box.h 1.0.18:27,69: crypto_box_PUBLICKEYBYTES == 32
+        buffer param 5 len 32    // sodium/crypto_box.h 1.0.18:31,69: crypto_box_SECRETKEYBYTES == 32
+        ok 0    // sodium/crypto_box.h 1.0.18:67: 0 on success, -1 on forgery
+    fn crypto_box_beforenm
+        buffer param 0 capacity 32    // sodium/crypto_box.h 1.0.18:90,95: crypto_box_BEFORENMBYTES == 32
+        buffer param 1 len 32    // sodium/crypto_box.h 1.0.18:27,95: crypto_box_PUBLICKEYBYTES == 32
+        buffer param 2 len 32    // sodium/crypto_box.h 1.0.18:31,96: crypto_box_SECRETKEYBYTES == 32
+        ok 0    // sodium/crypto_box.h 1.0.18:95: 0 on success
+    fn crypto_box_easy_afternm
+        buffer param 0 capacity param 2 + 16    // sodium/crypto_box.h 1.0.18:39,100: writes mlen + 16 bytes into c
+        buffer param 1 len param 2    // sodium/crypto_box.h 1.0.18:100: reads m[0..mlen)
+        buffer param 3 len 24    // sodium/crypto_box.h 1.0.18:35,101: crypto_box_NONCEBYTES == 24
+        buffer param 4 len 32    // sodium/crypto_box.h 1.0.18:90,102: crypto_box_BEFORENMBYTES == 32
+        ok 0    // sodium/crypto_box.h 1.0.18:100: 0 on success
+    fn crypto_box_open_easy_afternm
+        buffer param 0 capacity param 2 - 16    // sodium/crypto_box.h 1.0.18:39,105: writes clen - 16 bytes into m
+        buffer param 1 len param 2    // sodium/crypto_box.h 1.0.18:105: reads c[0..clen)
+        buffer param 3 len 24    // sodium/crypto_box.h 1.0.18:35,106: crypto_box_NONCEBYTES == 24
+        buffer param 4 len 32    // sodium/crypto_box.h 1.0.18:90,107: crypto_box_BEFORENMBYTES == 32
+        ok 0    // sodium/crypto_box.h 1.0.18:105: 0 on success, -1 on forgery
+    fn crypto_box_seal
+        buffer param 0 capacity param 2 + 48    // sodium/crypto_box.h 1.0.18:125,130: writes mlen + crypto_box_SEALBYTES (48) bytes into c
+        buffer param 1 len param 2    // sodium/crypto_box.h 1.0.18:130: reads m[0..mlen)
+        buffer param 3 len 32    // sodium/crypto_box.h 1.0.18:27,131: crypto_box_PUBLICKEYBYTES == 32
+        ok 0    // sodium/crypto_box.h 1.0.18:130: 0 on success
+    fn crypto_box_seal_open
+        buffer param 0 capacity param 2 - 48    // sodium/crypto_box.h 1.0.18:125,135: writes clen - crypto_box_SEALBYTES (48) bytes into m
+        buffer param 1 len param 2    // sodium/crypto_box.h 1.0.18:135: reads c[0..clen)
+        buffer param 3 len 32    // sodium/crypto_box.h 1.0.18:27,137: crypto_box_PUBLICKEYBYTES == 32
+        buffer param 4 len 32    // sodium/crypto_box.h 1.0.18:31,137: crypto_box_SECRETKEYBYTES == 32
+        ok 0    // sodium/crypto_box.h 1.0.18:135: 0 on success, -1 on forgery
+
+    // ── Public-key signatures (sodium/crypto_sign.h) ──
+    fn crypto_sign_keypair
+        buffer param 0 capacity 32    // sodium/crypto_sign.h 1.0.18:36,58: crypto_sign_PUBLICKEYBYTES == 32
+        buffer param 1 capacity 64    // sodium/crypto_sign.h 1.0.18:40,58: crypto_sign_SECRETKEYBYTES == 64
+        ok 0    // sodium/crypto_sign.h 1.0.18:58: 0 on success
+    fn crypto_sign_seed_keypair
+        buffer param 0 capacity 32    // sodium/crypto_sign.h 1.0.18:36,53: crypto_sign_PUBLICKEYBYTES == 32
+        buffer param 1 capacity 64    // sodium/crypto_sign.h 1.0.18:40,53: crypto_sign_SECRETKEYBYTES == 64
+        buffer param 2 len 32    // sodium/crypto_sign.h 1.0.18:32,54: crypto_sign_SEEDBYTES == 32
+        ok 0    // sodium/crypto_sign.h 1.0.18:53: 0 on success
+    fn crypto_sign_detached
+        buffer param 0 capacity 64    // sodium/crypto_sign.h 1.0.18:28,73: writes crypto_sign_BYTES (64) signature
+        fills param 1    // sodium/crypto_sign.h 1.0.18:73: writes actual signature length into *siglen_p
+        buffer param 2 len param 3    // sodium/crypto_sign.h 1.0.18:74: reads m[0..mlen)
+        buffer param 4 len 64    // sodium/crypto_sign.h 1.0.18:40,75: crypto_sign_SECRETKEYBYTES == 64
+        ok 0    // sodium/crypto_sign.h 1.0.18:73: 0 on success
+    fn crypto_sign_verify_detached
+        buffer param 0 len 64    // sodium/crypto_sign.h 1.0.18:28,78: reads crypto_sign_BYTES (64) signature
+        buffer param 1 len param 2    // sodium/crypto_sign.h 1.0.18:79: reads m[0..mlen)
+        buffer param 3 len 32    // sodium/crypto_sign.h 1.0.18:36,81: crypto_sign_PUBLICKEYBYTES == 32
+        ok 0    // sodium/crypto_sign.h 1.0.18:78: 0 if signature is valid, -1 if invalid
+
+    // ── Password hashing (sodium/crypto_pwhash.h) ──
+    fn crypto_pwhash
+        buffer param 0 capacity param 1    // sodium/crypto_pwhash.h 1.0.18:104: writes outlen derived key bytes into out
+        buffer param 2 len param 3    // sodium/crypto_pwhash.h 1.0.18:105: reads passwd[0..passwdlen)
+        buffer param 4 len 16    // sodium/crypto_pwhash.h 1.0.18:45,106: crypto_pwhash_SALTBYTES == 16
+        ok 0    // sodium/crypto_pwhash.h 1.0.18:104: 0 on success, -1 on error
+    fn crypto_pwhash_str
+        buffer param 0 capacity 128    // sodium/crypto_pwhash.h 1.0.18:49,116: writes NUL-terminated hash into out[128]
+        buffer param 1 len param 2    // sodium/crypto_pwhash.h 1.0.18:117: reads passwd[0..passwdlen)
+        ok 0    // sodium/crypto_pwhash.h 1.0.18:116: 0 on success
+    fn crypto_pwhash_str_verify
+        text param 0    // sodium/crypto_pwhash.h 1.0.18:128: NUL-terminated encoded hash string
+        buffer param 1 len param 2    // sodium/crypto_pwhash.h 1.0.18:129: reads passwd[0..passwdlen)
+        ok 0    // sodium/crypto_pwhash.h 1.0.18:128: 0 if password matches, -1 otherwise
+
+    // ── Hashing & utilities (crypto_generichash.h, crypto_hash_sha256.h, utils.h) ──
+    fn crypto_generichash
+        buffer param 0 capacity param 1    // sodium/crypto_generichash.h 1.0.18:54: writes outlen hash bytes into out
+        buffer param 2 len param 3    // sodium/crypto_generichash.h 1.0.18:55: reads in[0..inlen)
+        buffer param 4 len param 5    // sodium/crypto_generichash.h 1.0.18:56: reads optional key[0..keylen) (empty slice passes NULL, 0)
+        ok 0    // sodium/crypto_generichash.h 1.0.18:54: 0 on success
+    fn crypto_generichash_keygen
+        buffer param 0 capacity 32    // sodium/crypto_generichash.h 1.0.18:36,77: crypto_generichash_KEYBYTES == 32
+    fn crypto_hash_sha256
+        buffer param 0 capacity 32    // sodium/crypto_hash_sha256.h 1.0.18:33,38: writes 32-byte SHA-256 digest
+        buffer param 1 len param 2    // sodium/crypto_hash_sha256.h 1.0.18:38: reads in[0..inlen)
+        ok 0    // sodium/crypto_hash_sha256.h 1.0.18:38: 0 on success
+    fn sodium_memzero
+        buffer param 0 capacity param 1    // sodium/utils.h 1.0.18:22: zeroes pnt[0..len)
+    fn sodium_is_zero
+        buffer param 0 len param 1    // sodium/utils.h 1.0.18:48: checks whether n[0..nlen) is all zeros in constant time
+    fn sodium_increment
+        buffer param 0 capacity param 1    // sodium/utils.h 1.0.18:51: increments little-endian nonce n[0..nlen)

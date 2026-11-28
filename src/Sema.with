@@ -537,6 +537,7 @@ type FacadeResource {
     out_params: List[i32], // parallel to producers; -1 for a direct return
     init: i32,            // the first `init`, for what is true of the resource (it is in place)
     inits: List[i32],     // every `init`, each a constructor
+    init_params: List[i32], // parallel (D249): parameter index receiving storage (`init f(self)` -> 0, `init f(param N)` -> N)
     init_ok: List[i32],   // parallel: how many success statuses that `init` states for itself (`init f(self), ok K`)
     preinit: i32,
     drop: i32,
@@ -720,6 +721,7 @@ type FacadePairOp {
     invokes: i32,       // 1 unless the operation is `callbacks none`
     subject_param: i32, // the parameter that receives the resource the operation acts on
     retained_param: i32, // the parameter whose referent a userdata setter or a retained pointer setter retains (its `&U` / its storage), or -1
+    retained_param2: i32, // D250: optional second retained parameter (e.g. `yaml_emitter_set_output_string` retaining buffer + size_written), or -1
     releases: i64,      // D194: the retained slots (bit per variadic slot index) this operation releases (`until`), besides reset and destruction
 }
 

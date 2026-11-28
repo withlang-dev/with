@@ -261,7 +261,7 @@ pub const TDK_FLAG_RESOURCE: i32 = 32768
 // D51 §16.2b stage 1: NK_FACADE_CLAUSE.d0 and the operands each kind writes
 // to extra (a 0 operand is "absent"; refs are NK_FACADE_PARAM_REF nodes).
 pub const FACADE_CLAUSE_FROM: i32 = 1              // [producer_sym, out_param_ref|0]
-pub const FACADE_CLAUSE_INIT: i32 = 2              // [fn_sym]
+pub const FACADE_CLAUSE_INIT: i32 = 2              // [fn_sym, param_ref|0, ok_sym...]  (D249: `init f(self)` or `init f(param N)`, optional `, ok K...`)
 pub const FACADE_CLAUSE_PREINIT: i32 = 3           // [fn_sym]
 pub const FACADE_CLAUSE_DROP: i32 = 4              // [fn_sym, param_ref|0]  (`drop f(param N)`: N receives the resource, the first when 0, D209)
 pub const FACADE_CLAUSE_DESTROYS: i32 = 5          // [fn_sym|0, param_ref|0]   (a resource names one; an fn item is one)
@@ -284,7 +284,7 @@ pub const FACADE_CLAUSE_CALLBACK: i32 = 44          // [callback_ref]  (`callbac
 pub const FACADE_CLAUSE_CALLBACK_USERDATA: i32 = 21 // [callback_ref, userdata_ref]  (`callback param N userdata param M`, §16.2b.9)
 pub const FACADE_CLAUSE_VALID_ON_FAILED: i32 = 22  // []  (`valid on failed`: presented on the failed-state resource too, §16.2b.4)
 pub const FACADE_CLAUSE_NULLABLE: i32 = 23         // [param_ref]  (`nullable param N`: the facade establishes nullability, §16.2b.8)
-pub const FACADE_CLAUSE_BUFFER: i32 = 24           // [ptr_ref, len_ref, mode(0=len|1=capacity-inout|2=capacity), elements(0|1)] (D64/D243 §16.2b.8)
+pub const FACADE_CLAUSE_BUFFER: i32 = 24           // [ptr_ref, len_ref, mode(0=len|1=capacity-inout|2=capacity|3=len-updates|4=capacity-updates|5=len-const|6=capacity-const|7=capacity-plus|8=capacity-minus), elements(0|1), fixed_sym(0|sym)] (D64/D243/D247/D248 §16.2b.8)
 pub const FACADE_CLAUSE_FIXED: i32 = 25            // [param_ref, literal(node)]  (`param N fixed <literal>`, D64 §16.2b.11)
 pub const FACADE_CLAUSE_VARIADIC: i32 = 26         // [vararg_ref, selector_ref, case(node)...]  (`variadic param N selected by param P:`, D66 §16.2b.5)
 pub const FACADE_CLAUSE_VARIADIC_CASE: i32 = 27    // [selector_sym, type(node), callback_ref|0, userdata_selector_ref|0, retainer_ref|0, length_ref|0, length_type(node)|0, until_sym...] (D194: the last three; d2 is the count, so the `until` names are extras 7..d2)
@@ -354,8 +354,8 @@ pub const FACADE_PARAM_REF_TYPE: i32 = 2
 // read it here, the renderer reads the leading operands as it reads any
 // clause. Only the kinds a profile rule can state have a row.
 fn facade_clause_operand_count(kind: i32) -> i32:
-    if kind == FACADE_CLAUSE_FROM or kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS: return 2
-    if kind == FACADE_CLAUSE_INIT or kind == FACADE_CLAUSE_PREINIT: return 1
+    if kind == FACADE_CLAUSE_FROM or kind == FACADE_CLAUSE_INIT or kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS: return 2
+    if kind == FACADE_CLAUSE_PREINIT: return 1
     if kind == FACADE_CLAUSE_LEND: return 0
     -1
 

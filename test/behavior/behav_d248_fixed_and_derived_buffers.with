@@ -1,0 +1,41 @@
+//! expect-stdout: key=42
+//! expect-stdout: sealed=4
+//! expect-stdout: opened=10 20 30 40
+//! expect-stdout: ok
+
+// D248 (§16.2b.8): fixed-size (`len <N>`, `capacity <N>`) and offset-derived
+// (`capacity param <L> + <N>`, `capacity param <L> - <N>`) buffer clauses.
+
+use c_import("#include <stddef.h>\nstatic inline void gen_key(unsigned char *k) { for (int i = 0; i < 4; i++) k[i] = 42; }\nstatic inline int seal_msg(unsigned char *out, const unsigned char *msg, size_t mlen, const unsigned char *key) { out[0] = key[0]; out[1] = 7; for (size_t i = 0; i < mlen; i++) out[i + 2] = (unsigned char)(msg[i] ^ key[0]); return 0; }\nstatic inline int open_msg(unsigned char *out, const unsigned char *ct, size_t clen, const unsigned char *key) { if (clen < 2 || ct[0] != key[0] || ct[1] != 7) return -1; for (size_t i = 0; i < clen - 2; i++) out[i] = (unsigned char)(ct[i + 2] ^ key[0]); return 0; }\n")
+
+c contract box_demo:
+    fn gen_key
+        buffer param 0 capacity 4
+    fn seal_msg
+        buffer param 0 capacity param 2 + 2
+        buffer param 1 len param 2
+        buffer param 3 len 4
+        ok 0
+    fn open_msg
+        buffer param 0 capacity param 2 - 2
+        buffer param 1 len param 2
+        buffer param 3 len 4
+        ok 0
+
+fn main:
+    var key: [u8; 4] = [0 as u8; 4]
+    gen_key(key)
+    print(f"key={key[0]}")
+
+    let plain: [u8; 4] = [10, 20, 30, 40]
+    var ct: [u8; 6] = [0 as u8; 6]
+    seal_msg(ct, plain[..], key[..]).unwrap()
+    print(f"sealed={plain.len()}")
+
+    var out: [u8; 4] = [0 as u8; 4]
+    open_msg(out, ct[..], key[..]).unwrap()
+    print(f"opened={out[0]} {out[1]} {out[2]} {out[3]}")
+
+    var tiny: [u8; 1] = [0 as u8; 1]
+    assert(open_msg(out, tiny[..], key[..]).is_err())
+    print("ok")
