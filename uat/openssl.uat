@@ -1,0 +1,14 @@
+scenario: c.openssl runs SHA-256, AES-256-GCM, RSA/ECDSA sign/verify, and loopback TLS with cert verification without unsafe
+requires: network
+platforms: darwin, linux-x86_64
+# D171, D212, #3141: OpenSSL builds with its own Perl Configure script rather
+# than CMake, so `with get c.openssl` links Conan Center's prebuilt binary on
+# darwin and linux-x86_64 and draws its contract from installed headers + registry.
+
+new directory
+run: with init .
+run: with get c.openssl
+write src/main.with from openssl_main.with
+run: with run
+expect exit: 0
+expect stdout contains: openssl ok
