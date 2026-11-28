@@ -1246,7 +1246,8 @@ impl Sema:
         // non-generic declaration never displaces a generic template.
         var displaces_generic = false
         if self.type_decl_tp_count(node) == 0 and self.type_decl_nodes.contains(name):
-            displaces_generic = self.type_decl_tp_count(self.type_decl_nodes.get(name).unwrap()) > 0
+            let existing = self.type_decl_nodes.get(name).unwrap()
+            displaces_generic = self.type_decl_tp_count(existing) > 0 or (type_decl_sub_kind(self.ast.get_data2(node)) == TypeDeclKind.Opaque and self.ast.kind(existing) == NodeKind.NK_TYPE_DECL and type_decl_sub_kind(self.ast.get_data2(existing)) != TypeDeclKind.Opaque)
         if not displaces_generic:
             self.type_decl_nodes.insert(name, node)
         // Generic decls stay OUT of the shadow tier mask: a tiered lookup

@@ -8478,11 +8478,8 @@ impl Sema:
         let resolved = self.resolve_alias(tid)
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
             return false
-        let name_sym = self.get_type_d0(resolved)
-        if name_sym == 0 or not self.type_decl_nodes.contains(name_sym):
-            return false
-        let decl = self.type_decl_nodes.get(name_sym).unwrap()
-        if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:
+        let decl = self.type_decl_nodes_by_tid.get(resolved as i32) ?? (if self.get_type_d0(resolved) != 0: self.type_decl_nodes.get(self.get_type_d0(resolved)) ?? 0 else: 0)
+        if decl == 0 or self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:
             return false
         if type_decl_sub_kind(self.ast.get_data2(decl)) == TypeDeclKind.Opaque:
             return true
