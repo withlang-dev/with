@@ -1,0 +1,161 @@
+// lz4 1.11.1 (conan-center-index recipes/lz4). Every clause cites lz4.h,
+// lz4hc.h, or lz4frame.h installed by the package.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - LZ4_compress_fast_extState, LZ4_compress_HC_extStateHC,
+//   LZ4_compress_HC_destSize: take an untyped caller-allocated `void* state`
+//   buffer whose required size and 8-byte alignment are runtime-checked only.
+// - LZ4_loadDict, LZ4_loadDictSlow, LZ4_attach_dictionary,
+//   LZ4_compress_fast_continue, LZ4_setStreamDecode,
+//   LZ4_decompress_safe_continue, LZ4_loadDictHC, LZ4_compress_HC_continue,
+//   LZ4_compress_HC_continue_destSize, LZ4_attach_HC_dictionary,
+//   LZ4F_compressBegin_usingDict, LZ4F_compressBegin_usingCDict,
+//   LZ4F_decompress_usingDict: retain pointers into the caller's dictionary or
+//   previous 64 KB history ring buffer across subsequent calls.
+// - lz4file.h (`LZ4F_readOpen`, `LZ4F_writeOpen`, etc.): operate on `FILE*`.
+c facts lz4:
+    resource CCtx wraps *mut LZ4F_cctx_s
+        from LZ4F_createCompressionContext(out param 0)    // lz4frame.h 1.11.1:354: allocates LZ4F_cctx into cctxPtr, freed by LZ4F_freeCompressionContext
+        drop LZ4F_freeCompressionContext    // lz4frame.h 1.11.1:355: frees LZ4F_cctx (NULL-safe)
+        ok 0    // lz4frame.h 1.11.1:347: return != 0 indicates creation failure
+    resource DCtx wraps *mut LZ4F_dctx_s
+        from LZ4F_createDecompressionContext(out param 0)    // lz4frame.h 1.11.1:500: allocates LZ4F_dctx into dctxPtr, freed by LZ4F_freeDecompressionContext
+        drop LZ4F_freeDecompressionContext    // lz4frame.h 1.11.1:501: frees LZ4F_dctx
+        ok 0    // lz4frame.h 1.11.1:495: 0 indicates success
+    resource CDict wraps *mut LZ4F_CDict_s
+        from LZ4F_createCDict    // lz4frame.h 1.11.1:708: copies dictBuffer into a new LZ4F_CDict freed by LZ4F_freeCDict
+        drop LZ4F_freeCDict    // lz4frame.h 1.11.1:709: frees LZ4F_CDict
+    resource Stream wraps *mut LZ4_stream_u
+        from LZ4_createStream    // lz4.h 1.11.1:340: allocates LZ4_stream_t freed by LZ4_freeStream
+        drop LZ4_freeStream    // lz4.h 1.11.1:341: frees LZ4_stream_t
+    resource StreamDecode wraps *mut LZ4_streamDecode_u
+        from LZ4_createStreamDecode    // lz4.h 1.11.1:474: allocates LZ4_streamDecode_t freed by LZ4_freeStreamDecode
+        drop LZ4_freeStreamDecode    // lz4.h 1.11.1:475: frees LZ4_streamDecode_t
+    resource StreamHC wraps *mut LZ4_streamHC_u
+        from LZ4_createStreamHC    // lz4hc.h 1.11.1:112: allocates LZ4_streamHC_t freed by LZ4_freeStreamHC
+        drop LZ4_freeStreamHC    // lz4hc.h 1.11.1:113: frees LZ4_streamHC_t
+
+    // ── Block compression & decompression (lz4.h) ──
+    fn LZ4_versionString
+        returns static CStr    // lz4.h 1.11.1:147: static library version string
+    fn LZ4_compress_default
+        buffer param 0 len param 2    // lz4.h 1.11.1:195: reads srcSize bytes from src
+        buffer param 1 capacity param 3    // lz4.h 1.11.1:195: writes at most dstCapacity bytes into dst
+    fn LZ4_decompress_safe
+        buffer param 0 len param 2    // lz4.h 1.11.1:215: reads compressedSize bytes from src
+        buffer param 1 capacity param 3    // lz4.h 1.11.1:215: writes at most dstCapacity bytes into dst
+    fn LZ4_compress_fast
+        buffer param 0 len param 2    // lz4.h 1.11.1:243: reads srcSize bytes from src
+        buffer param 1 capacity param 3    // lz4.h 1.11.1:243: writes at most dstCapacity bytes into dst
+    fn LZ4_compress_destSize
+        buffer param 0 len param 2 updates    // lz4.h 1.11.1:281: reads src up to *srcSizePtr and updates *srcSizePtr with bytes consumed
+        buffer param 1 capacity param 3    // lz4.h 1.11.1:281: writes at most targetDstSize bytes into dst
+    fn LZ4_decompress_safe_partial
+        buffer param 0 len param 2    // lz4.h 1.11.1:317: reads srcSize bytes from src
+        buffer param 1 capacity param 4    // lz4.h 1.11.1:317: writes at most dstCapacity bytes into dst
+    fn LZ4_decompress_safe_usingDict
+        buffer param 0 len param 2    // lz4.h 1.11.1:555: reads srcSize bytes from src
+        buffer param 1 capacity param 3    // lz4.h 1.11.1:555: writes at most dstCapacity bytes into dst
+        buffer param 4 len param 5    // lz4.h 1.11.1:555: reads dictSize bytes from dictStart
+    fn LZ4_decompress_safe_partial_usingDict
+        buffer param 0 len param 2    // lz4.h 1.11.1:566: reads compressedSize bytes from src
+        buffer param 1 capacity param 4    // lz4.h 1.11.1:566: writes at most maxOutputSize bytes into dst
+        buffer param 5 len param 6    // lz4.h 1.11.1:566: reads dictSize bytes from dictStart
+    fn LZ4_resetStream_fast
+        of Stream    // lz4.h 1.11.1:367: resets streaming compression state
+        lend    // lz4.h 1.11.1:367: borrows stream
+    fn LZ4_saveDict
+        of Stream    // lz4.h 1.11.1:459: copies history into safeBuffer
+        lend    // lz4.h 1.11.1:459: borrows stream
+        buffer param 1 capacity param 2    // lz4.h 1.11.1:459: writes at most maxDictSize bytes into safeBuffer
+
+    // ── High Compression (lz4hc.h) ──
+    fn LZ4_compress_HC
+        buffer param 0 len param 2    // lz4hc.h 1.11.1:69: reads srcSize bytes from src
+        buffer param 1 capacity param 3    // lz4hc.h 1.11.1:69: writes at most dstCapacity bytes into dst
+    fn LZ4_resetStreamHC_fast
+        of StreamHC    // lz4hc.h 1.11.1:160: resets HC stream with compressionLevel
+        lend    // lz4hc.h 1.11.1:160: borrows streamHC
+    fn LZ4_saveDictHC
+        of StreamHC    // lz4hc.h 1.11.1:188: copies history into safeBuffer
+        lend    // lz4hc.h 1.11.1:188: borrows streamHC
+        buffer param 1 capacity param 2    // lz4hc.h 1.11.1:188: writes at most maxDictSize bytes into safeBuffer
+
+    // ── Frame API (lz4frame.h) ──
+    fn LZ4F_getErrorName
+        returns static CStr    // lz4frame.h 1.11.1:120: static error description string
+    fn LZ4F_compressFrame
+        buffer param 0 capacity param 1    // lz4frame.h 1.11.1:284: writes at most dstCapacity bytes into dstBuffer
+        buffer param 2 len param 3    // lz4frame.h 1.11.1:285: reads srcSize bytes from srcBuffer
+        reads param 4    // lz4frame.h 1.11.1:286: reads optional LZ4F_preferences_t
+        nullable param 4    // lz4frame.h 1.11.1:280: NULL selects default preferences
+    fn LZ4F_compressFrameBound
+        reads param 1    // lz4frame.h 1.11.1:294: reads optional LZ4F_preferences_t
+        nullable param 1    // lz4frame.h 1.11.1:290: NULL assumes default preferences
+    fn LZ4F_compressBound
+        reads param 1    // lz4frame.h 1.11.1:412: reads optional LZ4F_preferences_t
+        nullable param 1    // lz4frame.h 1.11.1:402: NULL assumes worst-case preferences
+    fn LZ4F_createCompressionContext
+        rename new    // lz4frame.h 1.11.1:354: CCtx.new(LZ4F_VERSION)
+    fn LZ4F_compressBegin
+        of CCtx    // lz4frame.h 1.11.1:386: writes frame header into dstBuffer
+        rename compress_begin    // lz4frame.h 1.11.1:386: cctx.compress_begin(dst, prefs)
+        lend    // lz4frame.h 1.11.1:386: borrows cctx
+        buffer param 1 capacity param 2    // lz4frame.h 1.11.1:387: writes header into dstBuffer[0..dstCapacity)
+        reads param 3    // lz4frame.h 1.11.1:388: reads optional LZ4F_preferences_t
+        nullable param 3    // lz4frame.h 1.11.1:382: NULL sets default preferences
+    fn LZ4F_compressUpdate
+        of CCtx    // lz4frame.h 1.11.1:429: feeds input bytes into frame
+        rename compress_update    // lz4frame.h 1.11.1:429: cctx.compress_update(dst, src, opts)
+        lend    // lz4frame.h 1.11.1:429: borrows cctx
+        buffer param 1 capacity param 2    // lz4frame.h 1.11.1:430: writes into dstBuffer[0..dstCapacity)
+        buffer param 3 len param 4    // lz4frame.h 1.11.1:431: reads srcSize bytes from srcBuffer
+        reads param 5    // lz4frame.h 1.11.1:432: reads optional LZ4F_compressOptions_t
+        nullable param 5    // lz4frame.h 1.11.1:425: NULL sets default options
+    fn LZ4F_flush
+        of CCtx    // lz4frame.h 1.11.1:448: flushes buffered input into dstBuffer
+        rename flush    // lz4frame.h 1.11.1:448: cctx.flush(dst, opts)
+        lend    // lz4frame.h 1.11.1:448: borrows cctx
+        buffer param 1 capacity param 2    // lz4frame.h 1.11.1:449: writes into dstBuffer[0..dstCapacity)
+        reads param 3    // lz4frame.h 1.11.1:450: reads optional LZ4F_compressOptions_t
+        nullable param 3    // lz4frame.h 1.11.1:442: NULL sets default options
+    fn LZ4F_compressEnd
+        of CCtx    // lz4frame.h 1.11.1:466: finishes frame with endmark and checksum
+        rename compress_end    // lz4frame.h 1.11.1:466: cctx.compress_end(dst, opts)
+        lend    // lz4frame.h 1.11.1:466: borrows cctx
+        buffer param 1 capacity param 2    // lz4frame.h 1.11.1:467: writes into dstBuffer[0..dstCapacity)
+        reads param 3    // lz4frame.h 1.11.1:468: reads optional LZ4F_compressOptions_t
+        nullable param 3    // lz4frame.h 1.11.1:460: NULL sets default options
+    fn LZ4F_createDecompressionContext
+        rename new    // lz4frame.h 1.11.1:500: DCtx.new(LZ4F_VERSION)
+    fn LZ4F_headerSize
+        buffer param 0 len param 1    // lz4frame.h 1.11.1:521: inspects srcSize bytes of frame header
+    fn LZ4F_getFrameInfo
+        of DCtx    // lz4frame.h 1.11.1:567: decodes frame header into frameInfoPtr
+        rename get_frame_info    // lz4frame.h 1.11.1:567: dctx.get_frame_info(src)
+        lend    // lz4frame.h 1.11.1:567: borrows dctx
+        fills param 1    // lz4frame.h 1.11.1:568: fills LZ4F_frameInfo_t
+        buffer param 2 len param 3 updates    // lz4frame.h 1.11.1:569: reads srcBuffer and updates *srcSizePtr with bytes consumed
+    fn LZ4F_decompress
+        of DCtx    // lz4frame.h 1.11.1:625: incrementally decompresses LZ4 frame
+        rename decompress    // lz4frame.h 1.11.1:625: dctx.decompress(dst, src, opts)
+        lend    // lz4frame.h 1.11.1:625: borrows dctx
+        buffer param 1 capacity param 2 updates    // lz4frame.h 1.11.1:626: writes into dstBuffer and updates *dstSizePtr with bytes written
+        buffer param 3 len param 4 updates    // lz4frame.h 1.11.1:627: reads srcBuffer and updates *srcSizePtr with bytes consumed
+        reads param 5    // lz4frame.h 1.11.1:628: reads optional LZ4F_decompressOptions_t
+        nullable param 5    // lz4frame.h 1.11.1:589: NULL sets default options
+    fn LZ4F_resetDecompressionContext
+        of DCtx    // lz4frame.h 1.11.1:636: resets decompression context for a new frame
+        rename reset    // lz4frame.h 1.11.1:636: dctx.reset()
+        lend    // lz4frame.h 1.11.1:636: borrows dctx
+    fn LZ4F_createCDict
+        rename new    // lz4frame.h 1.11.1:708: CDict.new(dict)
+        buffer param 0 len param 1    // lz4frame.h 1.11.1:708: copies dictSize bytes from dictBuffer
+    fn LZ4F_compressFrame_usingCDict
+        of CCtx    // lz4frame.h 1.11.1:725: compresses a whole frame using a digested CDict
+        rename compress_frame_using_cdict    // lz4frame.h 1.11.1:725: cctx.compress_frame_using_cdict(dst, src, cdict, prefs)
+        lend    // lz4frame.h 1.11.1:725: borrows cctx and cdict
+        buffer param 1 capacity param 2    // lz4frame.h 1.11.1:726: writes into dst[0..dstCapacity)
+        buffer param 3 len param 4    // lz4frame.h 1.11.1:727: reads srcSize bytes from src
+        reads param 6    // lz4frame.h 1.11.1:729: reads optional LZ4F_preferences_t
+        nullable param 6    // lz4frame.h 1.11.1:718: NULL selects default preferences

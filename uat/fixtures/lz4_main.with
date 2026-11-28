@@ -1,0 +1,95 @@
+// Zero-unsafe UAT for c.lz4 (#3137): block compress/decompress, HC level,
+// and streaming LZ4F frame compression + decompression.
+use contracts.lz4
+use c_import("lz4.h")
+use c_import("lz4hc.h")
+use c_import("lz4frame.h")
+
+fn main:
+    assert(LZ4_versionNumber() >= 11000)
+    assert(LZ4_versionString().unwrap().to_str_lossy().len() > 0)
+
+    let payload = "The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. 0123456789! "
+    let src_bytes = payload as []u8
+    let bound = LZ4_compressBound(src_bytes.len() as i32)
+    assert(bound > 0 and bound <= 512)
+
+    // 1. Default block compression & safe decompression.
+    var comp: [u8; 512] = [0 as u8; 512]
+    let csize = LZ4_compress_default(src_bytes, comp)
+    assert(csize > 0 and csize < src_bytes.len() as i32)
+
+    var decomp: [u8; 256] = [0 as u8; 256]
+    let dsize = LZ4_decompress_safe(comp[0..csize], decomp)
+    assert(dsize == src_bytes.len() as i32)
+    for i in 0..src_bytes.len():
+        assert(decomp[i] == src_bytes[i])
+
+    // 2. High-Compression (HC) block level.
+    var hc_comp: [u8; 512] = [0 as u8; 512]
+    let hc_size = LZ4_compress_HC(src_bytes, hc_comp, LZ4HC_CLEVEL_MAX)
+    assert(hc_size > 0 and hc_size <= csize)
+
+    var hc_decomp: [u8; 256] = [0 as u8; 256]
+    let hc_dsize = LZ4_decompress_safe(hc_comp[0..hc_size], hc_decomp)
+    assert(hc_dsize == src_bytes.len() as i32)
+    for i in 0..src_bytes.len():
+        assert(hc_decomp[i] == src_bytes[i])
+
+    // 3. Streaming LZ4F frame API (compressBegin / compressUpdate / compressEnd) with HC level.
+    var prefs = LZ4F_preferences_t.zeroed()
+    prefs.compressionLevel = LZ4HC_CLEVEL_DEFAULT
+    prefs.frameInfo.contentChecksumFlag = LZ4F_contentChecksumEnabled
+
+    let cctx = CCtx.new(LZ4F_VERSION as u32).unwrap()
+    let chunk_cap = LZ4F_compressBound(src_bytes.len() as usize, Some(&prefs))
+    assert(chunk_cap <= 70000)
+    var chunk: [u8; 70000] = [0 as u8; 70000]
+
+    var frame: List[u8] = []
+    let hlen = cctx.compress_begin(chunk, Some(&prefs))
+    assert(LZ4F_isError(hlen) == 0 and hlen >= LZ4F_HEADER_SIZE_MIN as usize)
+    for i in 0..hlen:
+        frame.push(chunk[i])
+
+    // Feed payload in two halves.
+    let mid = src_bytes.len() / 2
+    let u1 = cctx.compress_update(chunk, src_bytes[0..mid], None)
+    assert(LZ4F_isError(u1) == 0)
+    for i in 0..u1:
+        frame.push(chunk[i])
+
+    let u2 = cctx.compress_update(chunk, src_bytes[mid..src_bytes.len()], None)
+    assert(LZ4F_isError(u2) == 0)
+    for i in 0..u2:
+        frame.push(chunk[i])
+
+    let elen = cctx.compress_end(chunk, None)
+    assert(LZ4F_isError(elen) == 0 and elen > 0)
+    for i in 0..elen:
+        frame.push(chunk[i])
+
+    // 4. Streaming LZ4F decompression + frame info inspection.
+    let dctx = DCtx.new(LZ4F_VERSION as u32).unwrap()
+    let (info_hint, info, hdr_consumed) = dctx.get_frame_info(frame[..])
+    assert(LZ4F_isError(info_hint) == 0)
+    assert(hdr_consumed == hlen)
+    assert(info.contentChecksumFlag == LZ4F_contentChecksumEnabled)
+
+    var out_buf: [u8; 64] = [0 as u8; 64]
+    var recovered: List[u8] = []
+    var pos = hdr_consumed
+    var hint: usize = 1
+    while hint != 0:
+        let (next_hint, written, consumed) = dctx.decompress(out_buf, frame[pos..frame.len()], None)
+        assert(LZ4F_isError(next_hint) == 0)
+        for i in 0..written:
+            recovered.push(out_buf[i])
+        pos = pos + consumed
+        hint = next_hint
+    assert(pos == frame.len())
+    assert(recovered.len() == src_bytes.len())
+    for i in 0..src_bytes.len():
+        assert(recovered[i] == src_bytes[i])
+
+    print("lz4 ok")

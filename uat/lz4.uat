@@ -1,0 +1,11 @@
+scenario: c.lz4 compresses and decompresses blocks, HC, and LZ4F frames without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: with get c.lz4
+write src/main.with from lz4_main.with
+run: with run
+expect exit: 0
+expect stdout contains: lz4 ok
