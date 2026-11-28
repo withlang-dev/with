@@ -1,0 +1,68 @@
+// Zero-unsafe UAT for c.protobuf-c (#3163): unpack and pack a protoc-c
+// generated message (Person with nested Tag, repeated int32 scores, and
+// repeated nested Tag tags), inspect descriptor fields, verify check() and
+// packed round-trip, and exercise free_unpacked ownership via Drop.
+use contracts.protobuf_c
+use c_import("person.pb-c.h")
+
+fn main:
+    let ver = protobuf_c_version().unwrap().to_str_lossy()
+    let vernum = protobuf_c_version_number()
+    if not ver.starts_with("1.") or vernum < 1005000:
+        panic(f"unexpected protobuf-c version: {ver} ({vernum})")
+
+    // Inspect the protoc-c generated descriptor via safe borrow-only global view.
+    let desc = MessageDescriptor.person__descriptor()
+    let f_scores = desc.get_field_by_name("scores").unwrap()
+    let f_primary = desc.get_field_by_name("primary_tag").unwrap()
+    let f_tags = desc.get_field_by_name("tags").unwrap()
+    let f_name = desc.get_field(1).unwrap()
+    if f_name.id != 1 or f_scores.id != 4 or f_scores.label != PROTOBUF_C_LABEL_REPEATED or f_scores.type != PROTOBUF_C_TYPE_INT32:
+        panic("unexpected scores/name field descriptor")
+    if f_primary.id != 3 or f_primary.type != PROTOBUF_C_TYPE_MESSAGE or f_tags.id != 5 or f_tags.label != PROTOBUF_C_LABEL_REPEATED or f_tags.type != PROTOBUF_C_TYPE_MESSAGE:
+        panic("unexpected nested Tag field descriptor")
+
+    // Canonical protobuf wire payload for Person:
+    //   name = "Ada"
+    //   id = 42
+    //   primary_tag = Tag { key: "core", score: 7 }
+    //   scores = [10, 20, 30]
+    //   tags = [Tag { key: "a", score: 1 }, Tag { key: "b" }]
+    let wire: [u8; 35] = [
+        0x0a as u8, 0x03 as u8, 65 as u8, 100 as u8, 97 as u8,
+        0x10 as u8, 0x2a as u8,
+        0x1a as u8, 0x08 as u8, 0x0a as u8, 0x04 as u8, 99 as u8, 111 as u8, 114 as u8, 101 as u8, 0x10 as u8, 0x07 as u8,
+        0x20 as u8, 0x0a as u8, 0x20 as u8, 0x14 as u8, 0x20 as u8, 0x1e as u8,
+        0x2a as u8, 0x05 as u8, 0x0a as u8, 0x01 as u8, 97 as u8, 0x10 as u8, 0x01 as u8,
+        0x2a as u8, 0x03 as u8, 0x0a as u8, 0x01 as u8, 98 as u8]
+
+    // Unpack into an owned Message (Drop calls protobuf_c_message_free_unpacked).
+    let msg = Message.unpack(&desc, wire[..]).unwrap()
+    if msg.check() == 0:
+        panic("protobuf_c_message_check failed")
+
+    let packed_size = msg.get_packed_size()
+    if packed_size != 35:
+        panic(f"unexpected packed_size: {packed_size}")
+
+    var out: [u8; 64] = [0 as u8; 64]
+    let written = msg.pack(out)
+    if written != packed_size:
+        panic(f"pack wrote {written} bytes, expected {packed_size}")
+
+    for i in 0..35:
+        if out[i] != wire[i]:
+            panic(f"wire mismatch at byte {i}: got {out[i]} expected {wire[i]}")
+
+    // Round-trip unpack the packed bytes (second owned Message freed by Drop).
+    let msg2 = Message.unpack(&desc, out[0..written]).unwrap()
+    if msg2.check() == 0 or msg2.get_packed_size() != 35:
+        panic("round-trip message mismatch")
+
+    // Missing required field (`id`) must fail unpack cleanly and return None.
+    let bad: [u8; 5] = [0x0a as u8, 0x03 as u8, 65 as u8, 100 as u8, 97 as u8]
+    if Message.unpack(&desc, bad[..]).is_some():
+        panic("expected unpack of message missing required field to return None")
+
+    print(f"protobuf-c {ver}: packed={written}B fields=5")
+    print("protobuf-c ok")
