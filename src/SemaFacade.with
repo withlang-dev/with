@@ -2607,11 +2607,12 @@ impl Sema:
             else:
                 self.emit_error_with_help(f"fn '{fname}': a fixed argument is an integer literal, 'null', 'true', 'false', a constant the header defines or 'sizeof(T)' (§16.2b.11)", clause, "'param N fixed 0', 'param N fixed null' or 'param N fixed true'; a value the caller chooses stays a parameter")
                 return c
-            // D214: on a producer, a parent fixed to null is the absent parent:
-            // the constructor takes none and its value depends on nothing.
-            // That NULL is accepted there is the contract's stated claim.
-            let absent_parent = lk == NodeKind.NK_NULL_LIT and (self.facade_resource_produced_by(fn_sym).len() > 0 or self.facade_fn_destroys_a_resource(fn_sym))
-            if not absent_parent and self.facade_param_receives(fn_sym, pi).len() > 0:
+            // D214/D256: on a producer/destroyer, or on a non-receiver parameter
+            // (`pi != c.of_param`), fixing an optional resource or out-pointer to
+            // `null` states that C accepts NULL there (e.g. absent parent, optional
+            // EVP_PKEY_CTX** out-ptr, or unencrypted PEM_write_bio_PrivateKey).
+            let absent_optional = lk == NodeKind.NK_NULL_LIT and (self.facade_resource_produced_by(fn_sym).len() > 0 or self.facade_fn_destroys_a_resource(fn_sym) or pi != c.of_param)
+            if not absent_optional and self.facade_param_receives(fn_sym, pi).len() > 0:
                 self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed' binds {shown}, which receives a modeled resource; a resource is passed by the value that owns it, never fixed (§16.2b.11)", clause, f"delete 'param {pi} fixed …': the presented operation takes the resource itself, as its receiver when it is the first parameter")
                 return c
             for k in 0..c.fixed_params.len():
