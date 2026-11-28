@@ -1,15 +1,167 @@
 // libyaml 0.2.5, the version `with get c.libyaml` pins. Every citation is a
 // line of the package's installed header, include/yaml.h.
-//
-// A parser and an emitter are records the caller allocates; one function
-// initializes each in place and one ends it. A document is not stated here:
-// yaml_emitter_dump takes it over and destroys it (yaml.h line 1952, "The
-// emitter takes the responsibility for the document object and destroys its
-// content after it is emitted"), which a drop alone would repeat.
-c facade libyaml:
+c facts libyaml:
+    text utf8    // yaml.h 0.2.5 line 79: "The character type (UTF-8 octet)."
+
     resource Parser wraps yaml_parser_t
         init yaml_parser_initialize(self), ok 1    // yaml.h 0.2.5 line 1314: "This function creates a new parser object."; line 1319: "@returns @c 1 if the function succeeded, @c 0 on error."
         drop yaml_parser_delete    // yaml.h 0.2.5 line 1314: "An application is responsible for destroying the object using the yaml_parser_delete() function."
+
     resource Emitter wraps yaml_emitter_t
         init yaml_emitter_initialize(self), ok 1    // yaml.h 0.2.5 line 1781: "This function creates a new emitter object."; line 1786: "@returns @c 1 if the function succeeded, @c 0 on error."
         drop yaml_emitter_delete    // yaml.h 0.2.5 line 1781: "An application is responsible for destroying the object using the yaml_emitter_delete() function."
+
+    resource Event wraps yaml_event_t
+        init yaml_stream_start_event_initialize(self), ok 1    // yaml.h 0.2.5 line 490: "@returns @c 1 if the function succeeded, @c 0 on error."
+        init yaml_stream_end_event_initialize(self), ok 1    // yaml.h 0.2.5 line 502: "@returns @c 1 if the function succeeded, @c 0 on error."
+        init yaml_document_start_event_initialize(self), ok 1    // yaml.h 0.2.5 line 524: "@returns @c 1 if the function succeeded, @c 0 on error."
+        init yaml_document_end_event_initialize(self), ok 1    // yaml.h 0.2.5 line 543: "@returns @c 1 if the function succeeded, @c 0 on error."
+        init yaml_alias_event_initialize(self), ok 1    // yaml.h 0.2.5 line 555: "@returns @c 1 if the function succeeded, @c 0 on error."
+        init yaml_scalar_event_initialize(self), ok 1    // yaml.h 0.2.5 line 580: "@returns @c 1 if the function succeeded, @c 0 on error."
+        init yaml_sequence_start_event_initialize(self), ok 1    // yaml.h 0.2.5 line 603: "@returns @c 1 if the function succeeded, @c 0 on error."
+        init yaml_sequence_end_event_initialize(self), ok 1    // yaml.h 0.2.5 line 616: "@returns @c 1 if the function succeeded, @c 0 on error."
+        init yaml_mapping_start_event_initialize(self), ok 1    // yaml.h 0.2.5 line 635: "@returns @c 1 if the function succeeded, @c 0 on error."
+        init yaml_mapping_end_event_initialize(self), ok 1    // yaml.h 0.2.5 line 648: "@returns @c 1 if the function succeeded, @c 0 on error."
+        init yaml_parser_parse(param 1), ok 1    // yaml.h 0.2.5 line 1432: "Parse the input stream and produce the next parsing event."; "@returns @c 1 if the function succeeded, @c 0 on error."
+        independent    // yaml.h 0.2.5 line 1420: "An application is responsible for destroying any buffers associated with the produced event object using the yaml_event_delete() function."
+        drop yaml_event_delete    // yaml.h 0.2.5 line 657: "Free any memory allocated for an event object."
+
+    resource Document wraps yaml_document_t
+        init yaml_document_initialize(self), ok 1    // yaml.h 0.2.5 line 834: "@returns @c 1 if the function succeeded, @c 0 on error."
+        init yaml_parser_load(param 1), ok 1    // yaml.h 0.2.5 line 1457: "Parse the input stream and produce the next YAML document."; "@returns @c 1 if the function succeeded, @c 0 on error."
+        independent    // yaml.h 0.2.5 line 1445: "An application is responsible for destroying the produced document object using the yaml_document_delete() function."
+        drop yaml_document_delete    // yaml.h 0.2.5 line 847: "Delete a YAML document and all its nodes."
+
+    resource Token wraps yaml_token_t
+        init yaml_parser_scan(param 1), ok 1    // yaml.h 0.2.5 line 1408: "Scan the input stream and produce the next token."; "@returns @c 1 if the function succeeded, @c 0 on error."
+        independent    // yaml.h 0.2.5 line 1396: "An application is responsible for destroying any buffers associated with the produced token object using the yaml_token_delete() function."
+        drop yaml_token_delete    // yaml.h 0.2.5 line 345: "Free any memory allocated for a token object."
+
+    fn yaml_get_version_string
+        returns static CStr    // yaml.h 0.2.5 line 59: "Get the library version as a string."
+
+    fn yaml_get_version
+        fills param 0    // yaml.h 0.2.5 line 64: "@param[out] major Major version number."
+        fills param 1    // yaml.h 0.2.5 line 65: "@param[out] minor Minor version number."
+        fills param 2    // yaml.h 0.2.5 line 66: "@param[out] patch Patch version number."
+
+    fn yaml_document_start_event_initialize
+        reads param 1    // yaml.h 0.2.5 line 525: "The version directive."
+        nullable param 1    // yaml.h 0.2.5 line 513: "@param[in] version_directive The version directive or @c NULL."
+        param 2 fixed null    // yaml.h 0.2.5 line 526: "The beginning of the tag directives list."
+        param 3 fixed null    // yaml.h 0.2.5 line 527: "The end of the tag directives list."
+
+    fn yaml_alias_event_initialize
+        text param 1    // yaml.h 0.2.5 line 555: "@param[in] anchor The anchor."
+
+    fn yaml_scalar_event_initialize
+        text param 1    // yaml.h 0.2.5 line 581: "@param[in] anchor The anchor or @c NULL."
+        nullable param 1    // yaml.h 0.2.5 line 565: "@param[in] anchor The anchor or @c NULL."
+        text param 2    // yaml.h 0.2.5 line 581: "@param[in] tag The tag or @c NULL."
+        nullable param 2    // yaml.h 0.2.5 line 566: "@param[in] tag The tag or @c NULL."
+        buffer param 3 len param 4    // yaml.h 0.2.5 line 582: "@param[in] value The scalar value. @param[in] length The length of the scalar value."
+
+    fn yaml_sequence_start_event_initialize
+        text param 1    // yaml.h 0.2.5 line 604: "@param[in] anchor The anchor or @c NULL."
+        nullable param 1    // yaml.h 0.2.5 line 592: "@param[in] anchor The anchor or @c NULL."
+        text param 2    // yaml.h 0.2.5 line 604: "@param[in] tag The tag or @c NULL."
+        nullable param 2    // yaml.h 0.2.5 line 593: "@param[in] tag The tag or @c NULL."
+
+    fn yaml_mapping_start_event_initialize
+        text param 1    // yaml.h 0.2.5 line 636: "@param[in] anchor The anchor or @c NULL."
+        nullable param 1    // yaml.h 0.2.5 line 626: "@param[in] anchor The anchor or @c NULL."
+        text param 2    // yaml.h 0.2.5 line 636: "@param[in] tag The tag or @c NULL."
+        nullable param 2    // yaml.h 0.2.5 line 627: "@param[in] tag The tag or @c NULL."
+
+    fn yaml_document_initialize
+        reads param 1    // yaml.h 0.2.5 line 835: "The version directive."
+        nullable param 1    // yaml.h 0.2.5 line 821: "@param[in] version_directive The version directive or @c NULL."
+        param 2 fixed null    // yaml.h 0.2.5 line 836: "The beginning of the tag directives list."
+        param 3 fixed null    // yaml.h 0.2.5 line 837: "The end of the tag directives list."
+
+    fn yaml_document_get_node
+        lend    // yaml.h 0.2.5 line 862: "Get a node of a YAML document."
+        returns borrow yaml_node_t from param 0    // yaml.h 0.2.5 line 852: "The pointer returned by this function is valid until any of the functions modifying the documents are called."
+
+    fn yaml_document_get_root_node
+        lend    // yaml.h 0.2.5 line 881: "Get the root of a YAML document node."
+        returns borrow yaml_node_t from param 0    // yaml.h 0.2.5 line 869: "The pointer returned by this function is valid until any of the functions modifying the documents are called."
+
+    fn yaml_document_add_scalar
+        lend    // yaml.h 0.2.5 line 898: "Create a SCALAR node and attach it to the document."
+        text param 1    // yaml.h 0.2.5 line 899: "@param[in] tag The scalar tag."
+        nullable param 1    // yaml.h 0.2.5 line 890: "@param[in] tag The scalar tag (NULL for default)."
+        buffer param 2 len param 3    // yaml.h 0.2.5 line 899: "@param[in] value The scalar value. @param[in] length The length of the scalar value."
+
+    fn yaml_document_add_sequence
+        lend    // yaml.h 0.2.5 line 915: "Create a SEQUENCE node and attach it to the document."
+        text param 1    // yaml.h 0.2.5 line 916: "@param[in] tag The sequence tag."
+        nullable param 1    // yaml.h 0.2.5 line 908: "@param[in] tag The sequence tag (NULL for default)."
+
+    fn yaml_document_add_mapping
+        lend    // yaml.h 0.2.5 line 931: "Create a MAPPING node and attach it to the document."
+        text param 1    // yaml.h 0.2.5 line 932: "@param[in] tag The mapping tag."
+        nullable param 1    // yaml.h 0.2.5 line 924: "@param[in] tag The mapping tag (NULL for default)."
+
+    fn yaml_document_append_sequence_item
+        lend    // yaml.h 0.2.5 line 945: "Add an item to a SEQUENCE node."
+        ok 1    // yaml.h 0.2.5 line 941: "@returns @c 1 if the function succeeded, @c 0 on error."
+
+    fn yaml_document_append_mapping_pair
+        lend    // yaml.h 0.2.5 line 960: "Add a pair of a key and a value to a MAPPING node."
+        ok 1    // yaml.h 0.2.5 line 956: "@returns @c 1 if the function succeeded, @c 0 on error."
+
+    fn yaml_parser_set_input_string
+        lend    // yaml.h 0.2.5 line 1347: "Set a string input."
+        buffer param 1 len param 2    // yaml.h 0.2.5 line 1348: "@param[in] input A source data. @param[in] size The length of the source data in bytes."
+        retains param 1 by param 0    // yaml.h 0.2.5 line 1337: "Note that the @a input pointer must be valid while the @a parser object exists."
+
+    fn yaml_parser_set_encoding
+        lend    // yaml.h 0.2.5 line 1384: "Set the source encoding."
+
+    fn yaml_emitter_set_output_string
+        lend    // yaml.h 0.2.5 line 1817: "Set a string output."
+        buffer param 1 capacity param 2    // yaml.h 0.2.5 line 1818: "@param[in] output The output buffer. @param[in] size The buffer size."
+        updates param 3    // yaml.h 0.2.5 line 1818: "@param[out] size_written The pointer to save the number of written bytes."
+        retains param 1 by param 0    // yaml.h 0.2.5 line 1804: "The emitter will write the output characters to the @a output buffer."
+        retains param 3 by param 0    // yaml.h 0.2.5 line 1806: "The emitter will store the total number of written bytes in @a size_written."
+
+    fn yaml_emitter_set_encoding
+        lend    // yaml.h 0.2.5 line 1854: "Set the output encoding."
+
+    fn yaml_emitter_set_canonical
+        lend    // yaml.h 0.2.5 line 1865: "Set if the output should be in the canonical format."
+
+    fn yaml_emitter_set_indent
+        lend    // yaml.h 0.2.5 line 1875: "Set the indentation increment."
+
+    fn yaml_emitter_set_width
+        lend    // yaml.h 0.2.5 line 1885: "Set the preferred line width."
+
+    fn yaml_emitter_set_unicode
+        lend    // yaml.h 0.2.5 line 1895: "Set if unescaped non-ASCII characters are allowed."
+
+    fn yaml_emitter_set_break
+        lend    // yaml.h 0.2.5 line 1905: "Set the preferred line break."
+
+    fn yaml_emitter_emit
+        lend    // yaml.h 0.2.5 line 1922: "Emit an event."
+        consumes param 1    // yaml.h 0.2.5 line 1911: "The emitter takes the responsibility for the event object and destroys its content after it is emitted."
+        ok 1    // yaml.h 0.2.5 line 1918: "@returns @c 1 if the function succeeded, @c 0 on error."
+
+    fn yaml_emitter_open
+        lend    // yaml.h 0.2.5 line 1935: "Start a YAML stream."
+        ok 1    // yaml.h 0.2.5 line 1932: "@returns @c 1 if the function succeeded, @c 0 on error."
+
+    fn yaml_emitter_close
+        lend    // yaml.h 0.2.5 line 1948: "Finish a YAML stream."
+        ok 1    // yaml.h 0.2.5 line 1945: "@returns @c 1 if the function succeeded, @c 0 on error."
+
+    fn yaml_emitter_dump
+        lend    // yaml.h 0.2.5 line 1965: "Emit a YAML document."
+        consumes param 1    // yaml.h 0.2.5 line 1952: "The emitter takes the responsibility for the document object and destroys its content after it is emitted."
+        ok 1    // yaml.h 0.2.5 line 1961: "@returns @c 1 if the function succeeded, @c 0 on error."
+
+    fn yaml_emitter_flush
+        lend    // yaml.h 0.2.5 line 1976: "Flush the accumulated characters to the output."
+        ok 1    // yaml.h 0.2.5 line 1973: "@returns @c 1 if the function succeeded, @c 0 on error."
