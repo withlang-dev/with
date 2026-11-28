@@ -1,0 +1,22 @@
+//! expect-stdout: id=7 packed=3
+//! expect-stdout: ok
+// D253 (#3163): a borrow-only resource `resource Desc wraps *const desc_t`
+// renders `Desc.<global>()` for immutable `extern const desc_t` C globals,
+// allowing safe lookup and unpacking without unsafe.
+use pre_d_build_runner
+use std.sysinfo
+
+fn main:
+    let case_dir = p7_prepare_case("d253_borrow_only_const_global", "d253_const_global")
+    p7_write(case_dir, "src/desc.h", "#include <stdlib.h>\ntypedef struct desc_t { const char *name; int id; } desc_t;\ntypedef struct msg_t { const desc_t *desc; int len; } msg_t;\nextern const desc_t sample_desc;\nstatic inline int desc_id(const desc_t *d) { return d ? d->id : -1; }\nstatic inline msg_t *msg_unpack(const desc_t *d, const unsigned char *data, int len) {\n    if (!d || !data || len <= 0) return NULL;\n    msg_t *m = (msg_t *)malloc(sizeof(msg_t));\n    m->desc = d;\n    m->len = len;\n    return m;\n}\nstatic inline int msg_len(const msg_t *m) { return m ? m->len : 0; }\nstatic inline void msg_free(msg_t *m) { free(m); }\n")
+    p7_write(case_dir, "desc.c", "#include \"src/desc.h\"\nconst desc_t sample_desc = { \"sample\", 7 };\n")
+    p7_write(case_dir, "src/main.with", "use c_import(\"desc.h\")\n\nc contract d253_proto:\n    resource Desc wraps *const desc_t\n    resource Msg wraps *mut msg_t\n        from msg_unpack\n        drop msg_free\n        independent\n    fn desc_id\n        of Desc\n        lend\n    fn msg_unpack\n        of Msg\n        buffer param 1 len param 2\n    fn msg_len\n        of Msg\n        lend\n\nfn main:\n    let d = Desc.sample_desc()\n    let raw: [u8; 3] = [1 as u8, 2 as u8, 3 as u8]\n    let m = Msg.unpack(&d, raw[..]).unwrap()\n    print(f\"id={d.id()} packed={m.len()}\")\n    print(\"ok\")\n")
+    let object = if os() == "Windows": "desc.obj" else: "desc.o"
+    let binary = if os() == "Windows": "d253_app.exe" else: "d253_app"
+    let compiled = p7_run(case_dir, "d253_cc", "cc\0-c\0desc.c\0-o\0" ++ object ++ "\0")
+    p7_assert_success(compiled, "compile C global descriptor")
+    let built = p7_run(case_dir, "d253_build", "build\0src/main.with\0--link-object\0" ++ object ++ "\0-o\0" ++ binary ++ "\0")
+    p7_assert_success(built, "build With caller with D253 const global")
+    let ran = p7_run_with_compiler(p7_join(case_dir, binary), case_dir, "d253_run", "")
+    p7_assert_success(ran, "run D253 binary")
+    print(ran.stdout.trim())

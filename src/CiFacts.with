@@ -312,24 +312,26 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             ptr_cites = []
         if stripped.starts_with("resource "):
             in_resource = true
-            in_value = not stripped.contains(" wraps *mut ")
+            let is_const_ptr = stripped.contains(" wraps *const ")
+            in_value = not stripped.contains(" wraps *mut ") and not is_const_ptr
             if in_value:
                 // A by-value token (§16.2b.3): `resource R wraps Record`.
                 let words = stripped.fields()
-                if words.len() != 4 or words[2] != "wraps": return Err(facts_error(path, line_no, "a resource is `resource R wraps *mut record` or `resource R wraps Record`"))
+                if words.len() != 4 or words[2] != "wraps": return Err(facts_error(path, line_no, "a resource is `resource R wraps *mut record`, `resource R wraps *const record`, or `resource R wraps Record`"))
                 if words[1] == words[3]: return Err(facts_error(path, line_no, "a by-value resource needs a name of its own: `" ++ words[1] ++ "` is the record's"))
                 facts_push_unique(facts.value_resources, words[1])
                 facts.value_text = facts.value_text ++ "    " ++ stripped ++ "\n"
                 continue
-            let at = stripped.find(" wraps *mut ")
+            let ptr_kw = if is_const_ptr: " wraps *const " else: " wraps *mut "
+            let at = stripped.find(ptr_kw)
             let words = stripped.slice(0, at).fields()
-            if words.len() != 2: return Err(facts_error(path, line_no, "a resource is `resource R wraps *mut record` or `resource R wraps Record`"))
-            record = stripped.slice(at + 12, stripped.len()).trim()
+            if words.len() != 2: return Err(facts_error(path, line_no, "a resource is `resource R wraps *mut record`, `resource R wraps *const record`, or `resource R wraps Record`"))
+            record = stripped.slice(at + ptr_kw.len(), stripped.len()).trim()
             if record.len() == 0 or record.contains(" ") or record.contains("|"): return Err(facts_error(path, line_no, "a resource wraps one C record"))
             ptr_header = stripped.to_owned()
             ptr_name = words[1].to_owned()
             ptr_record = record.to_owned()
-            if record == "c_void": ptr_carry = true
+            if record == "c_void" or is_const_ptr: ptr_carry = true
             continue
         if is_top_level and stripped.starts_with("message "):
             in_resource = false

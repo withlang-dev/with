@@ -959,7 +959,8 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
                 let cbridge = facade_render_bridge(pool, intern, producer, 0, cidx, "facade_self.repr")
                 if not cbridge.ok: continue
                 let head = if cbridge.params.len() > 0: "facade_self: " ++ name ++ ", " ++ cbridge.params else: "facade_self: " ++ name
-                out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ head ++ "):\n    facade_self." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(cbridge.params) ++ ")\n"
+                let cgens = if cbridge.generics.len() > 0: "[" ++ cbridge.generics ++ "]" else: ""
+                out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ cgens ++ "(" ++ head ++ "):\n    facade_self." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(cbridge.params) ++ ")\n"
                 continue
             let bridge = facade_render_bridge(pool, intern, producer, 0, -1, "")
             if not bridge.ok: continue
@@ -968,7 +969,8 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
             // Option for a nullable producer, a Result for a failing one):
             // the forwarder's result is the constructor's, inferred (§9.1).
             let result = if repr.starts_with("*"): "" else: " -> " ++ made
-            out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ bridge.params ++ ")" ++ result ++ ":\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(bridge.params) ++ ")\n"
+            let bgens = if bridge.generics.len() > 0: "[" ++ bridge.generics ++ "]" else: ""
+            out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ bgens ++ "(" ++ bridge.params ++ ")" ++ result ++ ":\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(bridge.params) ++ ")\n"
         else if kind == FACADE_CLAUSE_INIT and not facade_render_has_clause(pool, resource, FACADE_CLAUSE_PREINIT):
             // D215 / D249: an in-place producer by its C name takes the modeled
             // argument list; the storage slot (`self` or `param N`) is what the
@@ -980,7 +982,8 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
             if at < 0: continue
             let ibridge = facade_render_bridge(pool, intern, init_fn, 0, at, "")
             if not ibridge.ok: continue
-            out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ ibridge.params ++ "):\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(ibridge.params) ++ ")\n"
+            let igens = if ibridge.generics.len() > 0: "[" ++ ibridge.generics ++ "]" else: ""
+            out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ igens ++ "(" ++ ibridge.params ++ "):\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(ibridge.params) ++ ")\n"
         else if kind == FACADE_CLAUSE_DROP:
             let dropper = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
             // D215 (§16.2b.11): a function whose resource parameter is
@@ -1051,8 +1054,29 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
 // Rendered beside `R`, once, with the origin resource of the first item that
 // borrows R; Sema refuses a second item borrowing R from another resource
 // (one borrowed type, one origin type). "" when no item borrows R.
+// D253: immutable C globals (`extern let G: T`) matching the pointee type `T`
+// of a borrow-only `*const T` resource. Static const C globals live for the
+// process, cannot be forged by With code, and are safely borrowed as
+// `Borrowed<R>[T]`.
+fn facade_render_const_globals(pool: &AstPool, intern: &InternPool, pointee: &str) -> List[str]:
+    let out = []
+    if pointee.len() == 0: return out
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) != NodeKind.NK_EXTERN_VAR: continue
+        if pool.get_data2(decl) % 2 != 0: continue
+        let ty = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_data1(decl) as NodeId))
+        if ty != pointee: continue
+        let gname = intern.resolve(pool.get_data0(decl))
+        if not out.contains(gname): out.push(gname.to_owned())
+    out
+
 fn facade_render_borrowed_type(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32, repr_text: &str, methods: &str) -> str:
     let rname = intern.resolve(pool.get_data0(resource as NodeId))
+    let unaliased_repr = facade_render_unalias(pool, intern, repr_text)
+    let const_pointee = if unaliased_repr.starts_with("*const "): unaliased_repr.slice(7, unaliased_repr.len()) else: ""
+    let const_globals = if facade_render_is_borrow_only_resource(pool, resource) and const_pointee.len() > 0: facade_render_const_globals(pool, intern, const_pointee) else: []
+    var has_borrowed_return = false
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
     for i in 0..items.len():
         let item = items[i]
@@ -1075,30 +1099,40 @@ fn facade_render_borrowed_type(pool: &AstPool, intern: &InternPool, ci: &List[i3
             let origin = facade_render_received(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), from) as NodeId))
             if origin <= 0:
                 continue
-            // D134 (§16.2b.6): one borrowed type serves every origin. The
-            // origin is a type parameter bound at each call by the value
-            // the constructing method hands it (`self`, a parameter, a
-            // parent view), so a `Node` borrowed from a `Doc` and one
-            // borrowed from an owned `Node` are one `BorrowedNode[_]`, and a
-            // borrow taken through a borrow views that borrow (D122).
-            let bname = facade_render_borrowed_name(rname)
-            var out = "type " ++ bname ++ "[Origin] ephemeral { origin: &Origin, repr: " ++ repr_text ++ " }\n"
-            let detach = facade_render_detach_methods(pool, intern, ci, resource, repr_text)
-            if methods.len() > 0 or detach.len() > 0:
-                out = out ++ "impl[Origin] " ++ bname ++ "[Origin]:\n" ++ methods ++ detach
-            // D134 (§16.2b.6): a detached value is owned — its Drop runs the
-            // resource's destroyer — and dependent on the origin it was taken
-            // out of, which it holds a view of, as a `borrows` child does.
-            if detach.len() > 0:
-                let dname = facade_render_detached_name(rname)
-                let drop_decl = facade_render_drop_decl(pool, intern, ci, resource)
-                let drop_call = facade_render_call(pool, intern, drop_decl, facade_render_repr_arg(pool, intern, drop_decl, repr_text, "self.repr", false))
-                out = out ++ "type " ++ dname ++ "[Origin] ephemeral { origin: &Origin, repr: " ++ repr_text ++ ", live: bool }\n"
-                out = out ++ "impl[Origin] Drop for " ++ dname ++ "[Origin]:\n    move fn drop():\n        if self.live: " ++ drop_call ++ "\n"
-                if methods.len() > 0:
-                    out = out ++ "impl[Origin] " ++ dname ++ "[Origin]:\n" ++ methods
-            return out
-    ""
+            has_borrowed_return = true
+            break
+        if has_borrowed_return: break
+    if not has_borrowed_return and const_globals.len() == 0:
+        return ""
+    // D134 (§16.2b.6): one borrowed type serves every origin. The
+    // origin is a type parameter bound at each call by the value
+    // the constructing method hands it (`self`, a parameter, a
+    // parent view), so a `Node` borrowed from a `Doc` and one
+    // borrowed from an owned `Node` are one `BorrowedNode[_]`, and a
+    // borrow taken through a borrow views that borrow (D122).
+    let bname = facade_render_borrowed_name(rname)
+    var out = "type " ++ bname ++ "[Origin] ephemeral { origin: &Origin, repr: " ++ repr_text ++ " }\n"
+    let detach = facade_render_detach_methods(pool, intern, ci, resource, repr_text)
+    if methods.len() > 0 or detach.len() > 0:
+        out = out ++ "impl[Origin] " ++ bname ++ "[Origin]:\n" ++ methods ++ detach
+    // D253: static immutable C globals matching a borrow-only `*const T`
+    // resource are safely borrowed as `Borrowed<R>[T]` via `<R>.<global>()`.
+    if const_globals.len() > 0:
+        out = out ++ "type " ++ rname ++ " {}\n"
+        for gname in const_globals:
+            out = out ++ "fn " ++ rname ++ "." ++ gname ++ "() -> " ++ bname ++ "[" ++ const_pointee ++ "]:\n    " ++ bname ++ " { origin: &" ++ gname ++ ", repr: unsafe { &raw const " ++ gname ++ " } }\n"
+    // D134 (§16.2b.6): a detached value is owned — its Drop runs the
+    // resource's destroyer — and dependent on the origin it was taken
+    // out of, which it holds a view of, as a `borrows` child does.
+    if detach.len() > 0:
+        let dname = facade_render_detached_name(rname)
+        let drop_decl = facade_render_drop_decl(pool, intern, ci, resource)
+        let drop_call = facade_render_call(pool, intern, drop_decl, facade_render_repr_arg(pool, intern, drop_decl, repr_text, "self.repr", false))
+        out = out ++ "type " ++ dname ++ "[Origin] ephemeral { origin: &Origin, repr: " ++ repr_text ++ ", live: bool }\n"
+        out = out ++ "impl[Origin] Drop for " ++ dname ++ "[Origin]:\n    move fn drop():\n        if self.live: " ++ drop_call ++ "\n"
+        if methods.len() > 0:
+            out = out ++ "impl[Origin] " ++ dname ++ "[Origin]:\n" ++ methods
+    out
 
 fn facade_render_detached_name(name: &str): "Detached" ++ name
 
@@ -1507,7 +1541,7 @@ fn facade_render_receiver_method(pool: &AstPool, intern: &InternPool, ci: &List[
     // A producer made from its own resource (libxml2's `xmlDictCreateSub(xmlDict *)`)
     // is its constructor alone: the receiver method would be a second
     // definition of the same name on the same type.
-    if parent <= 0 or parent == child:
+    if parent <= 0 or parent == child or facade_render_is_borrow_only_resource(pool, parent):
         return ""
     // D214: a producer has one home, chosen by `of`. An fn item that states
     // `of` the produced type makes it that type's constructor, and no parent
@@ -2019,7 +2053,8 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
             if not nonnull: result = "Option[" ++ name ++ "]"
             let repr = facade_render_fresh("repr", facade_render_param_names(pool, intern, producer))
             let value = name ++ " { " ++ made_deps ++ "repr: " ++ repr ++ ", live: true }"
-            let produced = "fn " ++ name ++ "." ++ pname ++ "(" ++ params ++ ") -> " ++ result ++ ":\n" ++ pro ++ "    let " ++ repr ++ " = " ++ call ++ "\n"
+            let gens = if bridge.generics.len() > 0: "[" ++ bridge.generics ++ "]" else: ""
+            let produced = "fn " ++ name ++ "." ++ pname ++ gens ++ "(" ++ params ++ ") -> " ++ result ++ ":\n" ++ pro ++ "    let " ++ repr ++ " = " ++ call ++ "\n"
             if nonnull: out = out ++ produced ++ "    if " ++ repr ++ " == null: panic(\"" ++ cname ++ ": the contract states 'from " ++ cname ++ ", nonnull', and C returned NULL (§31.8.2)\")\n    " ++ value ++ "\n"
             else: out = out ++ produced ++ "    if " ++ repr ++ " == null: None else: Some(" ++ value ++ ")\n"
         else:
