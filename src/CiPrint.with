@@ -531,7 +531,8 @@ fn ci_print_type(types: CiTypePool, id: CiTypeId) -> str:
             let pty = (types.get_extra(ps + i)) as CiTypeId
             out = out ++ ci_print_type(types, pty)
             i = i + 1
-        return out ++ ") -> " ++ ci_print_type(types, ret)
+        let ret_text = ci_print_type(types, ret)
+        return out ++ ") -> " ++ (if ret_text == "void": "Unit" else: ret_text)
     "<ci:ty:unimpl>"
 
 // A place expression: a name, a field, an element, a dereference. Anything

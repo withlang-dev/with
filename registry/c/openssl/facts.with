@@ -1,0 +1,470 @@
+// OpenSSL 4.1.0 (conan-center-index recipes/openssl).
+// Every clause cites the installed openssl/*.h headers.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - OSSL_PARAM arrays, provider/engine dispatch tables, and custom allocator/
+//   locking/verify callbacks with untyped void* state.
+// - Legacy low-level cipher/hash primitives (AES_*, DES_*, RC4_*, SHA1_*, MD5_*)
+//   and *_ctrl() / *_ex2() variadic/tag-dispatched control APIs outside the
+//   explicitly typed operations below.
+// - Raw ASN.1 d2i_*/i2d_* double-pointer buffer-advancing decoders/encoders,
+//   STACK_OF(*) type-erased generic stacks, and BIO_get_mem_data/BIO_ctrl
+//   untyped pointer controls.
+// - Direct memory management (CRYPTO_malloc/realloc/free) and printf-style
+//   variadics (BIO_printf, ERR_add_error_data).
+c facts openssl:
+    // ── Static algorithm & method descriptors (borrow-only *const T singletons) ──
+    resource EvpMd wraps *const EVP_MD
+    resource EvpCipher wraps *const EVP_CIPHER
+    resource SslMethod wraps *const SSL_METHOD
+    resource BioMethod wraps *const BIO_METHOD
+
+    // ── Core owned resources ──
+    resource MdCtx wraps *mut EVP_MD_CTX
+        from EVP_MD_CTX_new    // openssl/evp.h 4.1.0:627: allocates EVP_MD_CTX, freed by EVP_MD_CTX_free
+        drop EVP_MD_CTX_free    // openssl/evp.h 4.1.0:629: frees EVP_MD_CTX
+    resource CipherCtx wraps *mut EVP_CIPHER_CTX
+        from EVP_CIPHER_CTX_new    // openssl/evp.h 4.1.0:835: allocates EVP_CIPHER_CTX, freed by EVP_CIPHER_CTX_free
+        drop EVP_CIPHER_CTX_free    // openssl/evp.h 4.1.0:837: frees EVP_CIPHER_CTX
+    resource PkeyCtx wraps *mut EVP_PKEY_CTX
+        from EVP_PKEY_CTX_new_id    // openssl/evp.h 4.1.0:1648: allocates EVP_PKEY_CTX for algorithm id
+        from EVP_PKEY_CTX_new    // openssl/evp.h 4.1.0:1647: allocates EVP_PKEY_CTX for existing key
+        independent    // openssl/evp.h 4.1.0:1647: EVP_PKEY_CTX_new increments pkey refcount (EVP_PKEY_up_ref)
+        drop EVP_PKEY_CTX_free    // openssl/evp.h 4.1.0:1655: frees EVP_PKEY_CTX
+    resource Pkey wraps *mut EVP_PKEY
+        from EVP_PKEY_keygen(out param 1)    // openssl/evp.h 4.1.0:1884: generates key pair into *ppkey
+        ok 1    // openssl/evp.h 4.1.0:1884: EVP_PKEY_keygen returns 1 on success
+        independent    // openssl/evp.h 4.1.0:1884: generated EVP_PKEY is independent of EVP_PKEY_CTX
+        drop EVP_PKEY_free    // openssl/evp.h 4.1.0:1347: decrements refcount and frees EVP_PKEY
+    resource Bio wraps *mut BIO
+        from BIO_new    // openssl/bio.h 4.1.0:779: allocates BIO for method, freed by BIO_free
+        from BIO_new_file    // openssl/bio.h 4.1.0:773: opens file BIO, freed by BIO_free
+        from BIO_new_socket    // openssl/bio.h 4.1.0:970: wraps socket fd in BIO, freed by BIO_free
+        from BIO_new_connect    // openssl/bio.h 4.1.0:971: creates connect BIO, freed by BIO_free
+        from BIO_new_accept    // openssl/bio.h 4.1.0:972: creates accept BIO, freed by BIO_free
+        independent    // openssl/bio.h 4.1.0:779: BIO owns its internal state independently of static BIO_METHOD
+        drop BIO_free    // openssl/bio.h 4.1.0:780: decrements refcount and frees BIO
+    resource X509Name wraps *mut X509_NAME
+        from X509_NAME_new    // openssl/x509.h 4.1.0:1072: allocates X509_NAME, freed by X509_NAME_free
+        drop X509_NAME_free    // openssl/x509.h 4.1.0:1072: frees X509_NAME
+    resource X509Cert wraps *mut X509
+        from X509_new    // openssl/x509.h 4.1.0:1072: allocates X509 certificate, freed by X509_free
+        from PEM_read_bio_X509    // openssl/pem.h 4.1.0:477: reads X509 from BIO, freed by X509_free
+        independent    // openssl/pem.h 4.1.0:477: decoded X509 is independent of source BIO
+        drop X509_free    // openssl/x509.h 4.1.0:1072: decrements refcount and frees X509
+    resource Asn1Integer wraps *mut ASN1_INTEGER
+    resource Asn1Time wraps *mut ASN1_TIME
+    resource X509Store wraps *mut X509_STORE
+    resource SslCtx wraps *mut SSL_CTX
+        from SSL_CTX_new    // openssl/ssl.h 4.1.0:1739: allocates SSL_CTX for SSL_METHOD, freed by SSL_CTX_free
+        independent    // openssl/ssl.h 4.1.0:1739: SSL_CTX is independent of static SSL_METHOD
+        drop SSL_CTX_free    // openssl/ssl.h 4.1.0:1743: decrements refcount and frees SSL_CTX
+    resource Ssl wraps *mut SSL
+        from SSL_new    // openssl/ssl.h 4.1.0:1990: allocates SSL connection referencing SSL_CTX, freed by SSL_free
+        independent    // openssl/ssl.h 4.1.0:1990: SSL_new increments SSL_CTX refcount internally
+        drop SSL_free    // openssl/ssl.h 4.1.0:2109: decrements refcount and frees SSL
+
+    // ── Version, random, and error strings (crypto.h, rand.h, err.h) ──
+    fn OpenSSL_version
+        returns static CStr    // openssl/crypto.h 4.1.0:187: static library version string
+    fn OPENSSL_version_pre_release
+        returns static CStr    // openssl/crypto.h 4.1.0:183: static pre-release tag
+    fn OPENSSL_version_build_metadata
+        returns static CStr    // openssl/crypto.h 4.1.0:184: static build metadata string
+    fn RAND_bytes
+        buffer param 0 capacity param 1    // openssl/rand.h 4.1.0:60: fills buf[0..num) with cryptographically secure random bytes
+        ok 1    // openssl/rand.h 4.1.0:60: 1 on success
+    fn RAND_priv_bytes
+        buffer param 0 capacity param 1    // openssl/rand.h 4.1.0:61: fills buf[0..num) with private random bytes
+        ok 1    // openssl/rand.h 4.1.0:61: 1 on success
+    fn ERR_error_string_n
+        buffer param 1 capacity param 2    // openssl/err.h 4.1.0:412: writes NUL-terminated error string into buf[0..len)
+    fn ERR_lib_error_string
+        returns static CStr    // openssl/err.h 4.1.0:413: static library name string
+    fn ERR_reason_error_string
+        returns static CStr    // openssl/err.h 4.1.0:417: static reason string
+
+    // ── Static digest, cipher, SSL, and BIO methods ──
+    fn EVP_md5
+        returns static EvpMd    // openssl/evp.h 4.1.0:869: static EVP_MD descriptor for MD5
+    fn EVP_sha1
+        returns static EvpMd    // openssl/evp.h 4.1.0:876: static EVP_MD descriptor for SHA-1
+    fn EVP_sha224
+        returns static EvpMd    // openssl/evp.h 4.1.0:877: static EVP_MD descriptor for SHA-224
+    fn EVP_sha256
+        returns static EvpMd    // openssl/evp.h 4.1.0:878: static EVP_MD descriptor for SHA-256
+    fn EVP_sha384
+        returns static EvpMd    // openssl/evp.h 4.1.0:879: static EVP_MD descriptor for SHA-384
+    fn EVP_sha512
+        returns static EvpMd    // openssl/evp.h 4.1.0:880: static EVP_MD descriptor for SHA-512
+    fn EVP_sha3_256
+        returns static EvpMd    // openssl/evp.h 4.1.0:884: static EVP_MD descriptor for SHA3-256
+    fn EVP_sha3_512
+        returns static EvpMd    // openssl/evp.h 4.1.0:886: static EVP_MD descriptor for SHA3-512
+    fn EVP_MD_get_size
+        of EvpMd    // openssl/evp.h 4.1.0:470: returns digest output byte size
+        rename size    // openssl/evp.h 4.1.0:470: md.size()
+        lend    // openssl/evp.h 4.1.0:470: reads static descriptor
+    fn EVP_aes_128_cbc
+        returns static EvpCipher    // openssl/evp.h 4.1.0:978: static EVP_CIPHER for AES-128-CBC
+    fn EVP_aes_128_gcm
+        returns static EvpCipher    // openssl/evp.h 4.1.0:986: static EVP_CIPHER for AES-128-GCM
+    fn EVP_aes_256_cbc
+        returns static EvpCipher    // openssl/evp.h 4.1.0:1009: static EVP_CIPHER for AES-256-CBC
+    fn EVP_aes_256_gcm
+        returns static EvpCipher    // openssl/evp.h 4.1.0:1017: static EVP_CIPHER for AES-256-GCM
+    fn TLS_client_method
+        returns static SslMethod    // openssl/ssl.h 4.1.0:2180: static TLS client SSL_METHOD
+    fn TLS_server_method
+        returns static SslMethod    // openssl/ssl.h 4.1.0:2179: static TLS server SSL_METHOD
+    fn BIO_s_mem
+        returns static BioMethod    // openssl/bio.h 4.1.0:826: static in-memory BIO_METHOD
+
+    // ── EVP Digest & Sign/Verify (evp.h) ──
+    fn EVP_MD_CTX_reset
+        of MdCtx    // openssl/evp.h 4.1.0:628: resets EVP_MD_CTX
+        rename reset_md    // openssl/evp.h 4.1.0:628: ctx.reset_md()
+        lend    // openssl/evp.h 4.1.0:628: borrows ctx
+        ok 1    // openssl/evp.h 4.1.0:628: 1 on success
+    fn EVP_DigestInit_ex
+        of MdCtx    // openssl/evp.h 4.1.0:640: initializes digest context for EVP_MD
+        rename digest_init    // openssl/evp.h 4.1.0:640: ctx.digest_init(&md)
+        lend    // openssl/evp.h 4.1.0:640: borrows ctx and md
+        param 2 fixed null    // openssl/evp.h 4.1.0:641: impl must be NULL in OpenSSL 4
+        ok 1    // openssl/evp.h 4.1.0:640: 1 on success
+    fn EVP_DigestUpdate
+        of MdCtx    // openssl/evp.h 4.1.0:642: hashes cnt bytes from d into ctx
+        rename digest_update    // openssl/evp.h 4.1.0:642: ctx.digest_update(data)
+        lend    // openssl/evp.h 4.1.0:642: borrows ctx and reads d[0..cnt)
+        buffer param 1 len param 2    // openssl/evp.h 4.1.0:642: reads d[0..cnt)
+        ok 1    // openssl/evp.h 4.1.0:642: 1 on success
+    fn EVP_DigestFinal_ex
+        of MdCtx    // openssl/evp.h 4.1.0:644: writes digest into md[0..EVP_MAX_MD_SIZE) and length into *s
+        rename digest_final    // openssl/evp.h 4.1.0:644: ctx.digest_final(out)
+        lend    // openssl/evp.h 4.1.0:644: borrows ctx
+        buffer param 1 capacity 64    // openssl/evp.h 4.1.0:644: EVP_MAX_MD_SIZE == 64
+        fills param 2    // openssl/evp.h 4.1.0:645: writes actual digest byte length into *s
+        ok 1    // openssl/evp.h 4.1.0:644: 1 on success
+    fn EVP_DigestSignInit
+        of MdCtx    // openssl/evp.h 4.1.0:785: initializes signing context with digest and key
+        rename sign_init    // openssl/evp.h 4.1.0:785: ctx.sign_init(&md, &pkey)
+        lend    // openssl/evp.h 4.1.0:785: borrows ctx, md, and increments pkey refcount internally
+        param 1 fixed null    // openssl/evp.h 4.1.0:785: optional pctx out-ptr omitted
+        param 3 fixed null    // openssl/evp.h 4.1.0:787: engine impl must be NULL
+        ok 1    // openssl/evp.h 4.1.0:785: 1 on success
+    fn EVP_DigestSignUpdate
+        of MdCtx    // openssl/evp.h 4.1.0:789: feeds data[0..dsize) into signing digest
+        rename sign_update    // openssl/evp.h 4.1.0:789: ctx.sign_update(data)
+        lend    // openssl/evp.h 4.1.0:789: borrows ctx
+        buffer param 1 len param 2    // openssl/evp.h 4.1.0:789: reads data[0..dsize)
+        ok 1    // openssl/evp.h 4.1.0:789: 1 on success
+    fn EVP_DigestSignFinal
+        of MdCtx    // openssl/evp.h 4.1.0:790: computes signature into sigret[0..*siglen)
+        rename sign_final    // openssl/evp.h 4.1.0:790: ctx.sign_final(sig_buf)
+        lend    // openssl/evp.h 4.1.0:790: borrows ctx
+        buffer param 1 capacity param 2 inout    // openssl/evp.h 4.1.0:790: writes up to *siglen bytes and updates *siglen
+        ok 1    // openssl/evp.h 4.1.0:790: 1 on success
+    fn EVP_DigestVerifyInit
+        of MdCtx    // openssl/evp.h 4.1.0:797: initializes verification context with digest and key
+        rename verify_init    // openssl/evp.h 4.1.0:797: ctx.verify_init(&md, &pkey)
+        lend    // openssl/evp.h 4.1.0:797: borrows ctx, md, and increments pkey refcount internally
+        param 1 fixed null    // openssl/evp.h 4.1.0:797: optional pctx out-ptr omitted
+        param 3 fixed null    // openssl/evp.h 4.1.0:799: engine impl must be NULL
+        ok 1    // openssl/evp.h 4.1.0:797: 1 on success
+    fn EVP_DigestVerifyUpdate
+        of MdCtx    // openssl/evp.h 4.1.0:801: feeds data[0..dsize) into verification digest
+        rename verify_update    // openssl/evp.h 4.1.0:801: ctx.verify_update(data)
+        lend    // openssl/evp.h 4.1.0:801: borrows ctx
+        buffer param 1 len param 2    // openssl/evp.h 4.1.0:801: reads data[0..dsize)
+        ok 1    // openssl/evp.h 4.1.0:801: 1 on success
+    fn EVP_DigestVerifyFinal
+        of MdCtx    // openssl/evp.h 4.1.0:802: verifies sig[0..siglen); returns 1 if valid, 0 if mismatch, <0 on error
+        rename verify_final    // openssl/evp.h 4.1.0:802: ctx.verify_final(sig)
+        lend    // openssl/evp.h 4.1.0:802: borrows ctx
+        buffer param 1 len param 2    // openssl/evp.h 4.1.0:802: reads sig[0..siglen)
+
+    // ── EVP Cipher & AES-GCM (evp.h) ──
+    fn EVP_CIPHER_CTX_reset
+        of CipherCtx    // openssl/evp.h 4.1.0:836: resets EVP_CIPHER_CTX
+        rename reset_cipher    // openssl/evp.h 4.1.0:836: ctx.reset_cipher()
+        lend    // openssl/evp.h 4.1.0:836: borrows ctx
+        ok 1    // openssl/evp.h 4.1.0:836: 1 on success
+    fn EVP_CIPHER_CTX_set_padding
+        of CipherCtx    // openssl/evp.h 4.1.0:839: enables/disables block padding
+        rename set_padding    // openssl/evp.h 4.1.0:839: ctx.set_padding(pad)
+        lend    // openssl/evp.h 4.1.0:839: borrows ctx
+        ok 1    // openssl/evp.h 4.1.0:839: 1 on success
+    fn EVP_CipherInit_ex
+        of CipherCtx    // openssl/evp.h 4.1.0:726: initializes AES-256-GCM (32-byte key, 12-byte IV)
+        rename init_aes256_gcm    // openssl/evp.h 4.1.0:726: ctx.init_aes256_gcm(&cipher, key, iv, enc)
+        lend    // openssl/evp.h 4.1.0:726: borrows ctx, cipher, key, iv
+        param 2 fixed null    // openssl/evp.h 4.1.0:728: engine impl must be NULL
+        buffer param 3 len 32    // openssl/evp.h 4.1.0:729: AES-256 requires 32-byte key
+        buffer param 4 len 12    // openssl/evp.h 4.1.0:730: default GCM IV length is 12 bytes
+        ok 1    // openssl/evp.h 4.1.0:726: 1 on success
+    fn EVP_CipherInit_ex
+        of CipherCtx    // openssl/evp.h 4.1.0:726: initializes AES-128-GCM (16-byte key, 12-byte IV)
+        rename init_aes128_gcm    // openssl/evp.h 4.1.0:726: ctx.init_aes128_gcm(&cipher, key, iv, enc)
+        lend    // openssl/evp.h 4.1.0:726: borrows ctx, cipher, key, iv
+        param 2 fixed null    // openssl/evp.h 4.1.0:728: engine impl must be NULL
+        buffer param 3 len 16    // openssl/evp.h 4.1.0:729: AES-128 requires 16-byte key
+        buffer param 4 len 12    // openssl/evp.h 4.1.0:730: default GCM IV length is 12 bytes
+        ok 1    // openssl/evp.h 4.1.0:726: 1 on success
+    fn EVP_CipherInit_ex
+        of CipherCtx    // openssl/evp.h 4.1.0:726: initializes AES-256-CBC (32-byte key, 16-byte IV)
+        rename init_aes256_cbc    // openssl/evp.h 4.1.0:726: ctx.init_aes256_cbc(&cipher, key, iv, enc)
+        lend    // openssl/evp.h 4.1.0:726: borrows ctx, cipher, key, iv
+        param 2 fixed null    // openssl/evp.h 4.1.0:728: engine impl must be NULL
+        buffer param 3 len 32    // openssl/evp.h 4.1.0:729: AES-256 requires 32-byte key
+        buffer param 4 len 16    // openssl/evp.h 4.1.0:730: AES block/IV size is 16 bytes
+        ok 1    // openssl/evp.h 4.1.0:726: 1 on success
+    fn EVP_CipherUpdate
+        of CipherCtx    // openssl/evp.h 4.1.0:737: encrypts/decrypts in[0..inl) into out (capacity >= inl + 16)
+        rename update    // openssl/evp.h 4.1.0:737: ctx.update(out, in)
+        lend    // openssl/evp.h 4.1.0:737: borrows ctx
+        buffer param 1 capacity param 4 + 16    // openssl/evp.h 4.1.0:737: writes at most inl + block_size (16) bytes
+        fills param 2    // openssl/evp.h 4.1.0:738: writes bytes produced into *outl
+        buffer param 3 len param 4    // openssl/evp.h 4.1.0:738: reads in[0..inl)
+        ok 1    // openssl/evp.h 4.1.0:737: 1 on success
+    fn EVP_CipherUpdate
+        of CipherCtx    // openssl/evp.h 4.1.0:737: feeds GCM AAD (out == NULL)
+        rename update_aad    // openssl/evp.h 4.1.0:737: ctx.update_aad(aad)
+        lend    // openssl/evp.h 4.1.0:737: borrows ctx
+        param 1 fixed null    // openssl/evp.h 4.1.0:737: out == NULL passes additional authenticated data
+        fills param 2    // openssl/evp.h 4.1.0:738: writes AAD length processed into *outl
+        buffer param 3 len param 4    // openssl/evp.h 4.1.0:738: reads aad[0..inl)
+        ok 1    // openssl/evp.h 4.1.0:737: 1 on success
+    fn EVP_CipherFinal_ex
+        of CipherCtx    // openssl/evp.h 4.1.0:758: finalizes encryption/decryption (returns 1 on success, 0 on GCM tag failure)
+        rename finalize    // openssl/evp.h 4.1.0:758: ctx.finalize(out)
+        lend    // openssl/evp.h 4.1.0:758: borrows ctx
+        buffer param 1 capacity 32    // openssl/evp.h 4.1.0:758: writes at most EVP_MAX_BLOCK_LENGTH (32) bytes
+        fills param 2    // openssl/evp.h 4.1.0:759: writes final bytes produced into *outl
+    fn EVP_CIPHER_CTX_ctrl
+        of CipherCtx    // openssl/evp.h 4.1.0:840: sets GCM IV length
+        rename gcm_set_ivlen    // openssl/evp.h 4.1.0:297,840: EVP_CTRL_GCM_SET_IVLEN
+        lend    // openssl/evp.h 4.1.0:840: borrows ctx
+        param 1 fixed EVP_CTRL_GCM_SET_IVLEN    // openssl/evp.h 4.1.0:297: sets AEAD IV length
+        param 3 fixed null    // openssl/evp.h 4.1.0:840: ptr unused for SET_IVLEN
+        ok 1    // openssl/evp.h 4.1.0:840: 1 on success
+    fn EVP_CIPHER_CTX_ctrl
+        of CipherCtx    // openssl/evp.h 4.1.0:840: reads GCM authentication tag after encryption
+        rename gcm_get_tag    // openssl/evp.h 4.1.0:298,840: EVP_CTRL_GCM_GET_TAG
+        lend    // openssl/evp.h 4.1.0:840: borrows ctx
+        param 1 fixed EVP_CTRL_GCM_GET_TAG    // openssl/evp.h 4.1.0:298: retrieves AEAD tag
+        buffer param 3 capacity param 2    // openssl/evp.h 4.1.0:840: writes arg tag bytes into ptr
+        ok 1    // openssl/evp.h 4.1.0:840: 1 on success
+    fn EVP_CIPHER_CTX_ctrl
+        of CipherCtx    // openssl/evp.h 4.1.0:840: sets expected GCM authentication tag before decryption finalization
+        rename gcm_set_tag    // openssl/evp.h 4.1.0:299,840: EVP_CTRL_GCM_SET_TAG
+        lend    // openssl/evp.h 4.1.0:840: borrows ctx
+        param 1 fixed EVP_CTRL_GCM_SET_TAG    // openssl/evp.h 4.1.0:299: sets expected AEAD tag
+        buffer param 3 len param 2    // openssl/evp.h 4.1.0:840: reads arg tag bytes from ptr
+        ok 1    // openssl/evp.h 4.1.0:840: 1 on success
+
+    // ── Asymmetric key generation (evp.h, rsa.h, ec.h) ──
+    fn EVP_PKEY_CTX_new_id
+        rename new_id    // openssl/evp.h 4.1.0:1648: PkeyCtx.new_id(id)
+        param 1 fixed null    // openssl/evp.h 4.1.0:1648: engine impl must be NULL
+    fn EVP_PKEY_CTX_new
+        rename from_key    // openssl/evp.h 4.1.0:1647: PkeyCtx.from_key(&pkey)
+        param 1 fixed null    // openssl/evp.h 4.1.0:1647: engine impl must be NULL
+    fn EVP_PKEY_keygen_init
+        of PkeyCtx    // openssl/evp.h 4.1.0:1883: initializes keygen context
+        rename keygen_init    // openssl/evp.h 4.1.0:1883: pctx.keygen_init()
+        lend    // openssl/evp.h 4.1.0:1883: borrows pctx
+        ok 1    // openssl/evp.h 4.1.0:1883: 1 on success
+    fn EVP_PKEY_CTX_set_rsa_keygen_bits
+        of PkeyCtx    // openssl/rsa.h 4.1.0:128: sets RSA key modulus size in bits
+        rename set_rsa_bits    // openssl/rsa.h 4.1.0:128: pctx.set_rsa_bits(bits)
+        lend    // openssl/rsa.h 4.1.0:128: borrows pctx
+        ok 1    // openssl/rsa.h 4.1.0:128: 1 on success
+    fn EVP_PKEY_CTX_set_ec_paramgen_curve_nid
+        of PkeyCtx    // openssl/ec.h 4.1.0:31: sets EC named curve NID
+        rename set_ec_curve_nid    // openssl/ec.h 4.1.0:31: pctx.set_ec_curve_nid(nid)
+        lend    // openssl/ec.h 4.1.0:31: borrows pctx
+        ok 1    // openssl/ec.h 4.1.0:31: 1 on success
+
+    // ── BIO & PEM I/O (bio.h, pem.h) ──
+    fn BIO_read
+        of Bio    // openssl/bio.h 4.1.0:789: reads up to dlen bytes into data
+        rename read    // openssl/bio.h 4.1.0:789: bio.read(buf)
+        lend    // openssl/bio.h 4.1.0:789: borrows bio
+        buffer param 1 capacity param 2    // openssl/bio.h 4.1.0:789: fills data[0..dlen)
+    fn BIO_write
+        of Bio    // openssl/bio.h 4.1.0:796: writes dlen bytes from data
+        rename write    // openssl/bio.h 4.1.0:796: bio.write(buf)
+        lend    // openssl/bio.h 4.1.0:796: borrows bio
+        buffer param 1 len param 2    // openssl/bio.h 4.1.0:796: reads data[0..dlen)
+    fn PEM_write_bio_X509
+        of Bio    // openssl/pem.h 4.1.0:477: writes X509 certificate in PEM format to BIO
+        rename write_x509    // openssl/pem.h 4.1.0:477: bio.write_x509(&cert)
+        lend    // openssl/pem.h 4.1.0:477: borrows bio and cert
+        ok 1    // openssl/pem.h 4.1.0:477: 1 on success
+    fn PEM_read_bio_X509
+        rename from_bio    // openssl/pem.h 4.1.0:477: X509Cert.from_bio(&bio)
+        param 1 fixed null    // openssl/pem.h 4.1.0:477: allocate fresh X509
+        param 2 fixed null    // openssl/pem.h 4.1.0:477: no password callback
+        param 3 fixed null    // openssl/pem.h 4.1.0:477: no callback userdata
+    fn PEM_write_bio_PrivateKey
+        of Bio    // openssl/pem.h 4.1.0:514: writes unencrypted PKCS#8 private key in PEM format
+        rename write_private_key    // openssl/pem.h 4.1.0:514: bio.write_private_key(&pkey)
+        lend    // openssl/pem.h 4.1.0:514: borrows bio and pkey
+        param 2 fixed null    // openssl/pem.h 4.1.0:514: no encryption cipher
+        param 3 fixed null    // openssl/pem.h 4.1.0:514: no passphrase bytes
+        param 4 fixed 0    // openssl/pem.h 4.1.0:514: passphrase length 0
+        param 5 fixed null    // openssl/pem.h 4.1.0:514: no password callback
+        param 6 fixed null    // openssl/pem.h 4.1.0:514: no callback userdata
+        ok 1    // openssl/pem.h 4.1.0:514: 1 on success
+
+    // ── X.509 certificates & trust stores (x509.h, x509_vfy.h, asn1.h) ──
+    fn ASN1_INTEGER_set
+        of Asn1Integer    // openssl/asn1.h 4.1.0:1126: sets ASN1_INTEGER value
+        rename set    // openssl/asn1.h 4.1.0:1126: serial.set(v)
+        lend    // openssl/asn1.h 4.1.0:1126: borrows ASN1_INTEGER
+        ok 1    // openssl/asn1.h 4.1.0:1126: 1 on success
+    fn X509_gmtime_adj
+        of Asn1Time    // openssl/x509.h 4.1.0:1008: sets ASN1_TIME to now + adj seconds
+        rename gmtime_adj    // openssl/x509.h 4.1.0:1008: t.gmtime_adj(adj)
+        lend    // openssl/x509.h 4.1.0:1008: borrows ASN1_TIME
+        returns borrow Asn1Time from param 0    // openssl/x509.h 4.1.0:1008: returns input ASN1_TIME or NULL
+    fn X509_NAME_add_entry_by_txt
+        of X509Name    // openssl/x509.h 4.1.0:1376: adds distinguished-name entry
+        rename add_entry    // openssl/x509.h 4.1.0:1376: name.add_entry(field, type, bytes, loc, set)
+        lend    // openssl/x509.h 4.1.0:1376: copies bytes into name
+        buffer param 3 len param 4    // openssl/x509.h 4.1.0:1377: reads bytes[0..len)
+        ok 1    // openssl/x509.h 4.1.0:1376: 1 on success
+    fn X509_set_version
+        of X509Cert    // openssl/x509.h 4.1.0:1159: sets X.509 version (2 = v3)
+        rename set_version    // openssl/x509.h 4.1.0:1159: cert.set_version(2)
+        lend    // openssl/x509.h 4.1.0:1159: borrows cert
+        ok 1    // openssl/x509.h 4.1.0:1159: 1 on success
+    fn X509_get_serialNumber
+        of X509Cert    // openssl/x509.h 4.1.0:1161: returns borrowed internal serial number
+        rename serial_number    // openssl/x509.h 4.1.0:1161: cert.serial_number()
+        lend    // openssl/x509.h 4.1.0:1161: borrows cert
+        returns borrow Asn1Integer from param 0    // openssl/x509.h 4.1.0:1161: owned by cert
+    fn X509_getm_notBefore
+        of X509Cert    // openssl/x509.h 4.1.0:1168: returns borrowed internal notBefore time
+        rename not_before    // openssl/x509.h 4.1.0:1168: cert.not_before()
+        lend    // openssl/x509.h 4.1.0:1168: borrows cert
+        returns borrow Asn1Time from param 0    // openssl/x509.h 4.1.0:1168: owned by cert
+    fn X509_getm_notAfter
+        of X509Cert    // openssl/x509.h 4.1.0:1171: returns borrowed internal notAfter time
+        rename not_after    // openssl/x509.h 4.1.0:1171: cert.not_after()
+        lend    // openssl/x509.h 4.1.0:1171: borrows cert
+        returns borrow Asn1Time from param 0    // openssl/x509.h 4.1.0:1171: owned by cert
+    fn X509_set_pubkey
+        of X509Cert    // openssl/x509.h 4.1.0:1183: sets certificate public key (copies/refcounts pkey)
+        rename set_pubkey    // openssl/x509.h 4.1.0:1183: cert.set_pubkey(&pkey)
+        lend    // openssl/x509.h 4.1.0:1183: borrows cert and pkey
+        ok 1    // openssl/x509.h 4.1.0:1183: 1 on success
+    fn X509_set_subject_name
+        of X509Cert    // openssl/x509.h 4.1.0:1165: copies subject name into cert
+        rename set_subject_name    // openssl/x509.h 4.1.0:1165: cert.set_subject_name(&name)
+        lend    // openssl/x509.h 4.1.0:1165: borrows cert and name
+        ok 1    // openssl/x509.h 4.1.0:1165: 1 on success
+    fn X509_set_issuer_name
+        of X509Cert    // openssl/x509.h 4.1.0:1163: copies issuer name into cert
+        rename set_issuer_name    // openssl/x509.h 4.1.0:1163: cert.set_issuer_name(&name)
+        lend    // openssl/x509.h 4.1.0:1163: borrows cert and name
+        ok 1    // openssl/x509.h 4.1.0:1163: 1 on success
+    fn X509_sign
+        of X509Cert    // openssl/x509.h 4.1.0:848: signs cert with pkey and digest; returns signature byte len (>0) or 0 on error
+        rename sign    // openssl/x509.h 4.1.0:848: cert.sign(&pkey, &md)
+        lend    // openssl/x509.h 4.1.0:848: borrows cert, pkey, md
+    fn X509_STORE_add_cert
+        of X509Store    // openssl/x509_vfy.h 4.1.0:873: adds certificate to trust store (increments refcount)
+        rename add_cert    // openssl/x509_vfy.h 4.1.0:873: store.add_cert(&cert)
+        lend    // openssl/x509_vfy.h 4.1.0:873: borrows store and cert
+        ok 1    // openssl/x509_vfy.h 4.1.0:873: 1 on success
+
+    // ── TLS / SSL (ssl.h) ──
+    fn SSL_CTX_new
+        rename create    // openssl/ssl.h 4.1.0:1739: SslCtx.create(&method)
+    fn SSL_CTX_get_cert_store
+        of SslCtx    // openssl/ssl.h 4.1.0:1746: returns borrowed X509_STORE owned by ctx
+        rename cert_store    // openssl/ssl.h 4.1.0:1746: ctx.cert_store()
+        lend    // openssl/ssl.h 4.1.0:1746: borrows ctx
+        returns borrow X509Store from param 0    // openssl/ssl.h 4.1.0:1746: owned by ctx
+    fn SSL_CTX_set_verify
+        of SslCtx    // openssl/ssl.h 4.1.0:1951: sets peer certificate verification mode
+        rename set_verify    // openssl/ssl.h 4.1.0:1951: ctx.set_verify(mode)
+        lend    // openssl/ssl.h 4.1.0:1951: borrows ctx
+        param 2 fixed null    // openssl/ssl.h 4.1.0:1951: default verification callback
+    fn SSL_CTX_set_verify_depth
+        of SslCtx    // openssl/ssl.h 4.1.0:1952: sets maximum certificate chain depth
+        rename set_verify_depth    // openssl/ssl.h 4.1.0:1952: ctx.set_verify_depth(depth)
+        lend    // openssl/ssl.h 4.1.0:1952: borrows ctx
+    fn SSL_CTX_set_default_verify_paths
+        of SslCtx    // openssl/ssl.h 4.1.0:2259: loads default CA verification paths
+        rename set_default_verify_paths    // openssl/ssl.h 4.1.0:2259: ctx.set_default_verify_paths()
+        lend    // openssl/ssl.h 4.1.0:2259: borrows ctx
+        ok 1    // openssl/ssl.h 4.1.0:2259: 1 on success
+    fn SSL_CTX_load_verify_file
+        of SslCtx    // openssl/ssl.h 4.1.0:2263: loads trusted CA certificates from PEM file
+        rename load_verify_file    // openssl/ssl.h 4.1.0:2263: ctx.load_verify_file(path)
+        lend    // openssl/ssl.h 4.1.0:2263: borrows ctx
+        ok 1    // openssl/ssl.h 4.1.0:2263: 1 on success
+    fn SSL_CTX_use_certificate
+        of SslCtx    // openssl/ssl.h 4.1.0:1968: installs server/client certificate (increments refcount)
+        rename use_certificate    // openssl/ssl.h 4.1.0:1968: ctx.use_certificate(&cert)
+        lend    // openssl/ssl.h 4.1.0:1968: borrows ctx and cert
+        ok 1    // openssl/ssl.h 4.1.0:1968: 1 on success
+    fn SSL_CTX_use_PrivateKey
+        of SslCtx    // openssl/ssl.h 4.1.0:1965: installs private key (increments refcount)
+        rename use_private_key    // openssl/ssl.h 4.1.0:1965: ctx.use_private_key(&pkey)
+        lend    // openssl/ssl.h 4.1.0:1965: borrows ctx and pkey
+        ok 1    // openssl/ssl.h 4.1.0:1965: 1 on success
+    fn SSL_CTX_use_certificate_file
+        of SslCtx    // openssl/ssl.h 4.1.0:1841: loads certificate from file
+        rename use_certificate_file    // openssl/ssl.h 4.1.0:1841: ctx.use_certificate_file(path, SSL_FILETYPE_PEM)
+        lend    // openssl/ssl.h 4.1.0:1841: borrows ctx
+        ok 1    // openssl/ssl.h 4.1.0:1841: 1 on success
+    fn SSL_CTX_use_PrivateKey_file
+        of SslCtx    // openssl/ssl.h 4.1.0:1839: loads private key from file
+        rename use_private_key_file    // openssl/ssl.h 4.1.0:1839: ctx.use_private_key_file(path, SSL_FILETYPE_PEM)
+        lend    // openssl/ssl.h 4.1.0:1839: borrows ctx
+        ok 1    // openssl/ssl.h 4.1.0:1839: 1 on success
+    fn SSL_set_fd
+        of Ssl    // openssl/ssl.h 4.1.0:1781: attaches OS socket fd to SSL connection
+        rename set_fd    // openssl/ssl.h 4.1.0:1781: ssl.set_fd(fd)
+        lend    // openssl/ssl.h 4.1.0:1781: borrows ssl
+        ok 1    // openssl/ssl.h 4.1.0:1781: 1 on success
+    fn SSL_accept
+        of Ssl    // openssl/ssl.h 4.1.0:2126: performs server-side TLS handshake
+        rename accept    // openssl/ssl.h 4.1.0:2126: ssl.accept()
+        lend    // openssl/ssl.h 4.1.0:2126: borrows ssl
+        ok 1    // openssl/ssl.h 4.1.0:2126: 1 on handshake success
+    fn SSL_connect
+        of Ssl    // openssl/ssl.h 4.1.0:2128: performs client-side TLS handshake
+        rename connect    // openssl/ssl.h 4.1.0:2128: ssl.connect()
+        lend    // openssl/ssl.h 4.1.0:2128: borrows ssl
+        ok 1    // openssl/ssl.h 4.1.0:2128: 1 on handshake success
+    fn SSL_read
+        of Ssl    // openssl/ssl.h 4.1.0:2129: reads up to num decrypted bytes into buf
+        rename read    // openssl/ssl.h 4.1.0:2129: ssl.read(buf)
+        lend    // openssl/ssl.h 4.1.0:2129: borrows ssl
+        buffer param 1 capacity param 2    // openssl/ssl.h 4.1.0:2129: writes at most num bytes into buf
+    fn SSL_write
+        of Ssl    // openssl/ssl.h 4.1.0:2142: writes num plaintext bytes over TLS
+        rename write    // openssl/ssl.h 4.1.0:2142: ssl.write(buf)
+        lend    // openssl/ssl.h 4.1.0:2142: borrows ssl
+        buffer param 1 len param 2    // openssl/ssl.h 4.1.0:2142: reads buf[0..num)
+    fn SSL_shutdown
+        of Ssl    // openssl/ssl.h 4.1.0:2200: sends/receives TLS close_notify
+        rename shutdown    // openssl/ssl.h 4.1.0:2200: ssl.shutdown()
+        lend    // openssl/ssl.h 4.1.0:2200: borrows ssl
+    fn SSL_get_error
+        of Ssl    // openssl/ssl.h 4.1.0:2163: returns TLS error code for prior I/O return value
+        rename get_error    // openssl/ssl.h 4.1.0:2163: ssl.get_error(ret)
+        lend    // openssl/ssl.h 4.1.0:2163: borrows ssl
+    fn SSL_get_verify_result
+        of Ssl    // openssl/ssl.h 4.1.0:2281: returns X509_V_* verification result (X509_V_OK == 0)
+        rename verify_result    // openssl/ssl.h 4.1.0:2281: ssl.verify_result()
+        lend    // openssl/ssl.h 4.1.0:2281: borrows ssl
+    fn SSL_get_version
+        of Ssl    // openssl/ssl.h 4.1.0:2164: returns static negotiated TLS protocol version string
+        rename version    // openssl/ssl.h 4.1.0:2164: ssl.version()
+        lend    // openssl/ssl.h 4.1.0:2164: borrows ssl
+        returns static CStr    // openssl/ssl.h 4.1.0:2164: static protocol string

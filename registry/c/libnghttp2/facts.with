@@ -1,0 +1,492 @@
+// libnghttp2 1.68.1, the version `with get c.libnghttp2` pins. Every citation
+// is a line of the package's installed header, include/nghttp2/nghttp2.h.
+//
+// Core resources:
+// - SessionCallbacks (`nghttp2_session_callbacks *`), allocated via out-param
+//   by nghttp2_session_callbacks_new and freed by nghttp2_session_callbacks_del.
+// - SessionOption (`nghttp2_option *`), allocated via out-param by
+//   nghttp2_option_new and freed by nghttp2_option_del.
+// - Session (`nghttp2_session *`), allocated via out-param by
+//   nghttp2_session_client_new/server_new/client_new2/server_new2 (copies
+//   callbacks and option by value, so independent of both) and freed by
+//   nghttp2_session_del.
+// - HdDeflater / HdInflater (`nghttp2_hd_deflater *` / `nghttp2_hd_inflater *`),
+//   allocated via out-param by nghttp2_hd_deflate_new / nghttp2_hd_inflate_new
+//   and freed by nghttp2_hd_deflate_del / nghttp2_hd_inflate_del.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - nghttp2_session_client_new3 / server_new3 / hd_deflate_new2 / hd_inflate_new2:
+//   custom nghttp2_mem allocator function-pointer table.
+// - nghttp2_session_get_stream_user_data / set_stream_user_data / set_user_data:
+//   untyped void* user_data storage.
+// - nghttp2_submit_data / data2 / extension / altsvc / origin: data provider
+//   callback unions and raw extension payload pointers.
+// - nghttp2_rcbuf_* / nghttp2_hd_deflate_get_table_entry / hd_inflate_get_table_entry:
+//   manual refcount and raw nghttp2_nv* table pointers.
+// - nghttp2_set_debug_vprintf_callback: C va_list debug logger.
+c facts libnghttp2:
+    // ── SessionCallbacks ──────────────────────────────────────────
+    resource SessionCallbacks wraps *mut nghttp2_session_callbacks
+        from nghttp2_session_callbacks_new(out param 0)    // nghttp2/nghttp2.h 1.68.1:2487: allocates callbacks table
+        drop nghttp2_session_callbacks_del    // nghttp2/nghttp2.h 1.68.1:2496: frees callbacks table
+    fn nghttp2_session_callbacks_new
+        rename new    // nghttp2/nghttp2.h 1.68.1:2487: SessionCallbacks.new()
+        ok 0    // nghttp2/nghttp2.h 1.68.1:2480: returns 0 on success
+    fn nghttp2_session_callbacks_set_send_callback
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2512: registers send callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2512: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2513: stateless C send callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2512: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2512: invoked synchronously during send
+    fn nghttp2_session_callbacks_set_send_callback2
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2525: registers send2 callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2525: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2526: stateless C send2 callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2525: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2525: invoked synchronously during send
+    fn nghttp2_session_callbacks_set_recv_callback
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2542: registers recv callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2542: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2543: stateless C recv callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2542: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2542: invoked synchronously during recv
+    fn nghttp2_session_callbacks_set_recv_callback2
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2555: registers recv2 callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2555: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2556: stateless C recv2 callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2555: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2555: invoked synchronously during recv
+    fn nghttp2_session_callbacks_set_on_frame_recv_callback
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2564: registers frame-received callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2564: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2566: stateless C frame callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2564: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2564: invoked synchronously during mem_recv
+    fn nghttp2_session_callbacks_set_on_invalid_frame_recv_callback
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2576: registers invalid-frame callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2576: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2578: stateless C callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2576: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2576: invoked synchronously during recv
+    fn nghttp2_session_callbacks_set_on_data_chunk_recv_callback
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2586: registers DATA chunk callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2586: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2588: stateless C data callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2586: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2586: invoked synchronously during recv
+    fn nghttp2_session_callbacks_set_before_frame_send_callback
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2595: registers before-frame-send callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2595: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2597: stateless C callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2595: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2595: invoked synchronously during send
+    fn nghttp2_session_callbacks_set_on_frame_send_callback
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2604: registers frame-sent callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2604: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2606: stateless C callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2604: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2604: invoked synchronously during send
+    fn nghttp2_session_callbacks_set_on_frame_not_send_callback
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2614: registers frame-not-sent callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2614: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2616: stateless C callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2614: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2614: invoked synchronously during send
+    fn nghttp2_session_callbacks_set_on_stream_close_callback
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2623: registers stream-close callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2623: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2625: stateless C callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2623: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2623: invoked synchronously during send/recv
+    fn nghttp2_session_callbacks_set_on_begin_headers_callback
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2633: registers begin-headers callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2633: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2635: stateless C callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2633: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2633: invoked synchronously during recv
+    fn nghttp2_session_callbacks_set_on_header_callback
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2646: registers header callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2646: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2648: stateless C header callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2646: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2646: invoked synchronously during recv
+    fn nghttp2_session_callbacks_set_on_header_callback2
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2656: registers header2 callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2656: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2658: stateless C header2 callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2656: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2656: invoked synchronously during recv
+    fn nghttp2_session_callbacks_set_on_invalid_header_callback
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2669: registers invalid-header callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2669: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2671: stateless C callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2669: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2669: invoked synchronously during recv
+    fn nghttp2_session_callbacks_set_on_invalid_header_callback2
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2679: registers invalid-header2 callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2679: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2681: stateless C callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2679: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2679: invoked synchronously during recv
+    fn nghttp2_session_callbacks_set_on_begin_frame_callback
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2750: registers begin-frame callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2750: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2752: stateless C callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2750: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2750: invoked synchronously during recv
+    fn nghttp2_session_callbacks_set_error_callback
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2831: registers error callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2831: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2832: stateless C callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2831: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2831: invoked synchronously on error
+    fn nghttp2_session_callbacks_set_error_callback2
+        of SessionCallbacks    // nghttp2/nghttp2.h 1.68.1:2844: registers error2 callback
+        lend    // nghttp2/nghttp2.h 1.68.1:2844: borrows callbacks table
+        callback param 1    // nghttp2/nghttp2.h 1.68.1:2845: stateless C callback
+        retains param 1 by param 0    // nghttp2/nghttp2.h 1.68.1:2844: stored in callbacks table
+        callback_thread registering    // nghttp2/nghttp2.h 1.68.1:2844: invoked synchronously on error
+
+    // ── SessionOption ─────────────────────────────────────────────
+    resource SessionOption wraps *mut nghttp2_option
+        from nghttp2_option_new(out param 0)    // nghttp2/nghttp2.h 1.68.1:2978: allocates option struct
+        drop nghttp2_option_del    // nghttp2/nghttp2.h 1.68.1:2986: frees option struct
+    fn nghttp2_option_new
+        rename new    // nghttp2/nghttp2.h 1.68.1:2978: SessionOption.new()
+        ok 0    // nghttp2/nghttp2.h 1.68.1:2972: returns 0 on success
+    fn nghttp2_option_set_no_auto_window_update
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:2999: disables automatic WINDOW_UPDATE
+        lend    // nghttp2/nghttp2.h 1.68.1:2999: borrows option
+    fn nghttp2_option_set_peer_max_concurrent_streams
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3017: sets initial peer max concurrent streams
+        lend    // nghttp2/nghttp2.h 1.68.1:3017: borrows option
+    fn nghttp2_option_set_no_recv_client_magic
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3040: disables client magic check on server
+        lend    // nghttp2/nghttp2.h 1.68.1:3040: borrows option
+    fn nghttp2_option_set_no_http_messaging
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3055: disables HTTP messaging enforcement
+        lend    // nghttp2/nghttp2.h 1.68.1:3055: borrows option
+    fn nghttp2_option_set_max_reserved_remote_streams
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3074: limits incoming reserved streams
+        lend    // nghttp2/nghttp2.h 1.68.1:3074: borrows option
+    fn nghttp2_option_set_user_recv_extension_type
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3091: registers user extension frame type
+        lend    // nghttp2/nghttp2.h 1.68.1:3091: borrows option
+    fn nghttp2_option_set_builtin_recv_extension_type
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3111: registers builtin extension frame type
+        lend    // nghttp2/nghttp2.h 1.68.1:3111: borrows option
+    fn nghttp2_option_set_no_auto_ping_ack
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3125: disables automatic PING ACK
+        lend    // nghttp2/nghttp2.h 1.68.1:3125: borrows option
+    fn nghttp2_option_set_max_send_header_block_length
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3140: sets max outbound header block length
+        lend    // nghttp2/nghttp2.h 1.68.1:3140: borrows option
+    fn nghttp2_option_set_max_deflate_dynamic_table_size
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3153: sets max HPACK deflate dynamic table size
+        lend    // nghttp2/nghttp2.h 1.68.1:3153: borrows option
+    fn nghttp2_option_set_no_closed_streams
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3166: deprecated noop
+        lend    // nghttp2/nghttp2.h 1.68.1:3166: borrows option
+    fn nghttp2_option_set_max_outbound_ack
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3177: limits queued SETTINGS/PING ACKs
+        lend    // nghttp2/nghttp2.h 1.68.1:3177: borrows option
+    fn nghttp2_option_set_max_settings
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3188: limits entries per SETTINGS frame
+        lend    // nghttp2/nghttp2.h 1.68.1:3188: borrows option
+    fn nghttp2_option_set_server_fallback_rfc7540_priorities
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3201: deprecated noop
+        lend    // nghttp2/nghttp2.h 1.68.1:3201: borrows option
+    fn nghttp2_option_set_no_rfc9113_leading_and_trailing_ws_validation
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3213: disables RFC 9113 whitespace check
+        lend    // nghttp2/nghttp2.h 1.68.1:3213: borrows option
+    fn nghttp2_option_set_stream_reset_rate_limit
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3230: configures RST_STREAM rate limit
+        lend    // nghttp2/nghttp2.h 1.68.1:3230: borrows option
+    fn nghttp2_option_set_max_continuations
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3241: limits CONTINUATION frames per HEADERS
+        lend    // nghttp2/nghttp2.h 1.68.1:3241: borrows option
+    fn nghttp2_option_set_glitch_rate_limit
+        of SessionOption    // nghttp2/nghttp2.h 1.68.1:3257: configures glitch rate limit
+        lend    // nghttp2/nghttp2.h 1.68.1:3257: borrows option
+
+    // ── Session ───────────────────────────────────────────────────
+    resource Session wraps *mut nghttp2_session
+        from nghttp2_session_client_new(out param 0)    // nghttp2/nghttp2.h 1.68.1:3283: initializes client session
+        from nghttp2_session_server_new(out param 0)    // nghttp2/nghttp2.h 1.68.1:3309: initializes server session
+        from nghttp2_session_client_new2(out param 0)    // nghttp2/nghttp2.h 1.68.1:3335: initializes client session with option
+        from nghttp2_session_server_new2(out param 0)    // nghttp2/nghttp2.h 1.68.1:3361: initializes server session with option
+        drop nghttp2_session_del    // nghttp2/nghttp2.h 1.68.1:3421: frees session
+        independent    // nghttp2/nghttp2.h 1.68.1:3264,3325: copies callbacks and option by value; retains neither
+    fn nghttp2_session_client_new
+        rename client_new    // nghttp2/nghttp2.h 1.68.1:3283: Session.client_new(&cbs)
+        ok 0    // nghttp2/nghttp2.h 1.68.1:3276: returns 0 on success
+        param 2 fixed null    // nghttp2/nghttp2.h 1.68.1:3285: NULL user_data (stateless callbacks)
+    fn nghttp2_session_server_new
+        rename server_new    // nghttp2/nghttp2.h 1.68.1:3309: Session.server_new(&cbs)
+        ok 0    // nghttp2/nghttp2.h 1.68.1:3302: returns 0 on success
+        param 2 fixed null    // nghttp2/nghttp2.h 1.68.1:3311: NULL user_data (stateless callbacks)
+    fn nghttp2_session_client_new2
+        rename client_new2    // nghttp2/nghttp2.h 1.68.1:3335: Session.client_new2(&cbs, &opt)
+        ok 0    // nghttp2/nghttp2.h 1.68.1:3328: returns 0 on success
+        param 2 fixed null    // nghttp2/nghttp2.h 1.68.1:3337: NULL user_data
+    fn nghttp2_session_server_new2
+        rename server_new2    // nghttp2/nghttp2.h 1.68.1:3361: Session.server_new2(&cbs, &opt)
+        ok 0    // nghttp2/nghttp2.h 1.68.1:3354: returns 0 on success
+        param 2 fixed null    // nghttp2/nghttp2.h 1.68.1:3363: NULL user_data
+    fn nghttp2_session_send
+        of Session    // nghttp2/nghttp2.h 1.68.1:3478: sends pending frames via send callback
+        lend    // nghttp2/nghttp2.h 1.68.1:3478: borrows session
+    fn nghttp2_session_mem_send
+        of Session    // nghttp2/nghttp2.h 1.68.1:3524: serializes next outbound chunk into *data_ptr
+        lend    // nghttp2/nghttp2.h 1.68.1:3524: borrows session
+        buffer out param 1 len return    // nghttp2/nghttp2.h 1.68.1:3525: sets *data_ptr and returns byte length (>0) or 0 / negative error
+    fn nghttp2_session_mem_send2
+        of Session    // nghttp2/nghttp2.h 1.68.1:3569: serializes next outbound chunk into *data_ptr (portable nghttp2_ssize)
+        lend    // nghttp2/nghttp2.h 1.68.1:3569: borrows session
+        buffer out param 1 len return    // nghttp2/nghttp2.h 1.68.1:3569: sets *data_ptr and returns byte length (>0) or 0 / negative error
+    fn nghttp2_session_recv
+        of Session    // nghttp2/nghttp2.h 1.68.1:3639: receives frames via recv callback
+        lend    // nghttp2/nghttp2.h 1.68.1:3639: borrows session
+    fn nghttp2_session_mem_recv
+        of Session    // nghttp2/nghttp2.h 1.68.1:3683: feeds received bytes to session
+        lend    // nghttp2/nghttp2.h 1.68.1:3683: borrows session; does not retain input buffer
+        buffer param 1 len param 2    // nghttp2/nghttp2.h 1.68.1:3684: reads inlen bytes from in
+    fn nghttp2_session_mem_recv2
+        of Session    // nghttp2/nghttp2.h 1.68.1:3726: feeds received bytes to session (portable nghttp2_ssize)
+        lend    // nghttp2/nghttp2.h 1.68.1:3726: borrows session; does not retain input buffer
+        buffer param 1 len param 2    // nghttp2/nghttp2.h 1.68.1:3727: reads inlen bytes from in
+    fn nghttp2_session_resume_data
+        of Session    // nghttp2/nghttp2.h 1.68.1:3744: resumes deferred DATA frame for stream
+        lend    // nghttp2/nghttp2.h 1.68.1:3744: borrows session
+    fn nghttp2_session_want_read
+        of Session    // nghttp2/nghttp2.h 1.68.1:3757: returns nonzero if session wants to read
+        lend    // nghttp2/nghttp2.h 1.68.1:3757: borrows session
+    fn nghttp2_session_want_write
+        of Session    // nghttp2/nghttp2.h 1.68.1:3769: returns nonzero if session wants to write
+        lend    // nghttp2/nghttp2.h 1.68.1:3769: borrows session
+    fn nghttp2_session_get_outbound_queue_size
+        of Session    // nghttp2/nghttp2.h 1.68.1:3826: returns queued outbound frame count
+        lend    // nghttp2/nghttp2.h 1.68.1:3826: borrows session
+    fn nghttp2_session_get_stream_effective_recv_data_length
+        of Session    // nghttp2/nghttp2.h 1.68.1:3842: returns un-acknowledged received DATA bytes for stream
+        lend    // nghttp2/nghttp2.h 1.68.1:3842: borrows session
+    fn nghttp2_session_get_stream_effective_local_window_size
+        of Session    // nghttp2/nghttp2.h 1.68.1:3862: returns effective local window size for stream
+        lend    // nghttp2/nghttp2.h 1.68.1:3862: borrows session
+    fn nghttp2_session_get_stream_local_window_size
+        of Session    // nghttp2/nghttp2.h 1.68.1:3877: returns local window size for stream
+        lend    // nghttp2/nghttp2.h 1.68.1:3877: borrows session
+    fn nghttp2_session_get_effective_recv_data_length
+        of Session    // nghttp2/nghttp2.h 1.68.1:3895: returns un-acknowledged received DATA bytes for connection
+        lend    // nghttp2/nghttp2.h 1.68.1:3895: borrows session
+    fn nghttp2_session_get_effective_local_window_size
+        of Session    // nghttp2/nghttp2.h 1.68.1:3915: returns effective local window size for connection
+        lend    // nghttp2/nghttp2.h 1.68.1:3915: borrows session
+    fn nghttp2_session_get_local_window_size
+        of Session    // nghttp2/nghttp2.h 1.68.1:3929: returns local window size for connection
+        lend    // nghttp2/nghttp2.h 1.68.1:3929: borrows session
+    fn nghttp2_session_get_stream_remote_window_size
+        of Session    // nghttp2/nghttp2.h 1.68.1:3945: returns remote window size for stream
+        lend    // nghttp2/nghttp2.h 1.68.1:3945: borrows session
+    fn nghttp2_session_get_remote_window_size
+        of Session    // nghttp2/nghttp2.h 1.68.1:3956: returns remote window size for connection
+        lend    // nghttp2/nghttp2.h 1.68.1:3956: borrows session
+    fn nghttp2_session_get_stream_local_close
+        of Session    // nghttp2/nghttp2.h 1.68.1:3965: returns whether local peer half-closed stream
+        lend    // nghttp2/nghttp2.h 1.68.1:3965: borrows session
+    fn nghttp2_session_get_stream_remote_close
+        of Session    // nghttp2/nghttp2.h 1.68.1:3975: returns whether remote peer half-closed stream
+        lend    // nghttp2/nghttp2.h 1.68.1:3975: borrows session
+    fn nghttp2_session_get_hd_inflate_dynamic_table_size
+        of Session    // nghttp2/nghttp2.h 1.68.1:3985: returns HPACK inflater dynamic table size
+        lend    // nghttp2/nghttp2.h 1.68.1:3985: borrows session
+    fn nghttp2_session_get_hd_deflate_dynamic_table_size
+        of Session    // nghttp2/nghttp2.h 1.68.1:3994: returns HPACK deflater dynamic table size
+        lend    // nghttp2/nghttp2.h 1.68.1:3994: borrows session
+    fn nghttp2_session_terminate_session
+        of Session    // nghttp2/nghttp2.h 1.68.1:4022: submits GOAWAY and terminates session
+        lend    // nghttp2/nghttp2.h 1.68.1:4022: borrows session
+    fn nghttp2_session_terminate_session2
+        of Session    // nghttp2/nghttp2.h 1.68.1:4051: submits GOAWAY with explicit last_stream_id
+        lend    // nghttp2/nghttp2.h 1.68.1:4051: borrows session
+    fn nghttp2_submit_shutdown_notice
+        of Session    // nghttp2/nghttp2.h 1.68.1:4090: submits graceful server shutdown GOAWAY
+        lend    // nghttp2/nghttp2.h 1.68.1:4090: borrows session
+    fn nghttp2_session_get_remote_settings
+        of Session    // nghttp2/nghttp2.h 1.68.1:4099: queries remote SETTINGS value
+        lend    // nghttp2/nghttp2.h 1.68.1:4099: borrows session
+    fn nghttp2_session_get_local_settings
+        of Session    // nghttp2/nghttp2.h 1.68.1:4109: queries acknowledged local SETTINGS value
+        lend    // nghttp2/nghttp2.h 1.68.1:4109: borrows session
+    fn nghttp2_session_set_next_stream_id
+        of Session    // nghttp2/nghttp2.h 1.68.1:4128: advances next outgoing stream ID
+        lend    // nghttp2/nghttp2.h 1.68.1:4128: borrows session
+    fn nghttp2_session_get_next_stream_id
+        of Session    // nghttp2/nghttp2.h 1.68.1:4139: returns next outgoing stream ID
+        lend    // nghttp2/nghttp2.h 1.68.1:4139: borrows session
+    fn nghttp2_session_consume
+        of Session    // nghttp2/nghttp2.h 1.68.1:4164: reports consumed stream+connection bytes
+        lend    // nghttp2/nghttp2.h 1.68.1:4164: borrows session
+    fn nghttp2_session_consume_connection
+        of Session    // nghttp2/nghttp2.h 1.68.1:4183: reports consumed connection bytes
+        lend    // nghttp2/nghttp2.h 1.68.1:4183: borrows session
+    fn nghttp2_session_consume_stream
+        of Session    // nghttp2/nghttp2.h 1.68.1:4204: reports consumed stream bytes
+        lend    // nghttp2/nghttp2.h 1.68.1:4204: borrows session
+    fn nghttp2_session_get_last_proc_stream_id
+        of Session    // nghttp2/nghttp2.h 1.68.1:5277: returns last processed stream ID
+        lend    // nghttp2/nghttp2.h 1.68.1:5277: borrows session
+    fn nghttp2_session_check_request_allowed
+        of Session    // nghttp2/nghttp2.h 1.68.1:5296: returns nonzero if new request is allowed
+        lend    // nghttp2/nghttp2.h 1.68.1:5296: borrows session
+    fn nghttp2_session_check_server_session
+        of Session    // nghttp2/nghttp2.h 1.68.1:5304: returns nonzero if session is server
+        lend    // nghttp2/nghttp2.h 1.68.1:5304: borrows session
+    fn nghttp2_submit_request
+        of Session    // nghttp2/nghttp2.h 1.68.1:4527: submits client HEADERS request (END_STREAM)
+        lend    // nghttp2/nghttp2.h 1.68.1:4477: copies all name/value pairs; retains none
+        param 1 fixed null    // nghttp2/nghttp2.h 1.68.1:4469: pri_spec is ignored
+        nv_slice param 2 len param 3    // nghttp2/nghttp2.h 1.68.1:4529: array of nghttp2_nv pairs (flags=0 so copied)
+        param 4 fixed null    // nghttp2/nghttp2.h 1.68.1:4498: NULL data_prd sets END_STREAM
+        param 5 fixed null    // nghttp2/nghttp2.h 1.68.1:4530: NULL stream_user_data
+    fn nghttp2_submit_request2
+        of Session    // nghttp2/nghttp2.h 1.68.1:4597: submits client HEADERS request (END_STREAM)
+        lend    // nghttp2/nghttp2.h 1.68.1:4547: copies all name/value pairs; retains none
+        param 1 fixed null    // nghttp2/nghttp2.h 1.68.1:4539: pri_spec is ignored
+        nv_slice param 2 len param 3    // nghttp2/nghttp2.h 1.68.1:4599: array of nghttp2_nv pairs (flags=0 so copied)
+        param 4 fixed null    // nghttp2/nghttp2.h 1.68.1:4568: NULL data_prd sets END_STREAM
+        param 5 fixed null    // nghttp2/nghttp2.h 1.68.1:4600: NULL stream_user_data
+    fn nghttp2_submit_response
+        of Session    // nghttp2/nghttp2.h 1.68.1:4672: submits server response HEADERS (END_STREAM)
+        lend    // nghttp2/nghttp2.h 1.68.1:4619: copies all name/value pairs; retains none
+        nv_slice param 2 len param 3    // nghttp2/nghttp2.h 1.68.1:4673: array of nghttp2_nv pairs
+        param 4 fixed null    // nghttp2/nghttp2.h 1.68.1:4637: NULL data_prd sets END_STREAM
+    fn nghttp2_submit_response2
+        of Session    // nghttp2/nghttp2.h 1.68.1:4743: submits server response HEADERS (END_STREAM)
+        lend    // nghttp2/nghttp2.h 1.68.1:4690: copies all name/value pairs; retains none
+        nv_slice param 2 len param 3    // nghttp2/nghttp2.h 1.68.1:4744: array of nghttp2_nv pairs
+        param 4 fixed null    // nghttp2/nghttp2.h 1.68.1:4708: NULL data_prd sets END_STREAM
+    fn nghttp2_submit_trailer
+        of Session    // nghttp2/nghttp2.h 1.68.1:4799: submits trailer HEADERS for stream
+        lend    // nghttp2/nghttp2.h 1.68.1:4756: copies all name/value pairs; retains none
+        nv_slice param 2 len param 3    // nghttp2/nghttp2.h 1.68.1:4799: array of nghttp2_nv pairs
+    fn nghttp2_submit_headers
+        of Session    // nghttp2/nghttp2.h 1.68.1:4880: submits raw HEADERS frame
+        lend    // nghttp2/nghttp2.h 1.68.1:4880: copies all name/value pairs; retains none
+        param 3 fixed null    // nghttp2/nghttp2.h 1.68.1:4880: pri_spec is ignored
+        nv_slice param 4 len param 5    // nghttp2/nghttp2.h 1.68.1:4880: array of nghttp2_nv pairs
+        param 6 fixed null    // nghttp2/nghttp2.h 1.68.1:4880: NULL stream_user_data
+    fn nghttp2_submit_rst_stream
+        of Session    // nghttp2/nghttp2.h 1.68.1:5072: submits RST_STREAM frame
+        lend    // nghttp2/nghttp2.h 1.68.1:5072: borrows session
+    fn nghttp2_submit_settings
+        of Session    // nghttp2/nghttp2.h 1.68.1:5106: submits SETTINGS frame
+        lend    // nghttp2/nghttp2.h 1.68.1:5086: copies all nghttp2_settings_entry elements
+        buffer param 2 len param 3 elements    // nghttp2/nghttp2.h 1.68.1:5108: iv[0..niv) settings entries
+    fn nghttp2_submit_ping
+        of Session    // nghttp2/nghttp2.h 1.68.1:5211: submits PING frame
+        lend    // nghttp2/nghttp2.h 1.68.1:5211: borrows session; copies 8 opaque bytes
+        buffer param 2 len 8    // nghttp2/nghttp2.h 1.68.1:5200: 8-byte opaque payload
+    fn nghttp2_submit_goaway
+        of Session    // nghttp2/nghttp2.h 1.68.1:5259: submits GOAWAY frame
+        lend    // nghttp2/nghttp2.h 1.68.1:5238: copies opaque debug data
+        buffer param 4 len param 5    // nghttp2/nghttp2.h 1.68.1:5262: opaque_data[0..opaque_data_len)
+    fn nghttp2_submit_window_update
+        of Session    // nghttp2/nghttp2.h 1.68.1:5344: submits WINDOW_UPDATE frame
+        lend    // nghttp2/nghttp2.h 1.68.1:5344: borrows session
+    fn nghttp2_session_set_local_window_size
+        of Session    // nghttp2/nghttp2.h 1.68.1:5383: sets local window size
+        lend    // nghttp2/nghttp2.h 1.68.1:5383: borrows session
+
+    // ── HPACK Deflater ────────────────────────────────────────────
+    resource HdDeflater wraps *mut nghttp2_hd_deflater
+        from nghttp2_hd_deflate_new(out param 0)    // nghttp2/nghttp2.h 1.68.1:5988: allocates HPACK deflater
+        drop nghttp2_hd_deflate_del    // nghttp2/nghttp2.h 1.68.1:6016: frees HPACK deflater
+    fn nghttp2_hd_deflate_new
+        rename new    // nghttp2/nghttp2.h 1.68.1:5988: HdDeflater.new(max_table_size)
+        ok 0    // nghttp2/nghttp2.h 1.68.1:5981: returns 0 on success
+    fn nghttp2_hd_deflate_change_table_size
+        of HdDeflater    // nghttp2/nghttp2.h 1.68.1:6042: updates dynamic table size limit
+        lend    // nghttp2/nghttp2.h 1.68.1:6042: borrows deflater
+    fn nghttp2_hd_deflate_hd
+        of HdDeflater    // nghttp2/nghttp2.h 1.68.1:6077: HPACK-deflates headers into output buffer
+        lend    // nghttp2/nghttp2.h 1.68.1:6065: does not retain buf or nva after return
+        buffer param 1 capacity param 2    // nghttp2/nghttp2.h 1.68.1:6078: writable output buffer buf[0..buflen)
+        nv_slice param 3 len param 4    // nghttp2/nghttp2.h 1.68.1:6079: input header name/value pairs
+    fn nghttp2_hd_deflate_hd2
+        of HdDeflater    // nghttp2/nghttp2.h 1.68.1:6112: HPACK-deflates headers into output buffer (nghttp2_ssize)
+        lend    // nghttp2/nghttp2.h 1.68.1:6099: does not retain buf or nva after return
+        buffer param 1 capacity param 2    // nghttp2/nghttp2.h 1.68.1:6112: writable output buffer buf[0..buflen)
+        nv_slice param 3 len param 4    // nghttp2/nghttp2.h 1.68.1:6113: input header name/value pairs
+    fn nghttp2_hd_deflate_bound
+        of HdDeflater    // nghttp2/nghttp2.h 1.68.1:6194: computes upper bound on compressed header block size
+        lend    // nghttp2/nghttp2.h 1.68.1:6194: borrows deflater and nva
+        nv_slice param 1 len param 2    // nghttp2/nghttp2.h 1.68.1:6195: input header name/value pairs
+    fn nghttp2_hd_deflate_get_num_table_entries
+        of HdDeflater    // nghttp2/nghttp2.h 1.68.1:6206: returns static + dynamic table entry count
+        lend    // nghttp2/nghttp2.h 1.68.1:6206: borrows deflater
+    fn nghttp2_hd_deflate_get_dynamic_table_size
+        of HdDeflater    // nghttp2/nghttp2.h 1.68.1:6229: returns used dynamic table bytes
+        lend    // nghttp2/nghttp2.h 1.68.1:6229: borrows deflater
+    fn nghttp2_hd_deflate_get_max_dynamic_table_size
+        of HdDeflater    // nghttp2/nghttp2.h 1.68.1:6238: returns maximum dynamic table bytes
+        lend    // nghttp2/nghttp2.h 1.68.1:6238: borrows deflater
+
+    // ── HPACK Inflater ────────────────────────────────────────────
+    resource HdInflater wraps *mut nghttp2_hd_inflater
+        from nghttp2_hd_inflate_new(out param 0)    // nghttp2/nghttp2.h 1.68.1:6262: allocates HPACK inflater
+        drop nghttp2_hd_inflate_del    // nghttp2/nghttp2.h 1.68.1:6287: frees HPACK inflater
+    fn nghttp2_hd_inflate_new
+        rename new    // nghttp2/nghttp2.h 1.68.1:6262: HdInflater.new()
+        ok 0    // nghttp2/nghttp2.h 1.68.1:6256: returns 0 on success
+    fn nghttp2_hd_inflate_change_table_size
+        of HdInflater    // nghttp2/nghttp2.h 1.68.1:6316: updates dynamic table size limit
+        lend    // nghttp2/nghttp2.h 1.68.1:6316: borrows inflater
+    fn nghttp2_hd_inflate_hd2
+        of HdInflater    // nghttp2/nghttp2.h 1.68.1:6517: inflates next header from compressed block
+        lend    // nghttp2/nghttp2.h 1.68.1:6517: borrows inflater and input buffer
+        nv_out param 1    // nghttp2/nghttp2.h 1.68.1:6518: writes decoded nghttp2_nv copied to owned bytes
+        fills param 2    // nghttp2/nghttp2.h 1.68.1:6519: writes NGHTTP2_HD_INFLATE_* flags
+        buffer param 3 len param 4    // nghttp2/nghttp2.h 1.68.1:6520: compressed input in[0..inlen)
+    fn nghttp2_hd_inflate_hd3
+        of HdInflater    // nghttp2/nghttp2.h 1.68.1:6608: inflates next header from compressed block (nghttp2_ssize)
+        lend    // nghttp2/nghttp2.h 1.68.1:6608: borrows inflater and input buffer
+        nv_out param 1    // nghttp2/nghttp2.h 1.68.1:6609: writes decoded nghttp2_nv copied to owned bytes
+        fills param 2    // nghttp2/nghttp2.h 1.68.1:6609: writes NGHTTP2_HD_INFLATE_* flags
+        buffer param 3 len param 4    // nghttp2/nghttp2.h 1.68.1:6610: compressed input in[0..inlen)
+    fn nghttp2_hd_inflate_end_headers
+        of HdInflater    // nghttp2/nghttp2.h 1.68.1:6621: completes decompression of current header block
+        lend    // nghttp2/nghttp2.h 1.68.1:6621: borrows inflater
+    fn nghttp2_hd_inflate_get_num_table_entries
+        of HdInflater    // nghttp2/nghttp2.h 1.68.1:6631: returns static + dynamic table entry count
+        lend    // nghttp2/nghttp2.h 1.68.1:6631: borrows inflater
+    fn nghttp2_hd_inflate_get_dynamic_table_size
+        of HdInflater    // nghttp2/nghttp2.h 1.68.1:6654: returns used dynamic table bytes
+        lend    // nghttp2/nghttp2.h 1.68.1:6654: borrows inflater
+    fn nghttp2_hd_inflate_get_max_dynamic_table_size
+        of HdInflater    // nghttp2/nghttp2.h 1.68.1:6661: returns maximum dynamic table bytes
+        lend    // nghttp2/nghttp2.h 1.68.1:6661: borrows inflater
+
+    // ── Standalone helpers ────────────────────────────────────────
+    fn nghttp2_strerror
+        returns static CStr    // nghttp2/nghttp2.h 1.68.1:4397: static error description string
+    fn nghttp2_http2_strerror
+        returns static CStr    // nghttp2/nghttp2.h 1.68.1:4407: static HTTP/2 error code string
+    fn nghttp2_pack_settings_payload
+        buffer param 0 capacity param 1    // nghttp2/nghttp2.h 1.68.1:4363: output buffer buf[0..buflen)
+        buffer param 2 len param 3 elements    // nghttp2/nghttp2.h 1.68.1:4363: input settings entries iv[0..niv)
+    fn nghttp2_pack_settings_payload2
+        buffer param 0 capacity param 1    // nghttp2/nghttp2.h 1.68.1:4389: output buffer buf[0..buflen)
+        buffer param 2 len param 3 elements    // nghttp2/nghttp2.h 1.68.1:4389: input settings entries iv[0..niv)
+    fn nghttp2_check_header_name
+        buffer param 0 len param 1    // nghttp2/nghttp2.h 1.68.1:5892: validates header name bytes
+    fn nghttp2_check_header_value
+        buffer param 0 len param 1    // nghttp2/nghttp2.h 1.68.1:5904: validates header value bytes
+    fn nghttp2_check_header_value_rfc9113
+        buffer param 0 len param 1    // nghttp2/nghttp2.h 1.68.1:5914: validates header value bytes per RFC 9113
+    fn nghttp2_check_method
+        buffer param 0 len param 1    // nghttp2/nghttp2.h 1.68.1:5925: validates HTTP method bytes
+    fn nghttp2_check_path
+        buffer param 0 len param 1    // nghttp2/nghttp2.h 1.68.1:5939: validates HTTP :path bytes
+    fn nghttp2_check_authority
+        buffer param 0 len param 1    // nghttp2/nghttp2.h 1.68.1:5958: validates HTTP :authority bytes

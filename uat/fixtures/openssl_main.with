@@ -1,0 +1,196 @@
+// Zero-unsafe UAT for c.openssl (#3141):
+// 1. SHA-256 via EVP_Digest* (verified against FIPS 180-4 "abc" vector)
+// 2. AES-256-GCM encrypt/decrypt + AAD + tag verification via EVP_Cipher*
+// 3. RSA-2048 and ECDSA P-256 key generation + EVP_DigestSign* / EVP_DigestVerify*
+// 4. Loopback TLS client/server connection (SSL_CTX/SSL over a socket) with X.509 certificate verification
+use contracts.openssl
+use c_import("openssl/ssl.h")
+use c_import("openssl/rand.h")
+use std.net
+
+fn test_sha256():
+    let sha256 = EVP_sha256().unwrap()
+    assert(sha256.size() == 32)
+    let ctx = MdCtx.new().unwrap()
+    ctx.digest_init(&sha256).unwrap()
+    ctx.digest_update("abc" as []u8).unwrap()
+    var digest: [u8; 64] = [0 as u8; 64]
+    let dlen = ctx.digest_final(digest).unwrap()
+    assert(dlen == 32)
+    // FIPS 180-4 SHA-256("abc") = ba7816bf 8f01cfea 414140de 5dae2223 b00361a3 96177a9c b410ff61 f20015ad
+    assert(digest[0] == 0xba as u8 and digest[1] == 0x78 as u8 and digest[2] == 0x16 as u8 and digest[3] == 0xbf as u8)
+    assert(digest[30] == 0x15 as u8 and digest[31] == 0xad as u8)
+
+fn test_aes_gcm():
+    let gcm = EVP_aes_256_gcm().unwrap()
+    var key: [u8; 32] = [0 as u8; 32]
+    var iv: [u8; 12] = [0 as u8; 12]
+    RAND_bytes(key).unwrap()
+    RAND_bytes(iv).unwrap()
+
+    let aad = "with-aad" as []u8
+    let plain = "hello aes-256-gcm from with!" as []u8
+    var ct_buf: [u8; 64] = [0 as u8; 64]
+    var fin_buf: [u8; 32] = [0 as u8; 32]
+    var tag: [u8; 16] = [0 as u8; 16]
+
+    let enc = CipherCtx.new().unwrap()
+    enc.init_aes256_gcm(&gcm, key, iv, 1).unwrap()
+    let aad_n = enc.update_aad(aad).unwrap()
+    assert(aad_n == aad.len() as i32)
+    let ct_n = enc.update(ct_buf, plain).unwrap()
+    let (ef_rc, ef_n) = enc.finalize(fin_buf)
+    assert(ef_rc == 1 and ef_n == 0)
+    enc.gcm_get_tag(tag).unwrap()
+
+    // Copy exact ciphertext bytes for decrypt.
+    var ct: List[u8] = List.new()
+    for i in 0..(ct_n as i64):
+        ct.push(ct_buf[i])
+    var pt_buf: [u8; 64] = [0 as u8; 64]
+    let dec = CipherCtx.new().unwrap()
+    dec.init_aes256_gcm(&gcm, key, iv, 0).unwrap()
+    let _ = dec.update_aad(aad).unwrap()
+    let pt_n = dec.update(pt_buf, ct).unwrap()
+    dec.gcm_set_tag(tag).unwrap()
+    let (df_rc, df_n) = dec.finalize(fin_buf)
+    assert(df_rc == 1 and df_n == 0 and pt_n == plain.len() as i32)
+    for i in 0..plain.len():
+        assert(pt_buf[i] == plain[i])
+
+    // Tampering with tag must fail authentication.
+    tag[0] = tag[0] ^ (1 as u8)
+    let bad = CipherCtx.new().unwrap()
+    bad.init_aes256_gcm(&gcm, key, iv, 0).unwrap()
+    let _ = bad.update_aad(aad).unwrap()
+    let _ = bad.update(pt_buf, ct).unwrap()
+    bad.gcm_set_tag(tag).unwrap()
+    let (bf_rc, _) = bad.finalize(fin_buf)
+    assert(bf_rc == 0)
+
+fn gen_rsa_key() -> Pkey:
+    let pctx = PkeyCtx.new_id(EVP_PKEY_RSA).unwrap()
+    pctx.keygen_init().unwrap()
+    pctx.set_rsa_bits(2048).unwrap()
+    pctx.keygen().unwrap()
+
+fn gen_ec_key() -> Pkey:
+    let pctx = PkeyCtx.new_id(EVP_PKEY_EC).unwrap()
+    pctx.keygen_init().unwrap()
+    pctx.set_ec_curve_nid(NID_X9_62_prime256v1).unwrap()
+    pctx.keygen().unwrap()
+
+fn check_sign_verify(key: &Pkey):
+    let sha256 = EVP_sha256().unwrap()
+    let msg = "signed by with + openssl" as []u8
+    let sctx = MdCtx.new().unwrap()
+    sctx.sign_init(&sha256, key).unwrap()
+    sctx.sign_update(msg).unwrap()
+    var sig_buf: [u8; 512] = [0 as u8; 512]
+    let sig_len = sctx.sign_final(sig_buf).unwrap()
+    assert(sig_len > 0)
+
+    var sig: List[u8] = List.new()
+    for i in 0..(sig_len as i64):
+        sig.push(sig_buf[i])
+
+    let vctx = MdCtx.new().unwrap()
+    vctx.verify_init(&sha256, key).unwrap()
+    vctx.verify_update(msg).unwrap()
+    assert(vctx.verify_final(sig) == 1)
+
+    // Tampered message must fail verification.
+    let vbad = MdCtx.new().unwrap()
+    vbad.verify_init(&sha256, key).unwrap()
+    vbad.verify_update("tampered message" as []u8).unwrap()
+    assert(vbad.verify_final(sig) != 1)
+
+fn write_self_signed_pem(cert_path: &str, key_path: &str):
+    let key = gen_ec_key()
+    let sha256 = EVP_sha256().unwrap()
+    let cert = X509Cert.new().unwrap()
+    cert.set_version(2).unwrap()
+    let serial = cert.serial_number().unwrap()
+    serial.set(1).unwrap()
+    let nb = cert.not_before().unwrap()
+    let _ = nb.gmtime_adj(0).unwrap()
+    let na = cert.not_after().unwrap()
+    let _ = na.gmtime_adj(86400).unwrap()
+    cert.set_pubkey(&key).unwrap()
+
+    let name = X509Name.new().unwrap()
+    name.add_entry("CN", MBSTRING_ASC, "localhost" as []u8, -1, 0).unwrap()
+    cert.set_subject_name(&name).unwrap()
+    cert.set_issuer_name(&name).unwrap()
+    assert(cert.sign(&key, &sha256) > 0)
+
+    let cbio = Bio.new_file(cert_path, "wb").unwrap()
+    cbio.write_x509(&cert).unwrap()
+    let kbio = Bio.new_file(key_path, "wb").unwrap()
+    kbio.write_private_key(&key).unwrap()
+
+fn test_tls_loopback():
+    let cert_path = "uat_cert.pem"
+    let key_path = "uat_key.pem"
+    write_self_signed_pem(cert_path, key_path)
+
+    let lfd = tcp_listen(0)
+    assert(lfd >= 0)
+    let port = sock_port(lfd)
+    assert(port > 0)
+
+    var reply_ok = false
+    var ver_str = ""
+    scope s =>
+        s.spawn(() =>
+            let sfd = tcp_accept(lfd)
+            assert(sfd >= 0)
+            let smeth = TLS_server_method().unwrap()
+            let sctx = SslCtx.create(&smeth).unwrap()
+            sctx.use_certificate_file(cert_path, SSL_FILETYPE_PEM).unwrap()
+            sctx.use_private_key_file(key_path, SSL_FILETYPE_PEM).unwrap()
+            let sssl = sctx.new().unwrap()
+            sssl.set_fd(sfd).unwrap()
+            sssl.accept().unwrap()
+            var rbuf: [u8; 64] = [0 as u8; 64]
+            let n = sssl.read(rbuf)
+            assert(n == 4 and rbuf[0] == 'p' as u8 and rbuf[3] == 'g' as u8)
+            assert(sssl.write("pong" as []u8) == 4)
+            let _ = sssl.shutdown()
+            let _ = socket_close(sfd)
+        )
+
+        let cfd = tcp_connect("127.0.0.1", port)
+        assert(cfd >= 0)
+        let cmeth = TLS_client_method().unwrap()
+        let cctx = SslCtx.create(&cmeth).unwrap()
+        cctx.load_verify_file(cert_path).unwrap()
+        cctx.set_verify(SSL_VERIFY_PEER)
+        let cssl = cctx.new().unwrap()
+        cssl.set_fd(cfd).unwrap()
+        cssl.connect().unwrap()
+        assert(cssl.verify_result() == X509_V_OK as i64)
+        ver_str = cssl.version().unwrap().to_str_lossy()
+        assert(cssl.write("ping" as []u8) == 4)
+        var cbuf: [u8; 64] = [0 as u8; 64]
+        let cn = cssl.read(cbuf)
+        assert(cn == 4 and cbuf[0] == 'p' as u8 and cbuf[1] == 'o' as u8 and cbuf[3] == 'g' as u8)
+        reply_ok = true
+        let _ = cssl.shutdown()
+        let _ = socket_close(cfd)
+
+    let _ = socket_close(lfd)
+    assert(reply_ok and ver_str.starts_with("TLS"))
+
+fn main:
+    let ver = OpenSSL_version(OPENSSL_VERSION).unwrap().to_str_lossy()
+    assert(ver.contains("OpenSSL"))
+    test_sha256()
+    test_aes_gcm()
+    let rsa_key = gen_rsa_key()
+    check_sign_verify(&rsa_key)
+    let ec_key = gen_ec_key()
+    check_sign_verify(&ec_key)
+    test_tls_loopback()
+    print(f"openssl {ver}: sha256=ok gcm=ok rsa=ok ecdsa=ok tls=ok")
+    print("openssl ok")

@@ -1,0 +1,158 @@
+//! expect-stdout: alg=256 ivlen=12 tag=42,43 out=hello nv=3 out_nv=:status=200 ok
+// D256: static singleton `*const T` resources (`returns static <Resource>`),
+// multi-rename dispatch on one C function (`rename`), borrowed return-length
+// out-buffers (`buffer out param P len return`), and name-value header slices /
+// output pairs (`nv_slice`, `nv_out`).
+
+use c_import("
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct my_alg_st { int bits; } my_alg;
+static const my_alg G_ALG_256 = { 256 };
+static inline const my_alg* my_alg_sha256(void) { return &G_ALG_256; }
+
+typedef struct my_ctx_st { int bits; int ivlen; uint8_t tag[4]; char out[16]; } my_ctx;
+static inline my_ctx* my_ctx_new(void) { return (my_ctx*)calloc(1, sizeof(my_ctx)); }
+static inline void my_ctx_free(my_ctx* c) { free(c); }
+static inline int my_ctx_set_alg(my_ctx* c, const my_alg* a) { c->bits = a->bits; return 1; }
+static inline int my_ctx_bits(const my_ctx* c) { return c->bits; }
+
+#define MY_CTRL_SET_IVLEN 1
+#define MY_CTRL_SET_TAG   2
+#define MY_CTRL_GET_TAG   3
+static inline int my_ctx_ctrl(my_ctx* c, int cmd, int arg, void* ptr) {
+    if (cmd == MY_CTRL_SET_IVLEN) { c->ivlen = arg; return 1; }
+    if (cmd == MY_CTRL_SET_TAG && arg >= 2 && ptr) {
+        memcpy(c->tag, ptr, (size_t)arg);
+        return 1;
+    }
+    if (cmd == MY_CTRL_GET_TAG && arg >= 2 && ptr) {
+        memcpy(ptr, c->tag, (size_t)arg);
+        return 1;
+    }
+    return 0;
+}
+static inline int my_ctx_ivlen(const my_ctx* c) { return c->ivlen; }
+
+static inline intptr_t my_ctx_mem_send(my_ctx* c, const uint8_t** data_ptr) {
+    memcpy(c->out, \"hello\", 5);
+    *data_ptr = (const uint8_t*)c->out;
+    return 5;
+}
+
+typedef struct {
+    uint8_t* name;
+    uint8_t* value;
+    size_t namelen;
+    size_t valuelen;
+    uint8_t flags;
+} my_nv;
+
+static inline int my_submit_headers(my_ctx* c, const my_nv* nva, size_t nvlen) {
+    (void)c;
+    if (nvlen == 0 || !nva) return -1;
+    size_t total = 0;
+    for (size_t i = 0; i < nvlen; i++) {
+        if (nva[i].flags != 0) return -2;
+        total += nva[i].namelen + nva[i].valuelen;
+    }
+    return total > 0 ? (int)nvlen : -3;
+}
+
+static inline intptr_t my_inflate_one(my_ctx* c, my_nv* nv_out, int* flags_out) {
+    (void)c;
+    nv_out->name = (uint8_t*)\":status\";
+    nv_out->namelen = 7;
+    nv_out->value = (uint8_t*)\"200\";
+    nv_out->valuelen = 3;
+    nv_out->flags = 0;
+    *flags_out = 1;
+    return 4;
+}
+")
+
+c contract d256_demo:
+    resource Alg wraps *const my_alg
+    fn my_alg_sha256
+        returns static Alg
+
+    resource Ctx wraps *mut my_ctx
+        from my_ctx_new
+        drop my_ctx_free
+    fn my_ctx_set_alg
+        of Ctx
+        rename set_alg
+        lend
+        ok 1
+    fn my_ctx_bits
+        of Ctx
+        rename bits
+        lend
+    fn my_ctx_ivlen
+        of Ctx
+        rename ivlen
+        lend
+    fn my_ctx_ctrl
+        of Ctx
+        rename set_ivlen
+        lend
+        param 1 fixed MY_CTRL_SET_IVLEN
+        param 3 fixed null
+        ok 1
+    fn my_ctx_ctrl
+        of Ctx
+        rename set_tag
+        lend
+        param 1 fixed MY_CTRL_SET_TAG
+        buffer param 3 len param 2
+        ok 1
+    fn my_ctx_ctrl
+        of Ctx
+        rename get_tag
+        lend
+        param 1 fixed MY_CTRL_GET_TAG
+        buffer param 3 capacity param 2
+        ok 1
+    fn my_ctx_mem_send
+        of Ctx
+        rename mem_send
+        lend
+        buffer out param 1 len return
+    fn my_submit_headers
+        of Ctx
+        rename submit_headers
+        lend
+        nv_slice param 1 len param 2
+    fn my_inflate_one
+        of Ctx
+        rename inflate_one
+        lend
+        nv_out param 1
+        fills param 2
+
+fn bytes_eq(bs: &List[u8], expected: &str) -> bool:
+    let eb: []u8 = expected as []u8
+    if bs.len() != eb.len(): return false
+    for i in 0..eb.len():
+        if bs[i] != eb[i]: return false
+    true
+
+fn main:
+    let alg = my_alg_sha256().unwrap()
+    let ctx = Ctx.new().unwrap()
+    ctx.set_alg(&alg).unwrap()
+    ctx.set_ivlen(12).unwrap()
+    let tag_in: [u8; 2] = [42 as u8, 43 as u8]
+    ctx.set_tag(tag_in).unwrap()
+    var tag_out: [u8; 2] = [0 as u8; 2]
+    ctx.get_tag(tag_out).unwrap()
+    let (n, chunk) = ctx.mem_send()
+    assert(n == 5 and bytes_eq(&chunk, "hello"))
+    let hdrs = [(":method", "GET"), (":scheme", "https"), (":path", "/")]
+    let submitted = ctx.submit_headers(&hdrs)
+    let (consumed, (k, v), flg) = ctx.inflate_one()
+    assert(consumed == 4 and flg == 1 and bytes_eq(&k, ":status") and bytes_eq(&v, "200"))
+    print(f"alg={ctx.bits()} ivlen={ctx.ivlen()} tag={tag_out[0]},{tag_out[1]} out=hello nv={submitted} out_nv=:status=200 ok")

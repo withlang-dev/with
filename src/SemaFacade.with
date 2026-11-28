@@ -1502,21 +1502,38 @@ impl Sema:
         let sig = self.facade_fn_sig(fn_sym, item)
         if sig < 0:
             return
+        // D256 (§16.2b.11): check if this item carries a `rename` so multiple
+        // renamed operations can present one command-dispatched C function.
+        var item_rename: i32 = 0
+        let pre_start = self.ast.get_data1(item)
+        for pk in 0..self.ast.get_data2(item):
+            let pcl = self.ast.get_extra(pre_start + pk)
+            if self.ast.get_data0(pcl) == FACADE_CLAUSE_RENAME:
+                item_rename = self.ast.get_extra(self.ast.get_data1(pcl))
+        var is_multi_rename = false
         if self.foreign_contract_index.contains(fn_sym):
             let prev: i32 = self.foreign_contract_index.get(fn_sym).unwrap()
             if self.foreign_contracts[prev].decl == decl:
-                self.emit_error_with_help(f"fn '{fname}' is described twice in this facade (§16.2b)", item, "to present one C function as two operations, give each item its own 'rename' (§16.2b.11)")
+                var distinct_renames = item_rename != 0
+                if distinct_renames:
+                    for existing in self.foreign_contracts:
+                        if existing.fn_sym == fn_sym and existing.decl == decl and (existing.rename == 0 or existing.rename == item_rename):
+                            distinct_renames = false
+                if not distinct_renames:
+                    self.emit_error_with_help(f"fn '{fname}' is described twice in this facade (§16.2b)", item, "to present one C function as two operations, give each item its own 'rename' (§16.2b.11)")
+                    return
+                is_multi_rename = true
+            else:
+                // Another block describes it too. The same clauses restated are
+                // the same facts — the runtime's files each carry a block naming
+                // `rt_libc_exit` identically, and meet in one unit (D30
+                // rt-in-unit) — so a word-for-word restatement is accepted;
+                // different clauses are two contracts for one function, refused.
+                if self.facade_item_words(self.foreign_contracts[prev].decl, self.foreign_contracts[prev].node) == self.facade_item_words(decl, item):
+                    return
+                self.emit_error_with_help(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item, f"delete one of the two 'fn {fname}' items, or make their clauses identical")
                 return
-            // Another block describes it too. The same clauses restated are
-            // the same facts — the runtime's files each carry a block naming
-            // `rt_libc_exit` identically, and meet in one unit (D30
-            // rt-in-unit) — so a word-for-word restatement is accepted;
-            // different clauses are two contracts for one function, refused.
-            if self.facade_item_words(self.foreign_contracts[prev].decl, self.foreign_contracts[prev].node) == self.facade_item_words(decl, item):
-                return
-            self.emit_error_with_help(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item, f"delete one of the two 'fn {fname}' items, or make their clauses identical")
-            return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: [], consumes_destroyed_by: [], retains: [], retains_by: [], returns_borrow_resource: 0, returns_borrow_from: [], returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: [], preserves_domains: [], of_resource: 0, of_param: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: [], bare_callbacks: [], discarded_params: [], field_buffer_ptrs: [], field_buffer_counts: [], field_buffer_reads: [], callback_userdata_cb: [], callback_userdata_of: [], valid_on_failed: 0, nullable_params: [], value_records: [], value_record_words: [], value_record_lens: [], async_req_param: -1, async_req_set: 0, async_req_get: 0, read_pair_alloc: -1, read_pair_buf_init: 0, read_pair_read: -1, read_pair_set: 0, read_pair_get: 0, close_release_get: 0, close_release_set: 0, text_params: [], text_return_free: 0, bridged: 0, buffer_ptr: [], buffer_len: [], buffer_inout: [], buffer_elements: [], fixed_params: [], fixed_literals: [], ok_const: 0, ok_count: 0, null_status_const: 0, null_status_node: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: [], variadic_case_values: [], variadic_case_tids: [], variadic_case_kinds: [], variadic_slots: [], present_cases_node: 0, present_cases_prefix: 0, returns_borrow_record: 0, argv_cb: [], argv_index: [], argc_index: [], argv_handle: [], argv_nodes: [], user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: [], consumes_destroyed_by: [], retains: [], retains_by: [], returns_borrow_resource: 0, returns_borrow_from: [], returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, returns_static_resource: 0, nv_slice_ptr: [], nv_slice_len: [], nv_outs: [], preserves_params: [], preserves_domains: [], of_resource: 0, of_param: 0, rename: 0, callback_thread_said: 0, callbacks_none: 0, callback_consumes: [], bare_callbacks: [], discarded_params: [], field_buffer_ptrs: [], field_buffer_counts: [], field_buffer_reads: [], callback_userdata_cb: [], callback_userdata_of: [], valid_on_failed: 0, nullable_params: [], value_records: [], value_record_words: [], value_record_lens: [], async_req_param: -1, async_req_set: 0, async_req_get: 0, read_pair_alloc: -1, read_pair_buf_init: 0, read_pair_read: -1, read_pair_set: 0, read_pair_get: 0, close_release_get: 0, close_release_set: 0, text_params: [], text_return_free: 0, bridged: 0, buffer_ptr: [], buffer_len: [], buffer_inout: [], buffer_elements: [], fixed_params: [], fixed_literals: [], ok_const: 0, ok_count: 0, null_status_const: 0, null_status_node: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: [], variadic_case_values: [], variadic_case_tids: [], variadic_case_kinds: [], variadic_slots: [], present_cases_node: 0, present_cases_prefix: 0, returns_borrow_record: 0, argv_cb: [], argv_index: [], argc_index: [], argv_handle: [], argv_nodes: [], user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1532,7 +1549,8 @@ impl Sema:
         // there is no default to lean on.
         for cb in c.bare_callbacks:
             if c.retains.contains(cb) and c.callback_thread_said == 0: self.emit_error_with_help(f"fn '{fname}': 'callback param {cb}' is retained, and the contract does not say which thread calls it (§16.2b.9)", item, "add 'callback_thread any' when the library may call it from any thread, or 'callback_thread registering' when it calls it only on the thread that registered it")
-        self.foreign_contract_index.insert(fn_sym, self.foreign_contracts.len() as i32)
+        if not is_multi_rename:
+            self.foreign_contract_index.insert(fn_sym, self.foreign_contracts.len() as i32)
         self.foreign_contracts.push(c)
 
     // D250 / D254 (§16.2b.9): validate every `retains param A by param B` once
@@ -2046,11 +2064,32 @@ impl Sema:
             c.returns_borrow_from = if from2 >= 0: [from, from2] else: [from]
             return c
         if kind == FACADE_CLAUSE_RETURNS_STATIC:
-            let tid = self.resolve_type_expr(self.ast.get_extra(ops)) as i32
+            let ty_node = self.ast.get_extra(ops)
+            // D256: `returns static <Resource>` for borrow-only `*const T` singletons
+            // (e.g. `EVP_sha256()`, `EVP_aes_256_gcm()`, `TLS_client_method()`).
+            if self.ast.kind(ty_node) == NodeKind.NK_TYPE_NAMED:
+                let rsym = self.ast.get_data0(ty_node)
+                if self.facade_resource_index.contains(rsym):
+                    let ri: i32 = self.facade_resource_index.get(rsym).unwrap()
+                    let r = &self.facade_resources[ri]
+                    let rn = self.pool_resolve(rsym)
+                    let is_borrow_only = r.handle == 0 and r.drop == 0 and r.init == 0 and r.producers.len() == 0 and r.destroyers.len() == 0
+                    let rrepr = self.resolve_alias(r.repr_tid as TypeId)
+                    if not is_borrow_only or self.get_type_kind(rrepr) != TypeKind.TY_PTR or self.get_type_d1(rrepr) != 0:
+                        self.emit_error_with_help(f"fn '{fname}': 'returns static {rn}' requires '{rn}' to be a borrow-only '*const T' resource (D256)", clause, f"declare 'resource {rn} wraps *const T' with no drop or producer")
+                        return c
+                    if not self.facade_same_type(self.sig_return_type(sig), r.repr_tid):
+                        let rt = self.type_name(self.sig_return_type(sig))
+                        self.emit_error_with_help(f"fn '{fname}' returns {rt}, not the representation of '{rn}' (§16.2b.13)", clause, f"name the resource whose wrapped pointer type is {rt}, or delete the clause")
+                        return c
+                    c.returns_static_resource = rsym
+                    c.bridged = 1
+                    return c
+            let tid = self.resolve_type_expr(ty_node) as i32
             if tid == 0:
                 return c
             // Ruling §40 states `returns static CStr`; static storage of
-            // another type is not ruled and stays as C declares it.
+            // another non-resource type stays as C declares it.
             if self.resolve_alias(tid as TypeId) != self.ty_cstr:
                 let tn = self.type_name(tid)
                 self.emit_error_with_help(f"fn '{fname}': 'returns static {tn}' — only 'returns static CStr' is ruled (§16.2b.7); a static pointer of another type stays as C declares it", clause, "delete the clause: the function keeps the pointer C declares; a view of a record is 'returns borrow <Record> from domain <name>'")
@@ -2088,6 +2127,38 @@ impl Sema:
             return c
         if kind == FACADE_CLAUSE_RENAME:
             c.rename = self.ast.get_extra(ops)
+            return c
+        if kind == FacadeAsyncClause.NvSlice as i32:
+            // D256: `nv_slice param P len param L` — array of `{name, value, namelen, valuelen, flags}` structs.
+            let p = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
+            let l = self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
+            if p < 0 or l < 0: return c
+            let ptype = self.resolve_alias(self.sig_param_type(sig, p) as TypeId)
+            let s = if self.get_type_kind(ptype) == TypeKind.TY_PTR: self.resolve_alias(self.get_type_d0(ptype) as TypeId) as i32 else: 0
+            let has_fields = s != 0 and self.get_type_kind(s as TypeId) == TypeKind.TY_STRUCT and self.struct_field_type_frozen(s, self.pool_intern("name")) != 0 and self.struct_field_type_frozen(s, self.pool_intern("value")) != 0 and self.struct_field_type_frozen(s, self.pool_intern("namelen")) != 0 and self.struct_field_type_frozen(s, self.pool_intern("valuelen")) != 0 and self.struct_field_type_frozen(s, self.pool_intern("flags")) != 0
+            if not has_fields:
+                let shown = self.facade_param_display(fn_sym, sig, p)
+                self.emit_error_with_help(f"fn '{fname}': 'nv_slice param {p}' names {shown}, which is not a pointer to a name-value struct with name/value/namelen/valuelen/flags fields (D256)", clause, "name the `const nghttp2_nv *` header array parameter")
+                return c
+            if self.get_type_kind(self.numeric_operand_type(self.sig_param_type(sig, l))) != TypeKind.TY_INT:
+                let shown = self.facade_param_display(fn_sym, sig, l)
+                self.emit_error_with_help(f"fn '{fname}': 'nv_slice ... len param {l}' names {shown}, which is not an integer (D256)", clause, "name the header array length parameter")
+                return c
+            c.nv_slice_ptr.push(p)
+            c.nv_slice_len.push(l)
+            return c
+        if kind == FacadeAsyncClause.NvOut as i32:
+            // D256: `nv_out param P` — single output `{name, value, namelen, valuelen, flags}` struct.
+            let p = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
+            if p < 0: return c
+            let ptype = self.resolve_alias(self.sig_param_type(sig, p) as TypeId)
+            let s = if self.get_type_kind(ptype) == TypeKind.TY_PTR and self.get_type_d1(ptype) != 0: self.resolve_alias(self.get_type_d0(ptype) as TypeId) as i32 else: 0
+            let has_fields = s != 0 and self.get_type_kind(s as TypeId) == TypeKind.TY_STRUCT and self.struct_field_type_frozen(s, self.pool_intern("name")) != 0 and self.struct_field_type_frozen(s, self.pool_intern("value")) != 0 and self.struct_field_type_frozen(s, self.pool_intern("namelen")) != 0 and self.struct_field_type_frozen(s, self.pool_intern("valuelen")) != 0 and self.struct_field_type_frozen(s, self.pool_intern("flags")) != 0
+            if not has_fields:
+                let shown = self.facade_param_display(fn_sym, sig, p)
+                self.emit_error_with_help(f"fn '{fname}': 'nv_out param {p}' names {shown}, which is not a mutable pointer to a name-value struct with name/value/namelen/valuelen/flags fields (D256)", clause, "name the `nghttp2_nv *` output parameter")
+                return c
+            c.nv_outs.push(p)
             return c
         if kind == FacadeAsyncClause.AsyncReq as i32:
             // D255: `async_req param N via <set_fn>, <get_fn>`.
@@ -2332,12 +2403,13 @@ impl Sema:
             let is_stride = mode == 12 or mode == 13
             let is_rows = mode == 14 or mode == 15
             let is_iov = mode == 16 or mode == 17
-            let l = if is_fixed_size: -1 else: self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
-            if not is_fixed_size and l < 0:
+            let is_out_ret = mode == 18
+            let l = if is_fixed_size or is_out_ret: -1 else: self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
+            if not is_fixed_size and not is_out_ret and l < 0:
                 return c
             // D198: a parameter a value-record clause describes is no buffer.
             for described in c.value_records:
-                if described == p or (not is_fixed_size and not is_derived_cap and not is_min_fn and not is_stride and not is_rows and described == l):
+                if described == p or (not is_fixed_size and not is_out_ret and not is_derived_cap and not is_min_fn and not is_stride and not is_rows and described == l):
                     self.emit_error_with_help(f"fn '{fname}': a pointer paired with a count is a buffer (§16.2b.8), not a value record; the `reads`/`fills`/`updates` clause on it does not apply (§16.2b.5)", clause, "delete the `reads`/`fills`/`updates` clause and keep 'buffer param P len param L'")
                     return c
             let is_capacity = mode == 1 or mode == 2 or mode == 4 or mode == 6 or mode == 7 or mode == 8 or mode == 11 or mode == 13 or mode == 15 or mode == 17
@@ -2358,13 +2430,17 @@ impl Sema:
                     let iname = self.pool_resolve(init_sym)
                     self.emit_error_with_help(f"fn '{fname}': 'via {iname}' must name a 2-parameter C constructor returning the buffer-descriptor struct (D255)", clause, "name the C constructor (e.g. `uv_buf_init`)")
                     return c
-            else if is_out_alloc or is_rows:
+            else if is_out_alloc or is_rows or is_out_ret:
                 let inner = if self.get_type_kind(ptype) == TypeKind.TY_PTR and self.get_type_d1(ptype) != 0: self.resolve_alias(self.get_type_d0(ptype) as TypeId) else: 0 as TypeId
                 if inner == 0 as TypeId or self.get_type_kind(inner) != TypeKind.TY_PTR or not self.facade_type_is_byte(self.get_type_d0(inner)):
                     let shown = self.facade_param_display(fn_sym, sig, p)
                     let kind_text = if is_rows: "rows" else: "out"
                     self.emit_error_with_help(f"fn '{fname}': 'buffer {kind_text} param {p}' names {shown}, which is not a mutable pointer to a byte pointer ('unsigned char **' / 'char **') (§16.2b.8)", clause, "name the 'T **' output/row-array buffer parameter")
                     return c
+                if is_out_ret:
+                    if self.get_type_kind(self.numeric_operand_type(self.sig_return_type(sig))) != TypeKind.TY_INT:
+                        self.emit_error_with_help(f"fn '{fname}': 'buffer out param {p} len return' requires an integer return type carrying the byte length (D256)", clause, "use 'buffer out param P len param L freed by F' when the length is written to an out parameter")
+                        return c
                 if is_out_alloc:
                     let free_sym = self.ast.get_extra(ops + 4)
                     let fsig = self.facade_fn_sig(free_sym, clause)
@@ -2423,7 +2499,7 @@ impl Sema:
                     let rrn = self.pool_resolve(info_res)
                     self.emit_error_with_help(f"fn '{fname}': rows clause names unknown resource '{rrn}' (§16.2b.8)", clause, f"declare 'resource {rrn} wraps ...' above this item")
                     return c
-            else if not is_fixed_size:
+            else if not is_fixed_size and not is_out_ret:
                 if p == l:
                     let shown = self.facade_param_display(fn_sym, sig, p)
                     self.emit_error_with_help(f"fn '{fname}': 'buffer param {p}' pairs {shown} with itself; a pairing names the pointer and the distinct integer that carries its length (§16.2b.8)", clause, f"'buffer param {p} len param N', with N the integer parameter that carries the length")
@@ -2440,7 +2516,7 @@ impl Sema:
                     let spell = if is_inout: f"capacity param {l} inout" else if is_out_alloc: f"out len param {l}" else if mode == 4: f"capacity param {l} updates" else: f"len param {l} updates"
                     self.emit_error_with_help(f"fn '{fname}': '{spell}' names {shown}, which is not a pointer to an integer; C reads the count through it and writes the updated count back (§16.2b.8)", clause, f"when the count is passed by value, write 'capacity param {l}' or 'len param {l}'")
                     return c
-            let l_claimed = if is_fixed_size or is_derived_cap or is_min_fn or is_stride or is_rows: -1 else: l
+            let l_claimed = if is_fixed_size or is_derived_cap or is_min_fn or is_stride or is_rows or is_out_ret: -1 else: l
             for k in 0..c.buffer_ptr.len():
                 let taken = if c.buffer_ptr[k] == p or c.buffer_len[k] == p: p else if l_claimed >= 0 and (c.buffer_ptr[k] == l_claimed or c.buffer_len[k] == l_claimed): l_claimed else: -1
                 if taken >= 0:
@@ -2531,11 +2607,12 @@ impl Sema:
             else:
                 self.emit_error_with_help(f"fn '{fname}': a fixed argument is an integer literal, 'null', 'true', 'false', a constant the header defines or 'sizeof(T)' (§16.2b.11)", clause, "'param N fixed 0', 'param N fixed null' or 'param N fixed true'; a value the caller chooses stays a parameter")
                 return c
-            // D214: on a producer, a parent fixed to null is the absent parent:
-            // the constructor takes none and its value depends on nothing.
-            // That NULL is accepted there is the contract's stated claim.
-            let absent_parent = lk == NodeKind.NK_NULL_LIT and (self.facade_resource_produced_by(fn_sym).len() > 0 or self.facade_fn_destroys_a_resource(fn_sym))
-            if not absent_parent and self.facade_param_receives(fn_sym, pi).len() > 0:
+            // D214/D256: on a producer/destroyer, or on a non-receiver parameter
+            // (`pi != c.of_param`), fixing an optional resource or out-pointer to
+            // `null` states that C accepts NULL there (e.g. absent parent, optional
+            // EVP_PKEY_CTX** out-ptr, or unencrypted PEM_write_bio_PrivateKey).
+            let absent_optional = lk == NodeKind.NK_NULL_LIT and (self.facade_resource_produced_by(fn_sym).len() > 0 or self.facade_fn_destroys_a_resource(fn_sym) or pi != c.of_param)
+            if not absent_optional and self.facade_param_receives(fn_sym, pi).len() > 0:
                 self.emit_error_with_help(f"fn '{fname}': 'param {pi} fixed' binds {shown}, which receives a modeled resource; a resource is passed by the value that owns it, never fixed (§16.2b.11)", clause, f"delete 'param {pi} fixed …': the presented operation takes the resource itself, as its receiver when it is the first parameter")
                 return c
             for k in 0..c.fixed_params.len():
@@ -3243,7 +3320,7 @@ impl Sema:
             let fn_sym = self.foreign_contracts[ci].fn_sym
             let node = self.foreign_contracts[ci].variadic_node
             let fname = self.pool_resolve(fn_sym)
-            if self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].buffer_ptr.len() > 0 or self.foreign_contracts[ci].returns_borrow_resource != 0 or self.foreign_contracts[ci].returns_static_tid != 0 or self.foreign_contracts[ci].returns_borrow_record != 0:
+            if self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].buffer_ptr.len() > 0 or self.foreign_contracts[ci].returns_borrow_resource != 0 or self.foreign_contracts[ci].returns_static_tid != 0 or self.foreign_contracts[ci].returns_static_resource != 0 or self.foreign_contracts[ci].returns_borrow_record != 0 or self.foreign_contracts[ci].nv_slice_ptr.len() > 0 or self.foreign_contracts[ci].nv_outs.len() > 0:
                 self.emit_error_with_help(f"fn '{fname}': a variadic contract describes a lend (with fixed arguments at most); '{fname}' states a stronger clause, and the two renderings are not combined (§16.2b.5)", node, "keep the 'variadic param …' clause and 'param N fixed …'; delete the other clauses of this item")
                 continue
             if self.facade_fn_is_resource_op(fn_sym):
@@ -3572,6 +3649,8 @@ fn facade_clause_name(kind: i32) -> str:
     if kind == FacadeAsyncClause.AsyncReq as i32: return "async_req"
     if kind == FacadeAsyncClause.ReadAllocPair as i32: return "read_pair"
     if kind == FacadeAsyncClause.CloseRelease as i32: return "close_release"
+    if kind == FacadeAsyncClause.NvSlice as i32: return "nv_slice"
+    if kind == FacadeAsyncClause.NvOut as i32: return "nv_out"
     if kind == FACADE_CLAUSE_CALLBACK_ARGV: return "callback … argv … paired with argc"
     if kind == FACADE_CLAUSE_USER_DATA: return "user_data from"
     "callback consumes"
@@ -3681,7 +3760,7 @@ impl Sema:
 
     fn facade_covers_return(fn_sym: i32) -> bool:
         let ci = self.facade_contract_for(fn_sym)
-        ci >= 0 and (self.foreign_contracts[ci].returns_borrow_resource != 0 or self.foreign_contracts[ci].returns_static_tid != 0)
+        ci >= 0 and (self.foreign_contracts[ci].returns_borrow_resource != 0 or self.foreign_contracts[ci].returns_static_tid != 0 or self.foreign_contracts[ci].returns_static_resource != 0)
 
     // An fn item covers its parameters, except the one a `destroys` item
     // destroys and any that takes a resource's representation (or a pointer
@@ -4358,7 +4437,7 @@ impl Sema:
             if described == pi: return true
         for k in 0..c.fixed_params.len():
             if c.fixed_params[k] == pi: return true
-        c.discarded_params.contains(pi) or c.value_record_lens.contains(pi) or c.async_req_param == pi or c.read_pair_alloc == pi or c.read_pair_read == pi
+        c.discarded_params.contains(pi) or c.value_record_lens.contains(pi) or c.async_req_param == pi or c.read_pair_alloc == pi or c.read_pair_read == pi or c.nv_slice_ptr.contains(pi) or c.nv_slice_len.contains(pi) or c.nv_outs.contains(pi)
 
     // D102: whether `nullable param N` names `pi` (a function-pointer
     // parameter reached through that clause, §16.2b.8).
@@ -4399,7 +4478,7 @@ impl Sema:
     fn facade_contract_param_is_out_alloc_ptr(ci: isize, pi: i32) -> bool:
         let c = &self.foreign_contracts[ci]
         for (k, bp) in c.buffer_ptr.enumerate():
-            if bp == pi and c.buffer_inout[k] == 9: return true
+            if bp == pi and (c.buffer_inout[k] == 9 or c.buffer_inout[k] == 18): return true
         false
 
     // Sema owns the C-to-presented parameter projection. Effects and
@@ -4413,7 +4492,7 @@ impl Sema:
             if source == c.of_param: return 0
             var presented: i32 = 1
             for pi in 0..(source + 1):
-                if pi == c.of_param or c.fixed_params.contains(pi) or c.discarded_params.contains(pi) or c.value_record_lens.contains(pi) or c.async_req_param == pi or c.buffer_len.contains(pi) or c.consumes_destroyed_by.contains(pi) or self.facade_contract_param_is_out_alloc_ptr(ci, pi):
+                if pi == c.of_param or c.fixed_params.contains(pi) or c.discarded_params.contains(pi) or c.value_record_lens.contains(pi) or c.async_req_param == pi or c.buffer_len.contains(pi) or c.nv_slice_len.contains(pi) or c.nv_outs.contains(pi) or c.consumes_destroyed_by.contains(pi) or self.facade_contract_param_is_out_alloc_ptr(ci, pi):
                     if pi == source: return -1
                     continue
                 if pi == source: return presented
@@ -4421,7 +4500,7 @@ impl Sema:
             return -1
         var presented: i32 = 0
         for pi in 0..(source + 1):
-            if c.fixed_params.contains(pi) or c.discarded_params.contains(pi) or c.value_record_lens.contains(pi) or c.async_req_param == pi or c.buffer_len.contains(pi) or c.consumes_destroyed_by.contains(pi) or self.facade_contract_param_is_out_alloc_ptr(ci, pi):
+            if c.fixed_params.contains(pi) or c.discarded_params.contains(pi) or c.value_record_lens.contains(pi) or c.async_req_param == pi or c.buffer_len.contains(pi) or c.nv_slice_len.contains(pi) or c.nv_outs.contains(pi) or c.consumes_destroyed_by.contains(pi) or self.facade_contract_param_is_out_alloc_ptr(ci, pi):
                 if pi == source: return -1
                 continue
             if pi == source: return presented
