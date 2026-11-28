@@ -2545,7 +2545,7 @@ fn ci_facade_import_spelling(header: &str, import_dirs: &List[str], declares: &s
 // package does not install is not presentable and the report says so) and
 // names the package's link library. Returns the report's summary, or ""
 // when nothing could be written (the reason is on stderr).
-fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], defines: &List[str], source_dir: &str, facade_name: &str, version: &str, facts_path: &str, import_dirs: &List[str], link_lib: &str, facade_path: &str, report_path: &str) -> str:
+fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], defines: &List[str], source_dir: &str, facade_name: &str, version: &str, facts_path: &str, import_dirs: &List[str], import_defines: &List[str], link_lib: &str, facade_path: &str, report_path: &str) -> str:
     migrate_reset_options()
     for path in include_paths: migrate_add_include_path(path)
     for define in defines: migrate_add_define(define)
@@ -2592,14 +2592,14 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
                 // each declaration once per process, so a header already
                 // translated (a second package, a second draft) comes back
                 // empty. The error is the verdict.
-                let translated = process_c_import_with_defines(rel, defines)
+                let translated = process_c_import_with_defines(rel, import_defines)
                 let why = c_import_last_error()
                 let imports = translated.len() > 0 or why.len() == 0
                 header_alone.insert(rel.to_owned(), imports)
                 // Such a header is still imported through the header that
                 // includes it (liblzma's lzma/base.h through lzma.h): the
                 // function is presented, and the facade imports the umbrella.
-                let umbrella = if imports: "" else: ci_facade_umbrella_of(rel, import_dirs, defines)
+                let umbrella = if imports: "" else: ci_facade_umbrella_of(rel, import_dirs, import_defines)
                 header_umbrella.insert(rel.to_owned(), umbrella)
                 if not imports and umbrella.len() == 0: dependent_headers = dependent_headers ++ (if dependent_headers.len() > 0: "; " else: "") ++ rel ++ " (" ++ why ++ ")"
             let alone = header_alone.get(rel).copied() ?? false
