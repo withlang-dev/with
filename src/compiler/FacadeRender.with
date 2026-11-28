@@ -617,14 +617,15 @@ fn facade_render_repr_arg_for(pool: &AstPool, intern: &InternPool, resource: i32
     let p0 = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), at) as NodeId))
     let repr = facade_render_unalias(pool, intern, repr_text)
     let is_async = facade_render_async_close_clause(pool, resource) != 0
-    if is_async or (for_view and not repr.starts_with("*")):
+    let view_is_ptr = for_view and not repr.starts_with("*") and facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT)
+    if is_async or view_is_ptr:
         if p0 == "*mut " ++ repr: return place
         if p0 == "*const " ++ repr: return "(" ++ place ++ " as " ++ p0 ++ ")"
     else:
         let direct = facade_render_repr_arg_at(pool, intern, decl, at, repr_text, place, pinned)
         if direct.len() > 0: return direct
     // D255: upcast along `extends` chain when C expects an ancestor struct pointer.
-    let ptr_expr = if is_async or repr.starts_with("*") or for_view: place else if pinned: place ++ ".as_mut_ptr()" else: "&raw mut " ++ place
+    let ptr_expr = if is_async or repr.starts_with("*") or view_is_ptr: place else if pinned: place ++ ".as_mut_ptr()" else: "&raw mut " ++ place
     for anc in facade_render_extends_chain(pool, intern, resource):
         let arepr = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(anc as NodeId)) as NodeId))
         let matches_anc = if arepr.starts_with("*"): (p0 == arepr or facade_render_const_of(p0, arepr)) else: (p0 == "*mut " ++ arepr or p0 == "*const " ++ arepr)
