@@ -1,0 +1,26 @@
+//! expect-stdout: len=4 bytes=72 73 33 10
+//! expect-stdout: err=true
+//! expect-stdout: ok
+
+// D251 (§16.2b.8): `buffer out param P len param L freed by F` copies a
+// C-allocated output buffer into an owned `List[u8]` and frees it on both
+// success and error paths.
+
+use c_import("#include <stddef.h>\n#include <stdlib.h>\ntypedef struct { int tag; } enc_t;\nstatic inline enc_t *enc_new(void) { enc_t *e = (enc_t *)malloc(sizeof(enc_t)); e->tag = 1; return e; }\nstatic inline void enc_free(enc_t *e) { free(e); }\nstatic inline void buf_release(unsigned char *p) { free(p); }\nstatic inline int enc_encode(enc_t *e, int fail, unsigned char **out_buf, size_t *out_len) { (void)e; unsigned char *p = (unsigned char *)malloc(4); p[0] = 72; p[1] = 73; p[2] = 33; p[3] = 10; *out_buf = p; *out_len = 4; return fail ? -1 : 0; }\n")
+
+c contract d251_out:
+    resource Enc wraps *mut enc_t
+        from enc_new
+        drop enc_free
+    fn enc_encode
+        lend
+        buffer out param 2 len param 3 freed by buf_release
+        ok 0
+
+fn main:
+    let e = Enc.new().unwrap()
+    let data = e.encode(0).unwrap()
+    print(f"len={data.len()} bytes={data[0]} {data[1]} {data[2]} {data[3]}")
+    let failed = e.encode(1).is_err()
+    print(f"err={failed}")
+    print("ok")

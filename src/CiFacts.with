@@ -329,6 +329,7 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             ptr_header = stripped.to_owned()
             ptr_name = words[1].to_owned()
             ptr_record = record.to_owned()
+            if record == "c_void": ptr_carry = true
             continue
         if is_top_level and stripped.starts_with("message "):
             in_resource = false
@@ -505,7 +506,7 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
         if current_fn.len() == 0: return Err(facts_error(path, line_no, "a fact belongs to a `resource` or an `fn` item"))
         let cwords = clause.fields()
         let is_of_clause = (cwords.len() == 2 and cwords[0] == "of") or (cwords.len() == 3 and cwords[0] == "of" and cwords[1].ends_with("(param") and cwords[2].ends_with(")") and cwords[1].len() > 6 and cwords[2].len() > 1)
-        let is_buffer_param = cwords.len() >= 5 and cwords[0] == "buffer" and cwords[1] == "param" and (cwords[3] == "len" or cwords[3] == "capacity")
+        let is_buffer_param = (cwords.len() >= 5 and cwords[0] == "buffer" and cwords[1] == "param" and (cwords[3] == "len" or cwords[3] == "capacity")) or (cwords.len() >= 9 and cwords[0] == "buffer" and cwords[1] == "out" and cwords[2] == "param")
         let is_discarded = cwords.len() == 3 and cwords[0] == "param" and cwords[2] == "discarded"
         let is_fixed = cwords.len() >= 4 and cwords[0] == "param" and cwords[2] == "fixed"
         let is_ok = cwords.len() >= 2 and cwords[0] == "ok"

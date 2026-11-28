@@ -713,7 +713,7 @@ fn facade_render_lend_methods(pool: &AstPool, intern: &InternPool, ci: &List[i32
         if repr_arg.len() == 0:
             continue
         let head = if repr_arg.starts_with("&raw mut "): "    mut fn " else: "    fn "
-        let bridge = if at == 0: facade_render_bridge(pool, intern, decl, 1, -1, "") else: facade_render_bridge(pool, intern, decl, 0, at, repr_arg)
+        let bridge = if at == 0: facade_render_bridge(pool, intern, decl, 1, 0, repr_arg) else: facade_render_bridge(pool, intern, decl, 0, at, repr_arg)
         if not bridge.ok:
             continue
         let params = bridge.params
@@ -2973,7 +2973,8 @@ type FacadeBridge {
     params: str,
     args: str,
     prologue: str,     // lines, each newline-terminated, unindented
-    post_checks: str,  // D247: post-call bounds checks for `buffer ... updates` counts, newline-terminated
+    post_checks: str,  // D247/D251: post-call bounds checks and out-allocated buffer copy/free, newline-terminated
+    err_cleanup: str,  // D251: cleanup statements run on failed `ok` status before returning Err, newline-terminated
     cap_var: str,      // the inout capacity local, or ""
     cap_type: str,     // its C integer type
     cap_of: str,       // the []mut u8 parameter it is the capacity of
@@ -3135,9 +3136,33 @@ fn facade_render_buffer_of(pool: &AstPool, intern: &InternPool, decl: i32, pi: i
         let l_ref = pool.get_extra(ops + 1)
         let l = if l_ref == 0: -1 else: facade_render_param_ref(pool, intern, decl, l_ref)
         let fixed_sym = pool.get_extra(ops + 4)
-        if p == pi or (mode <= 4 and l == pi):
+        if p == pi or ((mode <= 4 or mode == 9) and l == pi):
             return (p, l, mode, pool.get_extra(ops + 3), fixed_sym)
     (-1, -1, 0, 0, 0)
+
+// D252: return the FACADE_CLAUSE_BUFFER node for parameter `pi` (for reading
+// trailing stride operands `w_ref`, `h_ref`, `f_ref`), or 0.
+fn facade_render_buffer_clause(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32) -> i32:
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0: return 0
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) != FACADE_CLAUSE_BUFFER: continue
+        let ops = pool.get_data1(clause as NodeId)
+        if facade_render_param_ref(pool, intern, decl, pool.get_extra(ops)) == pi: return clause
+    0
+
+// D251: parameter 0's rendered C type for a 1-arg free function `free_sym`.
+fn facade_render_free_arg_type(pool: &AstPool, intern: &InternPool, free_sym: i32) -> str:
+    let want = intern.resolve(free_sym)
+    var d: i32 = g_facade_fn_ci_decl.get(want) ?? 0
+    if d == 0: d = g_facade_fn_any_decl.get(want) ?? 0
+    if d != 0:
+        let meta = pool.find_fn_meta(d as NodeId)
+        if meta >= 0 and pool.fn_meta_param_count(meta) == 1:
+            return render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), 0) as NodeId)
+    "*mut c_void"
 
 fn facade_render_param_consumed(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32) -> bool:
     let item = facade_render_fn_item(pool, intern, decl)
@@ -3152,7 +3177,7 @@ fn facade_render_param_consumed(pool: &AstPool, intern: &InternPool, decl: i32, 
     false
 
 fn facade_render_empty_bridge() -> FacadeBridge:
-    FacadeBridge { ok: true, params: "", args: "", prologue: "", post_checks: "", cap_var: "", cap_type: "", cap_of: "", cap_unit: "", fills: "", fill_types: "", generics: "" }
+    FacadeBridge { ok: true, params: "", args: "", prologue: "", post_checks: "", err_cleanup: "", cap_var: "", cap_type: "", cap_of: "", cap_unit: "", fills: "", fill_types: "", generics: "" }
 
 fn facade_render_is_borrow_only_resource(pool: &AstPool, resource: i32) -> bool:
     not facade_item_is_handle(pool, resource) and not facade_render_has_clause(pool, resource, FACADE_CLAUSE_FROM) and not facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT) and not facade_render_has_clause(pool, resource, FACADE_CLAUSE_DROP) and not facade_render_has_clause(pool, resource, FACADE_CLAUSE_DESTROYS)
@@ -3160,7 +3185,7 @@ fn facade_render_is_borrow_only_resource(pool: &AstPool, resource: i32) -> bool:
 // One parameter's projection, shared by ordinary and callback operations.
 // Clauses compose here: there is only one derivation of a buffer's slice,
 // pointer, count conversion, and copy-back storage.
-fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32) -> FacadeBridge:
+fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32, slot: i32 = -1, slot_arg: &str = "") -> FacadeBridge:
     let b = facade_render_empty_bridge()
     let meta = pool.find_fn_meta(decl as NodeId)
     let start = pool.fn_meta_param_start(meta)
@@ -3193,14 +3218,52 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
         b.args = fixed
         return b
     let (bp, bl, mode, elements, fixed_sym) = facade_render_buffer_of(pool, intern, decl, pi)
-    let writable = mode == 1 or mode == 2 or mode == 4 or mode == 6 or mode == 7 or mode == 8
+    let writable = mode == 1 or mode == 2 or mode == 4 or mode == 6 or mode == 7 or mode == 8 or mode == 11 or mode == 13
     let inout = mode == 1
     let is_updates = mode == 3 or mode == 4
     let is_fixed_size = mode == 5 or mode == 6
     let is_derived_cap = mode == 7 or mode == 8
-    let ptr_len = inout or is_updates
+    let is_out_alloc = mode == 9
+    let is_min_fn = mode == 10 or mode == 11
+    let is_stride = mode == 12 or mode == 13
+    let ptr_len = inout or is_updates or is_out_alloc
     if not is_fixed_size and ((bp < 0 and bl >= 0) or (bl < 0 and bp >= 0)):
         b.ok = false
+        return b
+    if bp == pi and is_out_alloc:
+        // D251: `buffer out param P len param L freed by F` — P receives
+        // `&raw mut <ptr_var>` and leaves the presented parameter list.
+        let ptr_type = facade_render_unalias(pool, intern, ptype)
+        if not ptr_type.starts_with("*mut "):
+            b.ok = false
+            return b
+        let elem_ptr = ptr_type.slice(5, ptr_type.len())
+        let ptr_var = facade_render_fresh(pname ++ "_out_ptr", taken)
+        b.prologue = "var " ++ ptr_var ++ ": " ++ elem_ptr ++ " = null\n"
+        b.args = "&raw mut " ++ ptr_var
+        return b
+    if bl == pi and is_out_alloc:
+        // D251: L receives `&raw mut <len_var>`, copies `0..len` into an owned
+        // `List[u8]`, and frees `<ptr_var>` via F on both success and error.
+        let bname = facade_render_param_name(pool, intern, start, bp)
+        let unaliased = facade_render_unalias(pool, intern, ptype)
+        if not unaliased.starts_with("*mut "):
+            b.ok = false
+            return b
+        let count_type = unaliased.slice(5, unaliased.len())
+        let ptr_var = facade_render_fresh(bname ++ "_out_ptr", taken)
+        let len_var = facade_render_fresh(bname ++ "_out_len", taken)
+        let out_var = facade_render_fresh(bname ++ "_out", taken)
+        let idx_var = facade_render_fresh(bname ++ "_i", taken)
+        let free_name = intern.resolve(fixed_sym)
+        let free_arg_ty = facade_render_free_arg_type(pool, intern, fixed_sym)
+        let free_stmt = "if " ++ ptr_var ++ " != null: unsafe { " ++ free_name ++ "(" ++ ptr_var ++ " as " ++ free_arg_ty ++ ") }\n"
+        b.prologue = "var " ++ len_var ++ ": " ++ count_type ++ " = 0 as " ++ count_type ++ "\n"
+        b.args = "&raw mut " ++ len_var
+        b.err_cleanup = free_stmt
+        b.post_checks = "var " ++ out_var ++ ": List[u8] = List.new()\nif " ++ ptr_var ++ " != null and " ++ len_var ++ " > 0:\n    var " ++ idx_var ++ ": i64 = 0\n    while " ++ idx_var ++ " < (" ++ len_var ++ " as i64):\n        " ++ out_var ++ ".push(unsafe { *((" ++ ptr_var ++ " as i64 + " ++ idx_var ++ ") as *const u8) })\n        " ++ idx_var ++ " = " ++ idx_var ++ " + 1\n" ++ free_stmt
+        b.fills = out_var
+        b.fill_types = "List[u8]"
         return b
     if bp == pi:
         let ptr_type = facade_render_unalias(pool, intern, ptype)
@@ -3216,6 +3279,34 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
         if is_fixed_size:
             let need = intern.resolve(fixed_sym)
             b.prologue = "if " ++ pname ++ ".len() < " ++ need ++ ": panic(\"" ++ fname ++ ": buffer '" ++ pname ++ "' requires at least " ++ need ++ " " ++ unit ++ " (§16.2b.8)\")\n"
+        else if is_min_fn:
+            let min_fn = intern.resolve(fixed_sym)
+            let arg_expr = if bl == slot and slot_arg.len() > 0: slot_arg else: facade_render_param_name(pool, intern, start, bl)
+            let min_var = facade_render_fresh(pname ++ "_min", taken)
+            b.prologue = "let " ++ min_var ++ ": usize = (unsafe { " ++ min_fn ++ "(" ++ arg_expr ++ ") }) as usize\nif " ++ pname ++ ".len() < " ++ min_var ++ ": panic(\"" ++ fname ++ ": buffer '" ++ pname ++ "' capacity is smaller than required size (§16.2b.8)\")\n"
+        else if is_stride:
+            let bclause = facade_render_buffer_clause(pool, intern, decl, pi)
+            if bclause == 0:
+                b.ok = false
+                return b
+            let bops = pool.get_data1(bclause as NodeId)
+            let w_idx = facade_render_param_ref(pool, intern, decl, pool.get_extra(bops + 5))
+            let h_idx = facade_render_param_ref(pool, intern, decl, pool.get_extra(bops + 6))
+            let f_idx = facade_render_param_ref(pool, intern, decl, pool.get_extra(bops + 7))
+            if w_idx < 0 or h_idx < 0 or f_idx < 0:
+                b.ok = false
+                return b
+            let sname = facade_render_param_name(pool, intern, start, bl)
+            let wname = facade_render_param_name(pool, intern, start, w_idx)
+            let hname = facade_render_param_name(pool, intern, start, h_idx)
+            let fname_p = facade_render_param_name(pool, intern, start, f_idx)
+            let tbl = intern.resolve(fixed_sym)
+            let row_var = facade_render_fresh(pname ++ "_row", taken)
+            let st_var = facade_render_fresh(pname ++ "_stride", taken)
+            b.prologue = "if " ++ wname ++ " <= 0 or " ++ hname ++ " <= 0 or " ++ fname_p ++ " < 0 or (" ++ fname_p ++ " as usize) >= " ++ tbl ++ ".len() or " ++ sname ++ " < 0: panic(\"" ++ fname ++ ": invalid image dimensions, stride, or pixel format (§16.2b.8)\")\n"
+            b.prologue = b.prologue ++ "let " ++ row_var ++ ": usize = (" ++ wname ++ " as usize) * (" ++ tbl ++ "[" ++ fname_p ++ " as usize] as usize)\n"
+            b.prologue = b.prologue ++ "let " ++ st_var ++ ": usize = if " ++ sname ++ " == 0: " ++ row_var ++ " else: (" ++ sname ++ " as usize)\n"
+            b.prologue = b.prologue ++ "if " ++ st_var ++ " < " ++ row_var ++ " or " ++ st_var ++ " * (" ++ hname ++ " as usize) > " ++ pname ++ ".len(): panic(\"" ++ fname ++ ": buffer '" ++ pname ++ "' is smaller than required image size (§16.2b.8)\")\n"
         else if is_derived_cap:
             let offset = intern.resolve(fixed_sym)
             let (obp, obl, omode, _, _) = facade_render_buffer_of(pool, intern, decl, bl)
@@ -3373,6 +3464,7 @@ fn facade_render_append_bridge(initial: FacadeBridge, part: &FacadeBridge):
         b.args = b.args ++ part.args
     b.prologue = b.prologue ++ part.prologue
     b.post_checks = b.post_checks ++ part.post_checks
+    b.err_cleanup = b.err_cleanup ++ part.err_cleanup
     if part.cap_var.len() > 0:
         b.cap_var = part.cap_var
         b.cap_type = part.cap_type
@@ -3395,7 +3487,7 @@ fn facade_render_bridge(pool: &AstPool, intern: &InternPool, decl: i32, skip: i3
             if b.args.len() > 0: b.args = b.args ++ ", "
             b.args = b.args ++ slot_arg
             continue
-        let part = facade_render_bridge_param(pool, intern, decl, pi)
+        let part = facade_render_bridge_param(pool, intern, decl, pi, slot, slot_arg)
         b = facade_render_append_bridge(b, part)
     b
 
@@ -3425,12 +3517,15 @@ fn facade_render_indent(text: &str, indent: &str):
 // called on the resource.
 // `empty_message`: the shared error's `Failed` carries a message and this
 // operation's resource names none.
-fn facade_render_failed(err: &str, status: &str, failed: &str, message_call: &str, taken: &str, indent: &str, empty_message: bool) -> str:
+fn facade_render_failed(err: &str, status: &str, failed: &str, message_call: &str, taken: &str, indent: &str, empty_message: bool, cleanup: &str = "") -> str:
+    let clean = if cleanup.len() > 0: facade_render_indent(cleanup, indent ++ "    ") else: ""
     if message_call.len() == 0:
-        return indent ++ "if " ++ failed ++ ": return Err(" ++ err ++ ".Failed(" ++ status ++ (if empty_message: ", \"\"" else: "") ++ "))\n"
+        if clean.len() == 0:
+            return indent ++ "if " ++ failed ++ ": return Err(" ++ err ++ ".Failed(" ++ status ++ (if empty_message: ", \"\"" else: "") ++ "))\n"
+        return indent ++ "if " ++ failed ++ ":\n" ++ clean ++ indent ++ "    return Err(" ++ err ++ ".Failed(" ++ status ++ (if empty_message: ", \"\"" else: "") ++ "))\n"
     let text = facade_render_fresh("facade_text", taken)
     let message = facade_render_fresh("facade_message", taken)
-    var out = indent ++ "if " ++ failed ++ ":\n"
+    var out = indent ++ "if " ++ failed ++ ":\n" ++ clean
     out = out ++ indent ++ "    let " ++ message ++ ": str = match " ++ message_call ++ ":\n"
     out = out ++ indent ++ "        Some(" ++ text ++ ") => " ++ text ++ ".to_str_lossy()\n"
     out = out ++ indent ++ "        None => \"\"\n"
@@ -3457,7 +3552,7 @@ fn facade_render_bridge_body(pool: &AstPool, intern: &InternPool, decl: i32, b: 
             return (" -> (" ++ status_type ++ ", " ++ b.fill_types ++ ")", indent ++ "let " ++ fill_status ++ " = " ++ call ++ "\n" ++ checks ++ indent ++ "(" ++ fill_status ++ ", " ++ b.fills ++ ")\n")
         let (fill_err, fill_empty_message) = facade_render_op_error(pool, intern, decl, presented)
         let fill_failed = facade_render_not_ok(intern, fill_oks, fill_status)
-        let fill_checked = indent ++ "let " ++ fill_status ++ " = " ++ call ++ "\n" ++ facade_render_failed(fill_err, fill_status, fill_failed, message_call, facade_render_param_names(pool, intern, decl), indent, fill_empty_message) ++ checks
+        let fill_checked = indent ++ "let " ++ fill_status ++ " = " ++ call ++ "\n" ++ facade_render_failed(fill_err, fill_status, fill_failed, message_call, facade_render_param_names(pool, intern, decl), indent, fill_empty_message, b.err_cleanup) ++ checks
         if not facade_render_ok_carries_status(intern, fill_oks):
             return (" -> Result[" ++ filled_type ++ ", " ++ fill_err ++ "]", fill_checked ++ indent ++ filled ++ "\n")
         return (" -> Result[(" ++ status_type ++ ", " ++ b.fill_types ++ "), " ++ fill_err ++ "]", fill_checked ++ indent ++ "(" ++ fill_status ++ ", " ++ b.fills ++ ")\n")

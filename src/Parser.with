@@ -5919,6 +5919,36 @@ impl Parser:
                 ops.push(1)
             else:
                 ops.push(0)
+        else if word == "buffer" and self.current_ident_is("out"):
+            // D251 (§16.2b.8): `buffer out param P len param L freed by F` —
+            // C allocates an output byte buffer through `*mut *mut u8` P and
+            // writes its length through `*mut <int>` L; the bridge copies it
+            // into an owned `List[u8]` and releases P with F.
+            kind = FACADE_CLAUSE_BUFFER
+            self.advance()
+            let p = self.parse_facade_param_ref()
+            if p == 0: return 0
+            if not self.current_ident_is("len"):
+                self.emit_error("an out-allocated buffer is written 'buffer out param <P> len param <L> freed by <fn>' (§16.2b.8)")
+                return 0
+            self.advance()
+            let l = self.parse_facade_param_ref()
+            if l == 0: return 0
+            if not self.current_ident_is("freed"):
+                self.emit_error("an out-allocated buffer is written 'buffer out param <P> len param <L> freed by <fn>' (§16.2b.8)")
+                return 0
+            self.advance()
+            if not self.current_ident_is("by"):
+                self.emit_error("an out-allocated buffer is written 'buffer out param <P> len param <L> freed by <fn>' (§16.2b.8)")
+                return 0
+            self.advance()
+            let free_fn = self.expect_ident()
+            if free_fn == 0: return 0
+            ops.push(p)
+            ops.push(l)
+            ops.push(9)
+            ops.push(0)
+            ops.push(free_fn)
         else if word == "buffer":
             // `buffer param P len param L` / `buffer param P capacity param L`
             // / `buffer param P capacity param L inout` (D64/D243, §16.2b.8):
@@ -5936,12 +5966,55 @@ impl Parser:
             var l: i32 = 0
             var mode: i32 = 0
             var fixed_sym: i32 = 0
+            var extra_w: i32 = 0
+            var extra_h: i32 = 0
+            var extra_f: i32 = 0
             if self.peek() == TokenKind.TK_INT_LIT:
                 // D248 (§16.2b.8): fixed-size buffer (`buffer param P len 32`
                 // / `buffer param P capacity 64`), no separate length param.
                 fixed_sym = self.intern_current()
                 self.advance()
                 mode = if is_cap: 6 else: 5
+            else if self.current_ident_is("min"):
+                // D252 (§16.2b.8): implicit-length buffer checked against a C
+                // size-query function (`min protobuf_c_message_get_packed_size(param 0)`).
+                self.advance()
+                fixed_sym = self.expect_ident()
+                if fixed_sym == 0: return 0
+                if self.expect(TokenKind.TK_L_PAREN) == 0: return 0
+                l = self.parse_facade_param_ref()
+                if l == 0: return 0
+                if self.expect(TokenKind.TK_R_PAREN) == 0: return 0
+                mode = if is_cap: 11 else: 10
+            else if self.current_ident_is("stride"):
+                // D252 (§16.2b.8): 2D pixel buffer checked against
+                // `stride param S width param W height param H table <TBL>[param F]`.
+                self.advance()
+                l = self.parse_facade_param_ref()
+                if l == 0: return 0
+                if not self.current_ident_is("width"):
+                    self.emit_error("a strided buffer is written 'buffer param <P> len|capacity stride param <S> width param <W> height param <H> table <TBL>[param <F>]' (§16.2b.8)")
+                    return 0
+                self.advance()
+                extra_w = self.parse_facade_param_ref()
+                if extra_w == 0: return 0
+                if not self.current_ident_is("height"):
+                    self.emit_error("a strided buffer is written 'buffer param <P> len|capacity stride param <S> width param <W> height param <H> table <TBL>[param <F>]' (§16.2b.8)")
+                    return 0
+                self.advance()
+                extra_h = self.parse_facade_param_ref()
+                if extra_h == 0: return 0
+                if not self.current_ident_is("table"):
+                    self.emit_error("a strided buffer is written 'buffer param <P> len|capacity stride param <S> width param <W> height param <H> table <TBL>[param <F>]' (§16.2b.8)")
+                    return 0
+                self.advance()
+                fixed_sym = self.expect_ident()
+                if fixed_sym == 0: return 0
+                if self.expect(TokenKind.TK_L_BRACKET) == 0: return 0
+                extra_f = self.parse_facade_param_ref()
+                if extra_f == 0: return 0
+                if self.expect(TokenKind.TK_R_BRACKET) == 0: return 0
+                mode = if is_cap: 13 else: 12
             else:
                 l = self.parse_facade_param_ref()
                 if l == 0: return 0
@@ -5983,6 +6056,10 @@ impl Parser:
             if elements: self.advance()
             ops.push((elements) as i32)
             ops.push(fixed_sym)
+            if mode == 12 or mode == 13:
+                ops.push(extra_w)
+                ops.push(extra_h)
+                ops.push(extra_f)
         else if word == "variadic":
             // `variadic param N selected by param P:` with `case CONST:
             // <type>` lines beneath it (D66, §16.2b.5): the closed set of

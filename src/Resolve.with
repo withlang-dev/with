@@ -1440,7 +1440,7 @@ fn resolve_dotted_selection(dotted: &str, resolved_path: &str) -> str:
         return ""
     let last = dotted.slice(last_dot + 1, dotted.len())
     let path = resolved_path.replace("\\", "/")
-    if dotted.starts_with("contracts.") and path.ends_with("/contract.with") and ("/" ++ path).contains("/.with/deps/c/" ++ last ++ "/"):
+    if dotted.starts_with("contracts.") and path.ends_with("/contract.with") and (("/" ++ path).contains("/.with/deps/c/" ++ last ++ "/") or ("/" ++ path).replace("-", "_").contains("/.with/deps/c/" ++ last ++ "/")):
         return ""
     last
 
@@ -1604,18 +1604,20 @@ fn resolve_fetched_facade_candidate(root: &str, rel_path: &str) -> str:
     if not rel_path.starts_with("contracts/") or not rel_path.ends_with(".with"): return ""
     let name = rel_path.slice("contracts/".len(), rel_path.len() - 5)
     if name.len() == 0 or name.contains("/"): return ""
-    let key = "c." ++ name
     for line in with_fs_read_file(resolve_join(root, "with.toml")).split("\n"):
         let t = line.trim()
-        if not t.starts_with(key): continue
-        let rest = t.slice(key.len(), t.len()).trim()
-        if not rest.starts_with("="): continue
+        if not t.starts_with("c."): continue
+        let eq = t.find("=")
+        if eq < 0: continue
+        let dep_name = t.slice(2, eq).trim()
+        if dep_name != name and dep_name.replace("-", "_") != name: continue
+        let rest = t.slice(eq, t.len()).trim()
         let open = rest.find("\"")
         if open < 0: continue
         let close = rest.slice(open + 1, rest.len()).find("\"")
         if close < 0: continue
         let version = rest.slice(open + 1, open + 1 + close)
-        let cand = resolve_join(root, ".with/deps/c/" ++ name ++ "/" ++ version ++ "/contract.with")
+        let cand = resolve_join(root, ".with/deps/c/" ++ dep_name ++ "/" ++ version ++ "/contract.with")
         if resolve_file_exists(cand): return cand
     ""
 

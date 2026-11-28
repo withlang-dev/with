@@ -284,7 +284,7 @@ pub const FACADE_CLAUSE_CALLBACK: i32 = 44          // [callback_ref]  (`callbac
 pub const FACADE_CLAUSE_CALLBACK_USERDATA: i32 = 21 // [callback_ref, userdata_ref]  (`callback param N userdata param M`, §16.2b.9)
 pub const FACADE_CLAUSE_VALID_ON_FAILED: i32 = 22  // []  (`valid on failed`: presented on the failed-state resource too, §16.2b.4)
 pub const FACADE_CLAUSE_NULLABLE: i32 = 23         // [param_ref]  (`nullable param N`: the facade establishes nullability, §16.2b.8)
-pub const FACADE_CLAUSE_BUFFER: i32 = 24           // [ptr_ref, len_ref, mode(0=len|1=capacity-inout|2=capacity|3=len-updates|4=capacity-updates|5=len-const|6=capacity-const|7=capacity-plus|8=capacity-minus), elements(0|1), fixed_sym(0|sym)] (D64/D243/D247/D248 §16.2b.8)
+pub const FACADE_CLAUSE_BUFFER: i32 = 24           // [ptr_ref, len_ref, mode(0=len|1=capacity-inout|2=capacity|3=len-updates|4=capacity-updates|5=len-const|6=capacity-const|7=capacity-plus|8=capacity-minus|9=out-alloc|10=len-min-fn|11=capacity-min-fn|12=len-stride|13=capacity-stride), elements(0|1), fixed_sym(0|sym), ...] (D64/D243/D247/D248/D251/D252 §16.2b.8)
 pub const FACADE_CLAUSE_FIXED: i32 = 25            // [param_ref, literal(node)]  (`param N fixed <literal>`, D64 §16.2b.11)
 pub const FACADE_CLAUSE_VARIADIC: i32 = 26         // [vararg_ref, selector_ref, case(node)...]  (`variadic param N selected by param P:`, D66 §16.2b.5)
 pub const FACADE_CLAUSE_VARIADIC_CASE: i32 = 27    // [selector_sym, type(node), callback_ref|0, userdata_selector_ref|0, retainer_ref|0, length_ref|0, length_type(node)|0, until_sym...] (D194: the last three; d2 is the count, so the `until` names are extras 7..d2)

@@ -12,6 +12,8 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D252 — Implicit-length size-checked buffers (`min <fn>(param A)` and `stride ... table <TBL>[param F]`) (delegated; #3154, #3163)](2026-11-27-D252-min-fn-and-stride-buffers.md)
+- [D251 — Out-allocated owned byte buffers (`buffer out param P len param L freed by F`) (delegated; #3154)](2026-11-27-D251-out-allocated-buffers.md)
 - [D250 — Retained buffer and value-record parameters (`retains param N by param 0`) (delegated; #3149)](2026-11-27-D250-retained-buffer-params.md)
 - [D249 — Positioned in-place initializers (`init F(param N)`) and bridged `init` rendering (delegated; #3149)](2026-11-27-D249-positioned-init.md)
 - [D248 — Fixed-size and offset-derived buffer contracts (`buffer param P len|capacity <N>` and `capacity param L +/- <N>`) (delegated; #3142, #3148)](2026-11-27-D248-fixed-and-derived-buffers.md)
