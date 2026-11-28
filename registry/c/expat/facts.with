@@ -1,18 +1,230 @@
 // expat 2.11.0, the version `with get c.expat` pins. Every citation is a line
-// of the package's installed header, include/expat.h.
+// of the package's installed header, include/expat.h (or expat_config.h).
 //
 // XML_Parser (`struct XML_ParserStruct *`) is allocated by XML_ParserCreate or
 // XML_ParserCreateNS and freed by XML_ParserFree. The source proof does not
 // close XML_ParserCreate on its own because parserCreate stores a back-pointer
 // to the parser inside the DTD owned by the same parser (#3124), so the pair
 // is stated here.
-c facade expat:
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - XML_ParserCreate_MM: takes a custom malloc/realloc/free function-pointer table.
+// - XML_SetUserData, XML_SetExternalEntityRefHandlerArg: untyped void* storage
+//   with no per-callback type pairing.
+// - XML_GetBuffer, XML_GetBuffer64, XML_MemMalloc, XML_MemRealloc, XML_MemFree,
+//   XML_FreeContentModel: raw internal buffer / allocator pointers.
+// - XML_GetInputContext, XML_GetInputContext64: returns raw pointer + byte
+//   offset/size into parser's internal input buffer valid only inside a handler.
+// - XML_GetFeatureList: returns a NULL/sentinel-terminated raw array of XML_Feature.
+// - XML_ExternalEntityParserCreate: creates a sub-parser linked to a parent parser.
+c facts expat:
     define XML_GE=1    // expat_config.h 2.11.0 line 105 (`#define XML_GE 1`) and expat.h 2.11.0 line 1125 (XML_DTD or XML_GE == 1): enables the billion-laughs and allocation-tracker APIs compiled into libexpat
     resource Parser wraps *mut XML_ParserStruct
-        from XML_ParserCreate    // expat.h 2.11.0 lines 258 to 262: "Constructs a new parser; encoding is the encoding specified by the external protocol or NULL if there is none specified."
-        from XML_ParserCreateNS    // expat.h 2.11.0 lines 264 to 287: "Constructs a new parser and namespace processor."
-        drop XML_ParserFree    // expat.h 2.11.0 lines 1029 to 1031: "Frees memory used by the parser."
+        from XML_ParserCreate    // expat.h 2.11.0:262: constructs a new parser; encoding may be NULL
+        from XML_ParserCreateNS    // expat.h 2.11.0:287: constructs a new parser and namespace processor
+        drop XML_ParserFree    // expat.h 2.11.0:1031: frees memory used by the parser
     fn XML_ParserCreate
-        nullable param 0    // expat.h 2.11.0 lines 258 to 259: "encoding is the encoding specified by the external protocol or NULL if there is none specified."
+        rename create    // expat.h 2.11.0:262: Parser.create(encoding)
+        nullable param 0    // expat.h 2.11.0:258: encoding may be NULL
     fn XML_ParserCreateNS
-        nullable param 0    // expat.h 2.11.0 lines 264 to 287: `const XML_Char *encoding` follows XML_ParserCreate and accepts NULL
+        rename create_ns    // expat.h 2.11.0:287: Parser.create_ns(encoding, sep)
+        nullable param 0    // expat.h 2.11.0:264: encoding may be NULL
+    fn XML_ParserReset
+        of Parser    // expat.h 2.11.0:313: prepares parser for reuse
+        lend    // expat.h 2.11.0:313: re-initializes parser in place; resets internal handlerArg to self
+        nullable param 1    // expat.h 2.11.0:313: encoding may be NULL
+    fn XML_Parse
+        of Parser    // expat.h 2.11.0:786: parses a chunk of XML input
+        rename parse    // expat.h 2.11.0:786: parser.parse(chunk, is_final)
+        lend    // expat.h 2.11.0:786: borrows parser and reads s[0..len) without retaining s
+        buffer param 1 len param 2    // expat.h 2.11.0:786: reads len bytes from s
+    fn XML_Parse64
+        of Parser    // expat.h 2.11.0:790: parses a chunk of XML input (64-bit length)
+        rename parse64    // expat.h 2.11.0:790: parser.parse64(chunk, is_final)
+        lend    // expat.h 2.11.0:790: borrows parser and reads s[0..len) without retaining s
+        buffer param 1 len param 2    // expat.h 2.11.0:790: reads len bytes from s
+    fn XML_ParseBuffer
+        of Parser    // expat.h 2.11.0:800: parses bytes written into XML_GetBuffer
+        lend    // expat.h 2.11.0:800: borrows parser
+    fn XML_ParseBuffer64
+        of Parser    // expat.h 2.11.0:804: parses bytes written into XML_GetBuffer64
+        lend    // expat.h 2.11.0:804: borrows parser
+    fn XML_ResumeParser
+        of Parser    // expat.h 2.11.0:853: resumes a suspended parser
+        lend    // expat.h 2.11.0:853: borrows parser
+    fn XML_UseParserAsHandlerArg
+        of Parser    // expat.h 2.11.0:725: passes parser itself as first handler argument
+        lend    // expat.h 2.11.0:725: sets parser->m_handlerArg to self
+    fn XML_SetBase
+        of Parser    // expat.h 2.11.0:758: sets base URI for resolving relative identifiers
+        lend    // expat.h 2.11.0:753: base argument is copied internally by expat
+        nullable param 1    // expat.h 2.11.0:758: NULL clears base
+    fn XML_GetBase
+        of Parser    // expat.h 2.11.0:761: returns previously set base URI
+        lend    // expat.h 2.11.0:761: borrows parser
+        returns borrow CStr from param 0    // expat.h 2.11.0:761: string owned by parser
+    fn XML_GetParsingStatus
+        of Parser    // expat.h 2.11.0:868: writes current XML_ParsingStatus
+        lend    // expat.h 2.11.0:868: borrows parser
+        fills param 1    // expat.h 2.11.0:868: fills XML_ParsingStatus
+    fn XML_SetHashSalt16Bytes
+        of Parser    // expat.h 2.11.0:944: sets 16-byte hash salt before parsing
+        lend    // expat.h 2.11.0:944: borrows parser and copies 16 entropy bytes
+        buffer param 1 len 16    // expat.h 2.11.0:944: reads 16 bytes from entropy[16]
+    fn XML_GetPropertyBool
+        of Parser    // expat.h 2.11.0:1107: queries boolean parser property
+        lend    // expat.h 2.11.0:1107: borrows parser
+        fills param 2    // expat.h 2.11.0:1108: writes XML_Bool result into *value
+    fn XML_GetPropertyDouble
+        of Parser    // expat.h 2.11.0:1110: queries double parser property
+        lend    // expat.h 2.11.0:1110: borrows parser
+        fills param 2    // expat.h 2.11.0:1111: writes double result into *value
+    fn XML_GetPropertyUInt64
+        of Parser    // expat.h 2.11.0:1113: queries uint64_t parser property
+        lend    // expat.h 2.11.0:1113: borrows parser
+        fills param 2    // expat.h 2.11.0:1114: writes uint64_t result into *value
+    fn XML_ErrorString
+        returns static CStr    // expat.h 2.11.0:1035: static string describing XML_Error code
+    fn XML_ExpatVersion
+        returns static CStr    // expat.h 2.11.0:1039: static version string
+
+    // ── Event handlers (retained by parser, invoked synchronously during XML_Parse) ──
+    fn XML_SetStartElementHandler
+        of Parser    // expat.h 2.11.0:583: registers start-element handler
+        lend    // expat.h 2.11.0:583: borrows parser
+        callback param 1    // expat.h 2.11.0:583: start-element callback
+        retains param 1 by param 0    // expat.h 2.11.0:583: retained by parser until replaced or freed
+        callback_thread registering    // expat.h 2.11.0:583: invoked synchronously on parsing thread
+    fn XML_SetEndElementHandler
+        of Parser    // expat.h 2.11.0:586: registers end-element handler
+        lend    // expat.h 2.11.0:586: borrows parser
+        callback param 1    // expat.h 2.11.0:586: end-element callback
+        retains param 1 by param 0    // expat.h 2.11.0:586: retained by parser until replaced or freed
+        callback_thread registering    // expat.h 2.11.0:586: invoked synchronously on parsing thread
+    fn XML_SetCharacterDataHandler
+        of Parser    // expat.h 2.11.0:589: registers character-data handler
+        lend    // expat.h 2.11.0:589: borrows parser
+        callback param 1    // expat.h 2.11.0:589: character-data callback
+        retains param 1 by param 0    // expat.h 2.11.0:589: retained by parser until replaced or freed
+        callback_thread registering    // expat.h 2.11.0:589: invoked synchronously on parsing thread
+    fn XML_SetProcessingInstructionHandler
+        of Parser    // expat.h 2.11.0:593: registers processing-instruction handler
+        lend    // expat.h 2.11.0:593: borrows parser
+        callback param 1    // expat.h 2.11.0:593: PI callback
+        retains param 1 by param 0    // expat.h 2.11.0:593: retained by parser
+        callback_thread registering    // expat.h 2.11.0:593: invoked synchronously on parsing thread
+    fn XML_SetCommentHandler
+        of Parser    // expat.h 2.11.0:596: registers comment handler
+        lend    // expat.h 2.11.0:596: borrows parser
+        callback param 1    // expat.h 2.11.0:596: comment callback
+        retains param 1 by param 0    // expat.h 2.11.0:596: retained by parser
+        callback_thread registering    // expat.h 2.11.0:596: invoked synchronously on parsing thread
+    fn XML_SetStartCdataSectionHandler
+        of Parser    // expat.h 2.11.0:604: registers start-CDATA handler
+        lend    // expat.h 2.11.0:604: borrows parser
+        callback param 1    // expat.h 2.11.0:604: start-CDATA callback
+        retains param 1 by param 0    // expat.h 2.11.0:604: retained by parser
+        callback_thread registering    // expat.h 2.11.0:604: invoked synchronously on parsing thread
+    fn XML_SetEndCdataSectionHandler
+        of Parser    // expat.h 2.11.0:608: registers end-CDATA handler
+        lend    // expat.h 2.11.0:608: borrows parser
+        callback param 1    // expat.h 2.11.0:608: end-CDATA callback
+        retains param 1 by param 0    // expat.h 2.11.0:608: retained by parser
+        callback_thread registering    // expat.h 2.11.0:608: invoked synchronously on parsing thread
+    fn XML_SetDefaultHandler
+        of Parser    // expat.h 2.11.0:616: registers default handler
+        lend    // expat.h 2.11.0:616: borrows parser
+        callback param 1    // expat.h 2.11.0:616: default callback
+        retains param 1 by param 0    // expat.h 2.11.0:616: retained by parser
+        callback_thread registering    // expat.h 2.11.0:616: invoked synchronously on parsing thread
+    fn XML_SetDefaultHandlerExpand
+        of Parser    // expat.h 2.11.0:623: registers default handler with entity expansion
+        lend    // expat.h 2.11.0:623: borrows parser
+        callback param 1    // expat.h 2.11.0:623: default callback
+        retains param 1 by param 0    // expat.h 2.11.0:623: retained by parser
+        callback_thread registering    // expat.h 2.11.0:623: invoked synchronously on parsing thread
+    fn XML_SetStartDoctypeDeclHandler
+        of Parser    // expat.h 2.11.0:630: registers start-doctype handler
+        lend    // expat.h 2.11.0:630: borrows parser
+        callback param 1    // expat.h 2.11.0:630: start-doctype callback
+        retains param 1 by param 0    // expat.h 2.11.0:630: retained by parser
+        callback_thread registering    // expat.h 2.11.0:630: invoked synchronously on parsing thread
+    fn XML_SetEndDoctypeDeclHandler
+        of Parser    // expat.h 2.11.0:634: registers end-doctype handler
+        lend    // expat.h 2.11.0:634: borrows parser
+        callback param 1    // expat.h 2.11.0:634: end-doctype callback
+        retains param 1 by param 0    // expat.h 2.11.0:634: retained by parser
+        callback_thread registering    // expat.h 2.11.0:634: invoked synchronously on parsing thread
+    fn XML_SetStartNamespaceDeclHandler
+        of Parser    // expat.h 2.11.0:649: registers start-namespace handler
+        lend    // expat.h 2.11.0:649: borrows parser
+        callback param 1    // expat.h 2.11.0:649: start-namespace callback
+        retains param 1 by param 0    // expat.h 2.11.0:649: retained by parser
+        callback_thread registering    // expat.h 2.11.0:649: invoked synchronously on parsing thread
+    fn XML_SetEndNamespaceDeclHandler
+        of Parser    // expat.h 2.11.0:653: registers end-namespace handler
+        lend    // expat.h 2.11.0:653: borrows parser
+        callback param 1    // expat.h 2.11.0:653: end-namespace callback
+        retains param 1 by param 0    // expat.h 2.11.0:653: retained by parser
+        callback_thread registering    // expat.h 2.11.0:653: invoked synchronously on parsing thread
+    fn XML_SetNotStandaloneHandler
+        of Parser    // expat.h 2.11.0:657: registers not-standalone handler
+        lend    // expat.h 2.11.0:657: borrows parser
+        callback param 1    // expat.h 2.11.0:657: not-standalone callback
+        retains param 1 by param 0    // expat.h 2.11.0:657: retained by parser
+        callback_thread registering    // expat.h 2.11.0:657: invoked synchronously on parsing thread
+    fn XML_SetSkippedEntityHandler
+        of Parser    // expat.h 2.11.0:672: registers skipped-entity handler
+        lend    // expat.h 2.11.0:672: borrows parser
+        callback param 1    // expat.h 2.11.0:672: skipped-entity callback
+        retains param 1 by param 0    // expat.h 2.11.0:672: retained by parser
+        callback_thread registering    // expat.h 2.11.0:672: invoked synchronously on parsing thread
+    fn XML_SetXmlDeclHandler
+        of Parser    // expat.h 2.11.0:250: registers XML-declaration handler
+        lend    // expat.h 2.11.0:250: borrows parser
+        callback param 1    // expat.h 2.11.0:250: XML-decl callback
+        retains param 1 by param 0    // expat.h 2.11.0:250: retained by parser
+        callback_thread registering    // expat.h 2.11.0:250: invoked synchronously on parsing thread
+    fn XML_SetElementDeclHandler
+        of Parser    // expat.h 2.11.0:219: registers element-decl handler
+        lend    // expat.h 2.11.0:219: borrows parser
+        callback param 1    // expat.h 2.11.0:219: element-decl callback
+        retains param 1 by param 0    // expat.h 2.11.0:219: retained by parser
+        callback_thread registering    // expat.h 2.11.0:219: invoked synchronously on parsing thread
+    fn XML_SetAttlistDeclHandler
+        of Parser    // expat.h 2.11.0:234: registers attlist-decl handler
+        lend    // expat.h 2.11.0:234: borrows parser
+        callback param 1    // expat.h 2.11.0:234: attlist-decl callback
+        retains param 1 by param 0    // expat.h 2.11.0:234: retained by parser
+        callback_thread registering    // expat.h 2.11.0:234: invoked synchronously on parsing thread
+    fn XML_SetEntityDeclHandler
+        of Parser    // expat.h 2.11.0:396: registers entity-decl handler
+        lend    // expat.h 2.11.0:396: borrows parser
+        callback param 1    // expat.h 2.11.0:396: entity-decl callback
+        retains param 1 by param 0    // expat.h 2.11.0:396: retained by parser
+        callback_thread registering    // expat.h 2.11.0:396: invoked synchronously on parsing thread
+    fn XML_SetUnparsedEntityDeclHandler
+        of Parser    // expat.h 2.11.0:637: registers unparsed-entity-decl handler
+        lend    // expat.h 2.11.0:637: borrows parser
+        callback param 1    // expat.h 2.11.0:637: unparsed-entity-decl callback
+        retains param 1 by param 0    // expat.h 2.11.0:637: retained by parser
+        callback_thread registering    // expat.h 2.11.0:637: invoked synchronously on parsing thread
+    fn XML_SetNotationDeclHandler
+        of Parser    // expat.h 2.11.0:641: registers notation-decl handler
+        lend    // expat.h 2.11.0:641: borrows parser
+        callback param 1    // expat.h 2.11.0:641: notation-decl callback
+        retains param 1 by param 0    // expat.h 2.11.0:641: retained by parser
+        callback_thread registering    // expat.h 2.11.0:641: invoked synchronously on parsing thread
+    fn XML_SetExternalEntityRefHandler
+        of Parser    // expat.h 2.11.0:661: registers external-entity-ref handler
+        lend    // expat.h 2.11.0:661: borrows parser
+        callback param 1    // expat.h 2.11.0:661: external-entity-ref callback
+        retains param 1 by param 0    // expat.h 2.11.0:661: retained by parser
+        callback_thread registering    // expat.h 2.11.0:661: invoked synchronously on parsing thread
+    fn XML_SetUnknownEncodingHandler
+        of Parser    // expat.h 2.11.0:676: registers unknown-encoding handler with userdata
+        lend    // expat.h 2.11.0:676: borrows parser and retains handler/userdata
+        callback param 1 userdata param 2    // expat.h 2.11.0:676: encoding handler + encodingHandlerData
+        retains param 1 by param 0    // expat.h 2.11.0:676: retained by parser
+        retains param 2 by param 0    // expat.h 2.11.0:676: retained by parser
+        callback_thread registering    // expat.h 2.11.0:676: invoked synchronously on parsing thread

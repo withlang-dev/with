@@ -1,0 +1,72 @@
+// Zero-unsafe UAT for c.expat (#3148): streaming chunked XML_Parse with
+// start/end/character-data handlers, parser-as-handler-arg userdata,
+// property queries, and malformed-XML error position reporting.
+use contracts.expat
+use c_import("expat.h")
+use std.sync
+
+var g_starts: AtomicI64 = atomic_new(0)
+var g_ends: AtomicI64 = atomic_new(0)
+var g_cdata_bytes: AtomicI64 = atomic_new(0)
+var g_nonnull_ud: AtomicI64 = atomic_new(0)
+
+fn on_start(ud: *mut c_void, name: *const c_char, atts: *mut *const c_char):
+    let _ = name
+    let _ = atts
+    if ud != null:
+        let _ = g_nonnull_ud.fetch_add(1, Order.SeqCst)
+    let _ = g_starts.fetch_add(1, Order.SeqCst)
+
+fn on_end(ud: *mut c_void, name: *const c_char):
+    let _ = name
+    if ud != null:
+        let _ = g_nonnull_ud.fetch_add(1, Order.SeqCst)
+    let _ = g_ends.fetch_add(1, Order.SeqCst)
+
+fn on_cdata(ud: *mut c_void, s: *const c_char, len: i32):
+    let _ = s
+    if ud != null:
+        let _ = g_nonnull_ud.fetch_add(1, Order.SeqCst)
+    let _ = g_cdata_bytes.fetch_add(len as i64, Order.SeqCst)
+
+fn main:
+    assert(XML_ExpatVersion().unwrap().to_str_lossy().contains("expat_2"))
+
+    // 1. Streaming parse across 3 chunks with start/end/cdata handlers and parser userdata.
+    let parser = Parser.create(None).unwrap()
+    parser.use_parser_as_handler_arg()
+    parser.set_start_element_handler(on_start)
+    parser.set_end_element_handler(on_end)
+    parser.set_character_data_handler(on_cdata)
+
+    let c1 = "<config><item id=\"1\">he" as []u8
+    let c2 = "llo</item><item id=\"2\">wor" as []u8
+    let c3 = "ld</item></config>" as []u8
+    assert(parser.parse(c1, 0) == XML_STATUS_OK)
+    assert(parser.parse(c2, 0) == XML_STATUS_OK)
+    assert(parser.parse(c3, 1) == XML_STATUS_OK)
+
+    assert(g_starts.load(Order.SeqCst) == 3)
+    assert(g_ends.load(Order.SeqCst) == 3)
+    assert(g_cdata_bytes.load(Order.SeqCst) == 10)
+    assert(g_nonnull_ud.load(Order.SeqCst) >= 8)
+
+    let status = parser.get_parsing_status()
+    assert(status.parsing == XML_FINISHED)
+
+    let (prop_rc, defer_enabled) = parser.get_property_bool(XML_PROP_REPARSE_DEFERRAL_ENABLED)
+    assert(prop_rc == XML_PROP_ERROR_NONE)
+    let _ = defer_enabled
+
+    // 2. Malformed XML error code, message, and line/column position reporting.
+    let bad = Parser.create(None).unwrap()
+    let broken = "<root>\n  <child>oops</wrong>\n</root>" as []u8
+    assert(bad.parse(broken, 1) == XML_STATUS_ERROR)
+    let code = bad.get_error_code()
+    assert(code == XML_ERROR_TAG_MISMATCH)
+    assert(XML_ErrorString(code).unwrap().to_str_lossy().len() > 0)
+    assert(bad.get_current_line_number64() == 2)
+    assert(bad.get_current_column_number64() > 0)
+    assert(bad.get_current_byte_index64() > 0)
+
+    print("expat ok")

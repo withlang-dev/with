@@ -1,0 +1,11 @@
+scenario: c.expat streams XML chunks through start/end/character-data handlers and reports error positions without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: with get c.expat
+write src/main.with from expat_main.with
+run: with run
+expect exit: 0
+expect stdout contains: expat ok
