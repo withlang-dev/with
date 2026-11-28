@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D255 — C struct-prefix subtyping, fat-pointer/iovec buffers, and async event-loop handles/requests (delegated; #3160)](2026-11-27-D255-c-subtypes-iovec-and-async-handles.md)
 - [D254 — Dependent-resource parent drop, retained resource parameters, const-widened handle accessors, and row-pointer image buffers (delegated; #3153)](2026-11-27-D254-parent-drop-retained-resource-and-row-buffers.md)
 - [D253 — Borrow-only `*const T` resources from immutable C globals (delegated; #3163)](2026-11-27-D253-borrow-only-const-globals.md)
 - [D252 — Implicit-length size-checked buffers (`min <fn>(param A)` and `stride ... table <TBL>[param F]`) (delegated; #3154, #3163)](2026-11-27-D252-min-fn-and-stride-buffers.md)

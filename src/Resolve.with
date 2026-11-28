@@ -1234,7 +1234,7 @@ impl ResolveState:
             var movable = false
             for ci in 0..ast_pool.get_data2(item as NodeId):
                 let kind = ast_pool.get_data0(ast_pool.get_extra(clause_start + 1 + ci) as NodeId)
-                if kind == FACADE_CLAUSE_INIT: has_init = true
+                if kind == FACADE_CLAUSE_INIT or kind == FacadeAsyncClause.AsyncClose as i32: has_init = true
                 if kind == FACADE_CLAUSE_MOVABLE: movable = true
             if has_init and not movable:
                 return true
@@ -1253,7 +1253,7 @@ impl ResolveState:
             for ci in 0..ast_pool.get_data2(item as NodeId):
                 let clause = ast_pool.get_extra(clause_start + ci) as NodeId
                 let kind = ast_pool.get_data0(clause)
-                if kind == FACADE_CLAUSE_RETAINS or kind == FACADE_CLAUSE_CALLBACK_USERDATA:
+                if kind == FACADE_CLAUSE_RETAINS or kind == FACADE_CLAUSE_CALLBACK_USERDATA or kind == FacadeAsyncClause.AsyncReq as i32 or kind == FacadeAsyncClause.ReadAllocPair as i32 or kind == FacadeAsyncClause.CloseRelease as i32:
                     return true
                 if kind == FACADE_CLAUSE_CONSUMES and ast_pool.get_extra(ast_pool.get_data1(clause) + 1) != 0:
                     return true

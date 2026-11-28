@@ -557,6 +557,9 @@ type FacadeResource {
     message: i32,         // `message <fn>` (ruling Amendment 3): the operation describing the most recent failure, or 0
     message_node: i32,
     handle: i32,          // 1 for a callback-scope `handle Name wraps *mut T` (§16.2b.9): no producer, destroyer or Drop; borrowed for the callback's invocation
+    extends_sym: i32,     // D255: C struct-prefix supertype (`extends Base`), or 0
+    async_close: i32,     // D255: `async_close <close_fn> check <check_fn>` close function symbol, or 0
+    async_close_check: i32, // D255: `async_close ... check <check_fn>` status-check function symbol, or 0
 }
 
 type ForeignContract {
@@ -594,6 +597,17 @@ type ForeignContract {
     nullable_params: List[i32],         // `nullable param N`: the facade establishes the parameter accepts NULL (§16.2b.8)
     value_records: List[i32],           // D198 §16.2b.5: each parameter a `reads`/`fills`/`updates param N` describes …
     value_record_words: List[i32],      // … and the clause's word, as its symbol (parallel)
+    value_record_lens: List[i32],       // D255: `fills param N as T len param L` companion inout-length parameter indices
+    async_req_param: i32,               // D255: `async_req param N via set, get` req parameter index, or -1
+    async_req_set: i32,                 // D255: req userdata setter symbol, or 0
+    async_req_get: i32,                 // D255: req userdata getter symbol, or 0
+    read_pair_alloc: i32,               // D255: `read_pair alloc param A ...` alloc callback param index, or -1
+    read_pair_buf_init: i32,            // D255: `via <buf_init>` function symbol, or 0
+    read_pair_read: i32,                // D255: `read param R` read callback param index, or -1
+    read_pair_set: i32,                 // D255: handle userdata setter symbol, or 0
+    read_pair_get: i32,                 // D255: handle userdata getter symbol, or 0
+    close_release_get: i32,             // D255: `close_release via get, set` getter symbol, or 0
+    close_release_set: i32,             // D255: `close_release via get, set` setter symbol, or 0
     text_params: List[i32],             // D122 `text param N`: input text of any C character type; takes a str (§16.2b.8)
     text_return_free: i32,              // D122 `text return, owned, freed by F`: F's symbol, or 0 (§16.2b.8)
     text_bytes: i32,                    // D134 `text return bytes`: owned bytes even under a `text utf8` facade (§16.2b.8)
