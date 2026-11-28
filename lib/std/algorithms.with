@@ -125,16 +125,10 @@ unsafe fn stable_sort_through_refs[T](base: *mut T, n: isize, compare: fn(*const
     with_free(source as *mut u8)
     with_free(target as *mut u8)
 
-impl[T: Ord] List[T]:
-    /// Sorts ascending by `Ord`, keeping equal elements in their input
-    /// order (merge sort; see the module note).
-    pub mut fn stable_sort():
-        let n = self.len()
-        if n < 2: return
-        unsafe { stable_sort_through_refs(self.ptr as *mut T, n, ord_compare(self.ptr)) }
-
-    /// Sorts ascending by `Ord` (D41). The word shapes sort in place through
-    /// the engine's own instantiation; everything else through references.
+impl[T] List[T]:
+    /// Sorts ascending (D41). The word shapes (`i64`, `u64`, `f64`) sort in
+    /// place through the engine's own instantiation; every other `T` requires
+    /// `T: Ord` via `ord_compare` and sorts through references.
     pub mut fn sort():
         let n = self.len()
         if n < 2: return
@@ -147,6 +141,14 @@ impl[T: Ord] List[T]:
             unsafe { stc_f64s_sort(base as *mut f64, n as i64) }
         else:
             unsafe { sort_through_refs(base, n, ord_compare(self.ptr)) }
+
+impl[T: Ord] List[T]:
+    /// Sorts ascending by `Ord`, keeping equal elements in their input
+    /// order (merge sort; see the module note).
+    pub mut fn stable_sort():
+        let n = self.len()
+        if n < 2: return
+        unsafe { stable_sort_through_refs(self.ptr as *mut T, n, ord_compare(self.ptr)) }
 
     /// The index of an element equal to `value` in a sorted list, if any.
     pub fn binary_search(value: &T) -> Option[isize]:

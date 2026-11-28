@@ -1,14 +1,15 @@
-//! expect-check-fail: symbol 'tommy_ilog2_u32' is private to its package
+//! expect-check-fail: symbol 'total_float_cmp' is private to its package
 //! expect-check-fail: symbol 'http_parse_url' is private to its package
 
-// #2958 (§18.3, D100): calling a non-`pub` std function — whether displaced
-// across modules (`tommy_ilog2_u32`) or in an unimported std module
+// #2958 (§18.3, D100): calling a non-`pub` std function — whether in an
+// ambient prelude module (`total_float_cmp`) or in an unimported std module
 // (`http_parse_url`) — reports the §18.3 package-privacy error naming the
 // declaring module rather than "undefined variable".
+// (Note: bundled engine corpora such as `tommyds` omit non-`pub` functions
+// from their Level 0 `.wi` interfaces by design.)
 
-use std.engines.tommyds.tommyhashlin
 use std.http.https_get
 
 fn main:
-    let _a = tommy_ilog2_u32(4u32)
+    let _a = total_float_cmp(1.0, 2.0)
     let _b = http_parse_url("https://example.com")
