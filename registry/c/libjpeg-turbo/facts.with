@@ -1,0 +1,106 @@
+// libjpeg-turbo 3.2.1, the version `with get c.libjpeg-turbo` pins. Every
+// citation is a line of the package's installed header, include/turbojpeg.h.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - tj3Alloc / tjAlloc / tj3Free / tjFree: raw heap allocator/deallocator
+//   (used automatically by `buffer out ... freed by` below).
+// - tj3Compress12 / tj3Compress16 / tj3Decompress12 / tj3Decompress16:
+//   12/16-bit sample variants taking short*/unsigned short* buffers.
+// - tj3CompressFromYUV* / tj3EncodeYUV* / tj3DecompressToYUV* / tj3DecodeYUV*
+//   / tjCompressFromYUV* / tjEncodeYUV* / tjDecodeYUV* / tjDecompressToYUV*:
+//   planar YUV buffer arrays whose plane counts and alignments depend on subsamp.
+// - tj3Transform / tjTransform: multi-output array of allocated buffers with
+//   optional DCT-coefficient callback hooks in `tjtransform`.
+// - tj3LoadImage* / tj3SaveImage* / tjLoadImage / tjSaveImage: file I/O
+//   returning raw heap pixel buffers without byte-length out-parameters.
+// - tj3GetScalingFactors / tjGetScalingFactors: returns static array pointer
+//   plus out-count (no borrowed slice return in WCL yet).
+// - jpeglib.h low-level API: requires caller-managed setjmp/longjmp error_mgr
+//   and header pre-includes (<stddef.h>/<stdio.h>).
+c facts libjpeg-turbo:
+    resource TjHandle wraps *mut c_void
+        from tj3InitVersion    // turbojpeg.h 3.2.1 line 1344: creates a new TurboJPEG instance, NULL on error
+        from tjInitCompress    // turbojpeg.h 3.2.1 line 2744: creates a TurboJPEG compressor instance, NULL on error
+        from tjInitDecompress    // turbojpeg.h 3.2.1 line 2746: creates a TurboJPEG decompressor instance, NULL on error
+        from tjInitTransform    // turbojpeg.h 3.2.1 line 2800: creates a TurboJPEG transformer instance, NULL on error
+        drop tj3Destroy    // turbojpeg.h 3.2.1 line 1353: destroys a TurboJPEG instance (NULL is a no-op)
+        destroys tjDestroy    // turbojpeg.h 3.2.1 line 2740: destroys a TurboJPEG instance, returning 0 on success
+
+    fn tj3GetErrorStr
+        lend    // turbojpeg.h 3.2.1 line 1366: reads last error string from handle
+        returns borrow CStr from param 0    // turbojpeg.h 3.2.1 line 1366: error string owned by the TurboJPEG instance
+
+    fn tj3GetErrorCode
+        lend    // turbojpeg.h 3.2.1 line 1378: returns TJERR_WARNING or TJERR_FATAL for handle
+
+    fn tj3Set
+        lend    // turbojpeg.h 3.2.1 line 1393: sets an integer parameter on handle
+        ok 0    // turbojpeg.h 3.2.1 line 1391: returns 0 on success, -1 on error
+
+    fn tj3Get
+        lend    // turbojpeg.h 3.2.1 line 1405: gets an integer parameter from handle
+
+    fn tj3SetICCProfile
+        lend    // turbojpeg.h 3.2.1 line 1572: associates ICC profile bytes with handle
+        buffer param 1 len param 2    // turbojpeg.h 3.2.1 line 1572: reads iccSize bytes from iccBuf
+        ok 0    // turbojpeg.h 3.2.1 line 1570: returns 0 on success, -1 on error
+
+    fn tj3GetICCProfile
+        lend    // turbojpeg.h 3.2.1 line 1990: retrieves extracted ICC profile from handle
+        buffer out param 1 len param 2 freed by tj3Free    // turbojpeg.h 3.2.1 line 1978: allocates *iccBuf of *iccSize bytes, freed with tj3Free
+        ok 0    // turbojpeg.h 3.2.1 line 1987: returns 0 on success, -1 on error
+
+    fn tj3Compress8
+        lend    // turbojpeg.h 3.2.1 line 1618: compresses 8-bit packed pixels to JPEG
+        buffer param 1 len stride param 3 width param 2 height param 4 table tjPixelSize[param 5]    // turbojpeg.h 3.2.1 lines 1584 to 1598: srcBuf is pitch * height (or width * tjPixelSize[pixelFormat] * height when pitch == 0)
+        buffer out param 6 len param 7 freed by tj3Free    // turbojpeg.h 3.2.1 lines 1605 to 1612: allocates *jpegBuf of *jpegSize bytes, freed with tj3Free
+        ok 0    // turbojpeg.h 3.2.1 line 1615: returns 0 on success, -1 on error
+
+    fn tj3DecompressHeader
+        lend    // turbojpeg.h 3.2.1 line 1955: reads JPEG header parameters into handle
+        buffer param 1 len param 2    // turbojpeg.h 3.2.1 line 1956: reads jpegSize bytes from jpegBuf
+        ok 0    // turbojpeg.h 3.2.1 line 1945: returns 0 on success, -1 on error
+
+    fn tj3SetScalingFactor
+        lend    // turbojpeg.h 3.2.1 line 2031: sets fractional decompression scaling factor
+        ok 0    // turbojpeg.h 3.2.1 line 2029: returns 0 on success, -1 on error
+
+    fn tj3SetCroppingRegion
+        lend    // turbojpeg.h 3.2.1 line 2055: sets partial decompression cropping region
+        ok 0    // turbojpeg.h 3.2.1 line 2053: returns 0 on success, -1 on error
+
+    fn tjGetErrorStr2
+        lend    // turbojpeg.h 3.2.1 line 2882: reads last error string from handle
+        returns borrow CStr from param 0    // turbojpeg.h 3.2.1 line 2882: error string owned by handle
+
+    fn tjGetErrorCode
+        lend    // turbojpeg.h 3.2.1 line 2880: returns error severity code for handle
+
+    fn tjCompress2
+        lend    // turbojpeg.h 3.2.1 line 2782: compresses packed RGB/RGBA/GRAY pixels to JPEG with quality
+        buffer param 1 len stride param 3 width param 2 height param 4 table tjPixelSize[param 5]    // turbojpeg.h 3.2.1 line 2782: srcBuf is pitch * height (or width * tjPixelSize[pixelFormat] * height when pitch == 0)
+        buffer out param 6 len param 7 freed by tjFree    // turbojpeg.h 3.2.1 line 2784: allocates *jpegBuf of *jpegSize bytes, freed with tjFree
+        ok 0    // turbojpeg.h 3.2.1 line 2782: returns 0 on success, -1 on error
+
+    fn tjDecompressHeader2
+        lend    // turbojpeg.h 3.2.1 line 2754: reads JPEG header dimensions and subsampling
+        buffer param 1 len param 2    // turbojpeg.h 3.2.1 line 2754: reads jpegSize bytes from jpegBuf
+        fills param 3    // turbojpeg.h 3.2.1 line 2754: writes image width
+        fills param 4    // turbojpeg.h 3.2.1 line 2755: writes image height
+        fills param 5    // turbojpeg.h 3.2.1 line 2755: writes JPEG subsampling
+        ok 0    // turbojpeg.h 3.2.1 line 2754: returns 0 on success, -1 on error
+
+    fn tjDecompressHeader3
+        lend    // turbojpeg.h 3.2.1 line 2842: reads JPEG header dimensions, subsampling, and colorspace
+        buffer param 1 len param 2    // turbojpeg.h 3.2.1 line 2843: reads jpegSize bytes from jpegBuf
+        fills param 3    // turbojpeg.h 3.2.1 line 2844: writes image width
+        fills param 4    // turbojpeg.h 3.2.1 line 2845: writes image height
+        fills param 5    // turbojpeg.h 3.2.1 line 2845: writes JPEG subsampling
+        fills param 6    // turbojpeg.h 3.2.1 line 2846: writes JPEG colorspace
+        ok 0    // turbojpeg.h 3.2.1 line 2842: returns 0 on success, -1 on error
+
+    fn tjDecompress2
+        lend    // turbojpeg.h 3.2.1 line 2787: decompresses JPEG bytes to packed RGB/RGBA/GRAY pixels
+        buffer param 1 len param 2    // turbojpeg.h 3.2.1 line 2787: reads jpegSize bytes from jpegBuf
+        buffer param 3 capacity stride param 5 width param 4 height param 6 table tjPixelSize[param 7]    // turbojpeg.h 3.2.1 line 2788: dstBuf holds pitch * height (or width * tjPixelSize[pixelFormat] * height when pitch == 0)
+        ok 0    // turbojpeg.h 3.2.1 line 2787: returns 0 on success, -1 on error

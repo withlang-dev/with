@@ -1,0 +1,11 @@
+scenario: c.libjpeg-turbo compresses an RGB image with quality and decompresses it back to RGB without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: with get c.libjpeg-turbo
+write src/main.with from libjpeg_turbo_main.with
+run: with run
+expect exit: 0
+expect stdout contains: libjpeg-turbo ok

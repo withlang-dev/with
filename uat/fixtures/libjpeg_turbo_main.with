@@ -1,0 +1,62 @@
+// Zero-unsafe UAT for c.libjpeg-turbo (#3154): compress an RGB image with
+// quality setting (tjCompress2 and tj3Compress8), inspect JPEG header
+// (tjDecompressHeader3 / tj3DecompressHeader), and decompress back to RGB
+// (tjDecompress2).
+use contracts.libjpeg_turbo
+use c_import("turbojpeg.h")
+
+fn abs_diff(a: u8, b: u8) -> i32:
+    let ai = a as i32
+    let bi = b as i32
+    if ai >= bi: ai - bi else: bi - ai
+
+fn main:
+    let w: i32 = 16
+    let h: i32 = 16
+    var src_rgb: [u8; 768] = [0 as u8; 768]
+    for y in 0..16:
+        for x in 0..16:
+            let idx = (y * 16 + x) * 3
+            src_rgb[idx] = (x * 16) as u8
+            src_rgb[idx + 1] = (y * 16) as u8
+            src_rgb[idx + 2] = 128 as u8
+
+    // 1. Compress with quality=95 using TurboJPEG 2 API (tjCompress2).
+    let comp = TjHandle.tjInitCompress().unwrap()
+    let jpeg = comp.tjCompress2(src_rgb[..], w, 0, h, TJPF_RGB as i32, TJSAMP_444 as i32, 95, 0).unwrap()
+    if jpeg.len() < 100 or jpeg[0] != 255 as u8 or jpeg[1] != 216 as u8:
+        panic(f"invalid JPEG output: len={jpeg.len()}")
+
+    // 2. Inspect header and decompress back to RGB using tjDecompressHeader3 + tjDecompress2.
+    let decomp = TjHandle.tjInitDecompress().unwrap()
+    let (dw, dh, dsubsamp, dcs) = decomp.tjDecompressHeader3(jpeg[..]).unwrap()
+    if dw != w or dh != h or dsubsamp != TJSAMP_444 as i32:
+        panic(f"unexpected JPEG header: {dw}x{dh} subsamp={dsubsamp} cs={dcs}")
+
+    var dst_rgb: [u8; 768] = [0 as u8; 768]
+    decomp.tjDecompress2(jpeg[..], dst_rgb, dw, 0, dh, TJPF_RGB as i32, 0).unwrap()
+
+    var max_err: i32 = 0
+    for i in 0..768:
+        let d = abs_diff(src_rgb[i], dst_rgb[i])
+        if d > max_err: max_err = d
+    if max_err > 12:
+        panic(f"decompressed RGB diverged too far: max_err={max_err}")
+
+    // 3. Also exercise TurboJPEG 3 API (tj3InitVersion, tj3Set, tj3Get, tj3Compress8, tj3DecompressHeader).
+    let c3 = TjHandle.tj3InitVersion(TJINIT_COMPRESS as i32, TURBOJPEG_VERSION_NUMBER as i32).unwrap()
+    c3.tj3Set(TJPARAM_SUBSAMP as i32, TJSAMP_444 as i32).unwrap()
+    c3.tj3Set(TJPARAM_QUALITY as i32, 85).unwrap()
+    if c3.tj3Get(TJPARAM_QUALITY as i32) != 85:
+        panic("tj3Get(TJPARAM_QUALITY) mismatch")
+    let jpeg3 = c3.tj3Compress8(src_rgb[..], w, 0, h, TJPF_RGB as i32).unwrap()
+    if jpeg3.len() < 100 or jpeg3[0] != 255 as u8 or jpeg3[1] != 216 as u8:
+        panic(f"invalid tj3Compress8 output: len={jpeg3.len()}")
+
+    let d3 = TjHandle.tj3InitVersion(TJINIT_DECOMPRESS as i32, TURBOJPEG_VERSION_NUMBER as i32).unwrap()
+    d3.tj3DecompressHeader(jpeg3[..]).unwrap()
+    if d3.tj3Get(TJPARAM_JPEGWIDTH as i32) != w or d3.tj3Get(TJPARAM_JPEGHEIGHT as i32) != h:
+        panic("tj3DecompressHeader dimension mismatch")
+
+    print(f"libjpeg-turbo: {dw}x{dh} q95={jpeg.len()}B q85={jpeg3.len()}B max_err={max_err}")
+    print("libjpeg-turbo ok")
