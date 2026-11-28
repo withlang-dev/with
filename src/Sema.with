@@ -1249,6 +1249,13 @@ type Sema {
     // MIR builds the Some around the lowered value. Keyed by expression node,
     // the Option type.
     value_to_option_nodes: HashMap[i32, i32, Minted],
+    // D34-A (D257, #920): expressions finalized at an owned demand via `Finalize[T]`.
+    // Keyed by expression node: target type, finalize method symbol, concrete sig,
+    // and (for generic builders) monomorphized symbol.
+    finalize_demand_nodes: HashMap[i32, i32, Minted],
+    finalize_demand_fn_syms: HashMap[i32, i32, Minted],
+    finalize_demand_sigs: HashMap[i32, i32, Minted],
+    finalize_demand_monos: HashMap[i32, i32, Minted],
     // D142 (§13.5): pipeline nodes whose left side is a sequence, iterated
     // by the `for` rule; the value is the iterator type MIR's inserted
     // `.iter()` call builds (for_iter_* keyed by the pipeline node).
@@ -4053,6 +4060,10 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         comptime_callable_chain: [:],
         comptime_callable_visiting: [],
         value_to_option_nodes: [:],
+        finalize_demand_nodes: [:],
+        finalize_demand_fn_syms: [:],
+        finalize_demand_sigs: [:],
+        finalize_demand_monos: [:],
         pipeline_implicit_iter: [:],
         implicit_iter_args: [:],
         iter_ctor_call_nodes: [:],
@@ -6680,6 +6691,7 @@ impl Sema:
         self.lang_trait_syms.insert(self.syms.scoped_send_trait, 1)
         self.lang_trait_syms.insert(self.pool_intern("Scoped"), 1)
         self.lang_trait_syms.insert(self.pool_intern("ScopedMut"), 1)
+        self.lang_trait_syms.insert(self.pool_intern("Finalize"), 1)
         self.lang_trait_syms.insert(self.pool_intern("Error"), 1)
 
 fn sema_is_name_char(ch: i32) -> bool:

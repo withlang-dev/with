@@ -201,6 +201,13 @@ pub trait ScopedMut[T]:
     fn with_enter_mut(self: &Self) -> T
     mut fn with_exit_mut(value: T) -> Unit
 
+/// Canonical builder finalization (D34-A, D257, #920).
+/// A builder implementing `Finalize[T]` satisfies an owned demand for `T`
+/// (return position, typed binding, typed call argument, literal element/field)
+/// without calling `.finalize()` explicitly (Laws 1 & 2).
+pub trait Finalize[T]:
+    move fn finalize() -> T
+
 /// The smaller and the larger of two integers. Declared here, as D110 asks
 /// of every built-in method (#3483); each compiles to a compare and a select.
 pub trait MinMax:

@@ -1,0 +1,34 @@
+//! expect-debug-alloc: leak count=0
+// D34-A (D257, #920): demand-site finalization consumes the builder cleanly
+// and drops both the builder's internal buffer and the finalized output once.
+use std.string.StringBuilder
+use std.traits.Finalize
+
+fn build_str(prefix: &str) -> str:
+    var b = StringBuilder.new()
+    b.push_str(prefix)
+    b.push_str("-built-heap-payload")
+    b
+
+type Payload { items: List[i64] }
+type PayloadBuilder { items: List[i64] }
+impl Finalize[Payload] for PayloadBuilder:
+    move fn finalize() -> Payload:
+        Payload { items: self.items }
+
+fn main:
+    let s1 = build_str("ret")
+    assert(s1 == "ret-built-heap-payload")
+
+    var b = StringBuilder.new()
+    b.push_str("let-heap")
+    let s2: str = b
+    b.push_str("-payload")
+    let s3: str = b
+    assert(s2 == "let-heap" and s3 == "let-heap-payload")
+
+    var pb = PayloadBuilder { items: List.new() }
+    pb.items.push(10)
+    pb.items.push(20)
+    let p: Payload = pb
+    assert(p.items.len() == 2 and p.items[1] == 20)

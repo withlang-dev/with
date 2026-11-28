@@ -76,6 +76,9 @@ impl StringBuilder:
     pub comptime fn to_str() -> str:
         with_str_from_vec_u8((&raw const self.bytes) as *const u8)
 
+impl Finalize[str] for StringBuilder:
+    pub move fn finalize() -> str: self.to_str()
+
 /// String length (same as `s.len()`).
 pub fn string_len(s: &str) -> i64:
     with_str_len(s)

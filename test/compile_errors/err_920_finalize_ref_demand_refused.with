@@ -1,0 +1,12 @@
+//! expect-error: wrong argument type
+
+// D34-A (D257, #920): a borrowed `&str` demand does not silently finalize/consume a builder.
+use std.string.StringBuilder
+
+fn peek(s: &str):
+    print(s)
+
+fn main:
+    var b = StringBuilder.new()
+    b.push_str("hi")
+    peek(b)

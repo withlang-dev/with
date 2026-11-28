@@ -1362,7 +1362,8 @@ impl Sema:
                 else:
                     // D141: an arm the `None` join converted to the Option
                     // keeps its own type; the record is the conversion.
-                    let arm_converted = arm_node > 0 and (self.value_to_option_nodes.contains(arm_node) or self.value_to_option_nodes.contains(self.join_arm_value_node(arm_node)))
+                    let arm_leaf = self.join_arm_value_node(arm_node)
+                    let arm_converted = arm_node > 0 and (self.value_to_option_nodes.contains(arm_node) or self.value_to_option_nodes.contains(arm_leaf) or self.finalize_demand_nodes.contains(arm_node) or self.finalize_demand_nodes.contains(arm_leaf))
                     if not arm_converted and self.contextual_join_value_accepts(final_type, arm_ty) == false:
                         self.emit_contextual_join_mismatch(join_name, final_type, arm_ty, report_node, arm_node)
                         return 0
@@ -5831,7 +5832,8 @@ impl Sema:
     mut fn note_option_tail_demand(body: i32, body_expected_ret: TypeId, body_ty: TypeId):
         if body_expected_ret == 0 or body_ty == 0 or body_ty == self.ty_void or body_ty == self.ty_never: return
         let tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
-        self.value_to_option_at_demand(tail, body_expected_ret, body_ty)
+        let after_opt = self.value_to_option_at_demand(tail, body_expected_ret, body_ty)
+        self.finalize_at_demand(tail, body_expected_ret, after_opt)
 
     mut fn check_body_result(body: i32, source_body: i32, body_ty: TypeId, body_expected_ret: TypeId, ret_type: i32, has_ret_annotation: bool, is_entry: bool) -> bool:
         if has_ret_annotation and ret_type != 0 and ret_type != self.ty_void as i32:
@@ -5877,9 +5879,8 @@ impl Sema:
             // §4.9 / D111: the tail may be a Copy view of the Ok payload.
             let tail_copies = self.can_contextually_copy_ref(self.tail_ok_payload(body_expected_ret as i32, body_ty as i32), body_ty as i32)
             let tail_demand = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
-            // §4.9a (D103): the return type is a demand on the tail; a `T`
-            // tail under an `Option[T]` return is `Some(tail)`.
-            let tail_to_option = self.value_to_option_at_demand(tail_demand, body_expected_ret, body_ty) != body_ty
+            // §4.9a (D103) / D34-A (#920): the return type is a demand on the tail.
+            let tail_to_option = self.value_to_option_at_demand(tail_demand, body_expected_ret, body_ty) != body_ty or self.finalize_at_demand(tail_demand, body_expected_ret, body_ty) != body_ty
             if not tail_to_option and self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == false and body_materializes_copy == 0 and not tail_copies and not self.note_int_local_arg_demand(tail_demand, body_expected_ret as i32, body_ty as i32):
                 if has_ret_annotation:
                     self.body_result_mismatch_pending = body
@@ -5929,8 +5930,8 @@ impl Sema:
                                 let tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
                                 ok_wrapped = self.record_contextual_copy_adjustment(tail, ok_type, body_ty as i32) != 0
                     let tail_leaf = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
-                    // §4.9a (D103): a `T` tail under an `Option[T]` return.
-                    let tail_to_option = not ok_wrapped and self.value_to_option_at_demand(tail_leaf, body_expected_ret, body_ty) != body_ty
+                    // §4.9a (D103) / D34-A (#920): Option wrapping or builder finalization on the tail.
+                    let tail_to_option = not ok_wrapped and (self.value_to_option_at_demand(tail_leaf, body_expected_ret, body_ty) != body_ty or self.finalize_at_demand(tail_leaf, body_expected_ret, body_ty) != body_ty)
                     if ok_wrapped:
                         self.implicit_ok_tail_sigs.insert(sig_idx, 1)
                     else if not tail_to_option and not self.note_int_local_arg_demand(tail_leaf, body_expected_ret as i32, body_ty as i32):
@@ -11389,9 +11390,9 @@ impl Sema:
             let value = self.ast.get_data0(node)
             if value == 0:
                 return 1
-            // §4.9a (D103): a value the return demand converted keeps its own
+            // §4.9a (D103) / D34-A (#920): a value the return demand converted keeps its own
             // type on the node; the record is the conversion.
-            if self.value_to_option_nodes.contains(value):
+            if self.value_to_option_nodes.contains(value) or self.finalize_demand_nodes.contains(value):
                 return 1
             let actual = self.recorded_expr_type_or_zero(value)
             if actual != 0 and actual != self.ty_void and actual != self.ty_never:
@@ -11432,9 +11433,9 @@ impl Sema:
         // if/match carrier too would stack a second contextual-Copy adjustment
         // on the same demand and MIR would dereference twice.
         if value_path != 0:
-            // §4.9a (D103): a leaf the return demand already converted to
-            // its Option keeps its own type; the record is the conversion.
-            if self.value_to_option_nodes.contains(node):
+            // §4.9a (D103) / D34-A (#920): a leaf the return demand already converted
+            // keeps its own type; the record is the conversion.
+            if self.value_to_option_nodes.contains(node) or self.finalize_demand_nodes.contains(node):
                 return 1
             let actual = self.recorded_expr_type_or_zero(node)
             if actual != 0 and actual != self.ty_void and actual != self.ty_never:
@@ -21022,6 +21023,8 @@ impl Sema:
                 if self.value_to_option_nodes.contains(value):
                     if self.recorded_expr_type_or_zero(value) == 0:
                         self.typed_expr_types.insert(value, self.option_demand_payload(val_type) as i32)
+                else if self.finalize_demand_nodes.contains(value):
+                    ()
                 else:
                     self.typed_expr_types.insert(value, val_type as i32)
             self.check_returned_field_move(value, self.current_return_type as i32)
@@ -31686,6 +31689,7 @@ impl Sema:
                 self.suppress_errors -= 1
                 out = expected
         out = self.value_to_option_at_demand(node, expected, out)
+        out = self.finalize_at_demand(node, expected, out)
         // D93: every demand on a literal's binding counts, the ones its
         // default (a List, D113) already meets too, so two that disagree are
         // an error at the second.
@@ -31771,6 +31775,82 @@ impl Sema:
         // wraps after); only the record says the demand wrapped it.
         self.value_to_option_nodes.insert(node, expected as i32)
         expected
+
+    // D34-A (D257, #920): where an owned type `expected` is demanded and
+    // `actual` is an owned builder implementing `Finalize[expected]`, consume
+    // the builder via `Finalize.finalize()` at the demand site. Law 2 Phase 2:
+    // only between two concrete known types, never binding an unknown, never
+    // chaining with another conversion, never firing on a borrowed demand or
+    // borrowed builder.
+    mut fn finalize_at_demand(node: i32, expected: TypeId, actual: TypeId) -> TypeId:
+        if node <= 0 or expected == 0 or actual == 0 or self.operator_operand_nodes.contains(node):
+            return actual
+        if self.value_to_option_nodes.contains(node):
+            return actual
+        if self.finalize_demand_nodes.contains(node):
+            return self.finalize_demand_nodes.get(node).unwrap() as TypeId
+        if expected == self.ty_void or actual == self.ty_void or actual == self.ty_never:
+            return actual
+        if self.types_compatible(expected, actual):
+            return actual
+        let exp_r = self.resolve_alias(expected)
+        let act_r = self.resolve_alias(actual)
+        if self.type_has_unresolved_parts(exp_r as i32) != 0 or self.type_has_unresolved_parts(act_r as i32) != 0:
+            return actual
+        let exp_k = self.get_type_kind(exp_r)
+        let act_k = self.get_type_kind(act_r)
+        if exp_k == TypeKind.TY_REF or exp_k == TypeKind.TY_PTR:
+            return actual
+        if act_k != TypeKind.TY_STRUCT and act_k != TypeKind.TY_ENUM and act_k != TypeKind.TY_GENERIC_INST:
+            return actual
+        let finalize_trait = self.pool_lookup_symbol("Finalize")
+        let finalize_method = self.pool_lookup_symbol("finalize")
+        if finalize_trait == 0 or finalize_method == 0:
+            return actual
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL:
+                continue
+            if self.ast.get_data2(decl) != finalize_trait:
+                continue
+            let target_match = self.impl_target_match(decl, act_r as i32)
+            if target_match.ok == 0:
+                continue
+            let tta_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
+            if tta_idx < 0:
+                continue
+            let arg_start: i32 = self.ast.state.impl_trait_type_args[(tta_idx + 1)]
+            let arg_count = self.ast.state.impl_trait_type_args[(tta_idx + 2)]
+            if arg_count <= 0:
+                continue
+            let built_ty = self.resolve_impl_trait_arg_for_source(decl, act_r as i32, self.ast.get_extra(arg_start), target_match.subst_names, target_match.subst_types)
+            if built_ty == 0 or not self.types_identical(self.resolve_alias(built_ty as TypeId) as i32, exp_r as i32):
+                continue
+            let owner_sym = self.method_owner_symbol_for_type(act_r as i32)
+            if owner_sym == 0:
+                continue
+            var fn_sym = self.lookup_method_fn(owner_sym, finalize_method)
+            var sig_idx = self.lookup_method_sig(owner_sym, finalize_method)
+            var mono_sym: i32 = 0
+            if sig_idx < 0:
+                fn_sym = self.lookup_generic_method_fn(owner_sym, finalize_method)
+                if fn_sym == 0:
+                    continue
+                sig_idx = self.concrete_owner_method_sig(owner_sym, act_r as i32, fn_sym)
+                if sig_idx < 0:
+                    continue
+                mono_sym = self.sig_names[sig_idx]
+            else if fn_sym == 0:
+                fn_sym = self.sig_names[sig_idx]
+            self.finalize_demand_nodes.insert(node, expected as i32)
+            self.finalize_demand_fn_syms.insert(node, fn_sym)
+            self.finalize_demand_sigs.insert(node, sig_idx)
+            if mono_sym != 0:
+                self.finalize_demand_monos.insert(node, mono_sym)
+            if self.is_copy(actual) == 0:
+                self.mark_moved_if_consumed(node)
+            return expected
+        actual
 
     // Use only after the surrounding construct has independently fixed an
     // owned destination type. The checked expression keeps its exact type;

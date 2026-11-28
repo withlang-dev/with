@@ -8721,6 +8721,35 @@ impl MirBuilder:
         self.register_stmt_temp(result_local, iterator_ty)
         result_place
 
+    // D34-A (D257, #920): invoke `Finalize[T].finalize()` on the lowered owned
+    // builder `op`, consuming its place and yielding the built `T`.
+    mut fn lower_finalize_demand(op: i32, node: i32) -> i32:
+        let fn_sym: i32 = self.sema.finalize_demand_fn_syms.get(node).unwrap()
+        let sig_idx: i32 = self.sema.finalize_demand_sigs.get(node).unwrap()
+        let mono_sym: i32 = self.sema.finalize_demand_monos.get(node) ?? 0
+        let target_ty: i32 = self.concrete_type(self.sema.finalize_demand_nodes.get(node).unwrap())
+        // Pass `op` directly: `consume_moved_operand` retains an `OK_COPY`
+        // value (so a Copy builder like `StringBuilder` remains usable if
+        // needed) and moves/resets an `OK_MOVE` non-Copy builder cleanly.
+        self.consume_moved_operand(op)
+        let args = [op]
+        let args_id = self.body.new_call_args(args)
+        self.body.set_call_ast_node(args_id, node)
+        if mono_sym != 0:
+            self.body.set_call_intrinsic(args_id, MirIntrinsic.GENERIC_CALL)
+            self.body.set_call_contract(args_id, sig_idx, mono_sym)
+            self.body.require_call_contract(args_id)
+        else:
+            self.body.set_call_contract(args_id, sig_idx, self.sema.sig_names[sig_idx])
+        let fn_op = self.const_operand(ConstKind.CK_FN, if mono_sym != 0: mono_sym else: fn_sym, self.sema.ty_void)
+        let result_local = self.new_temp(target_ty)
+        let result_place = self.place_for_local(result_local)
+        let after_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, after_bb)
+        self.switch_to(after_bb)
+        self.register_stmt_temp(result_local, target_ty)
+        if self.sema.is_copy_frozen(target_ty) != 0: self.body.new_operand(OperandKind.OK_COPY, result_place) else: self.body.new_operand(OperandKind.OK_MOVE, result_place)
+
     // D69 (§13.4): `for x in g` over a Gen[T] is `g.each(body)`; the loop
     // body runs as the closure `body: fn(T) -> bool`, capturing the enclosing
     // bindings it uses by place. Finishing the body or `continue` answers
@@ -17350,6 +17379,10 @@ impl MirBuilder:
         // D183 (§4.2.6): a checked narrowing Sema recorded on this node.
         if node > 0 and op >= 0 and self.sema.checked_narrowings.contains(node):
             op = self.lower_checked_narrowing(op, node, self.concrete_type(self.sema.checked_narrowings.get(node).unwrap()))
+        // D34-A (#920): Sema decided this builder finalizes to the demanded
+        // owned type via `Finalize[T].finalize()`.
+        if node > 0 and op >= 0 and self.sema.finalize_demand_nodes.contains(node):
+            op = self.lower_finalize_demand(op, node)
         // §4.9a (D103): Sema decided this value is `Some(value)` at its
         // demand; the Option is built here around the lowered value.
         if node > 0 and op >= 0 and self.sema.value_to_option_nodes.contains(node):
@@ -17383,6 +17416,8 @@ impl MirBuilder:
                 // the node keeps its own type for the leaf checks.
                 if self.sema.value_to_option_nodes.contains(node):
                     sema_ty = self.concrete_type(self.sema.value_to_option_nodes.get(node).unwrap())
+                else if self.sema.finalize_demand_nodes.contains(node):
+                    sema_ty = self.concrete_type(self.sema.finalize_demand_nodes.get(node).unwrap())
                 // D183 (§4.2.6): a checked narrowing Sema recorded is the
                 // adjustment applied above; the operand has the narrow type.
                 // D179: a leaf arm of a copy-out join is lowered at the view

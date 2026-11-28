@@ -1,0 +1,14 @@
+//! expect-error: use of moved value
+
+// D34-A (D257, #920): finalizing a non-Copy builder at an owned demand consumes it.
+use std.traits.Finalize
+
+type Doc { n: i32 }
+resource type DocBuilder { n: i32 }
+impl Finalize[Doc] for DocBuilder:
+    move fn finalize() -> Doc: Doc { n: self.n }
+
+fn main:
+    let b = DocBuilder { n: 7 }
+    let d: Doc = b
+    print(f"{d.n} {b.n}")
