@@ -4804,6 +4804,8 @@ fn facade_render_lend_hosted_by_record(pool: &AstPool, intern: &InternPool, li: 
         return false
     if facade_render_buffer_of(pool, intern, li.decl, 0).0 == 0:
         return false
+    if facade_render_value_record_kind(pool, intern, li.decl, 0) == "fills":
+        return false
     let meta = pool.find_fn_meta(li.decl as NodeId)
     let p0 = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), 0) as NodeId))
     if p0 != "*mut " ++ rname and p0 != "*const " ++ rname:

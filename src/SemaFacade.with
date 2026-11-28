@@ -7144,6 +7144,8 @@ impl Sema:
         if ci >= 0:
             for k in 0..self.foreign_contracts[ci].buffer_ptr.len():
                 if self.foreign_contracts[ci].buffer_ptr[k] == pi: return 0
+            for (k, vpi) in self.foreign_contracts[ci].value_records.enumerate():
+                if vpi == pi and self.pool_resolve(self.foreign_contracts[ci].value_record_words[k]) == "fills": return 0
         let p = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
         if self.get_type_kind(p) != TypeKind.TY_PTR:
             return 0
