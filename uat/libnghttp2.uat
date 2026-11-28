@@ -1,0 +1,11 @@
+scenario: c.libnghttp2 runs HTTP/2 client/server frame exchange with callbacks and HPACK deflate/inflate without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: with get c.libnghttp2
+write src/main.with from libnghttp2_main.with
+run: with run
+expect exit: 0
+expect stdout contains: libnghttp2 ok

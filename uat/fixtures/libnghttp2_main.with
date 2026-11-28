@@ -1,0 +1,203 @@
+// Zero-unsafe UAT for c.libnghttp2 (#3144): HTTP/2 client & server sessions
+// with callbacks, request/response submission, in-memory wire exchange via
+// mem_send / mem_recv, and HPACK deflate / inflate header roundtrip.
+use contracts.libnghttp2
+use c_import("nghttp2/nghttp2.h")
+use std.sync
+
+var g_server_frames: AtomicI64 = atomic_new(0)
+var g_server_begin_headers: AtomicI64 = atomic_new(0)
+var g_server_headers: AtomicI64 = atomic_new(0)
+var g_client_frames: AtomicI64 = atomic_new(0)
+var g_client_headers: AtomicI64 = atomic_new(0)
+var g_client_stream_closes: AtomicI64 = atomic_new(0)
+
+fn on_server_frame_recv(session: *mut nghttp2_session, frame: *const nghttp2_frame, ud: *mut c_void) -> c_int:
+    let _ = session
+    let _ = frame
+    let _ = ud
+    let _ = g_server_frames.fetch_add(1, Order.SeqCst)
+    0
+
+fn on_server_begin_headers(session: *mut nghttp2_session, frame: *const nghttp2_frame, ud: *mut c_void) -> c_int:
+    let _ = session
+    let _ = frame
+    let _ = ud
+    let _ = g_server_begin_headers.fetch_add(1, Order.SeqCst)
+    0
+
+fn on_server_header(session: *mut nghttp2_session, frame: *const nghttp2_frame, name: *const u8, namelen: usize, value: *const u8, valuelen: usize, flags: u8, ud: *mut c_void) -> c_int:
+    let _ = session
+    let _ = frame
+    let _ = name
+    let _ = value
+    let _ = flags
+    let _ = ud
+    if namelen > 0 and valuelen > 0:
+        let _ = g_server_headers.fetch_add(1, Order.SeqCst)
+    0
+
+fn on_client_frame_recv(session: *mut nghttp2_session, frame: *const nghttp2_frame, ud: *mut c_void) -> c_int:
+    let _ = session
+    let _ = frame
+    let _ = ud
+    let _ = g_client_frames.fetch_add(1, Order.SeqCst)
+    0
+
+fn on_client_header(session: *mut nghttp2_session, frame: *const nghttp2_frame, name: *const u8, namelen: usize, value: *const u8, valuelen: usize, flags: u8, ud: *mut c_void) -> c_int:
+    let _ = session
+    let _ = frame
+    let _ = name
+    let _ = value
+    let _ = flags
+    let _ = ud
+    if namelen > 0 and valuelen > 0:
+        let _ = g_client_headers.fetch_add(1, Order.SeqCst)
+    0
+
+fn on_client_stream_close(session: *mut nghttp2_session, stream_id: i32, error_code: u32, ud: *mut c_void) -> c_int:
+    let _ = session
+    let _ = stream_id
+    let _ = error_code
+    let _ = ud
+    let _ = g_client_stream_closes.fetch_add(1, Order.SeqCst)
+    0
+
+fn pump(src: &Session, dst: &Session) -> i64:
+    var total: i64 = 0
+    while true:
+        let (n, chunk) = src.mem_send2()
+        assert(n >= 0)
+        if n == 0:
+            break
+        assert(chunk.len() == n as isize)
+        let fed = dst.mem_recv2(chunk[0..chunk.len()])
+        assert(fed == n)
+        total += n as i64
+    total
+
+fn bytes_eq(bs: &List[u8], expected: &str) -> bool:
+    let eb: []u8 = expected as []u8
+    if bs.len() != eb.len(): return false
+    for i in 0..eb.len():
+        if bs[i] != eb[i]: return false
+    true
+
+fn main:
+    // 1. Standalone error & validation helpers
+    assert(nghttp2_strerror(0).unwrap().to_str_lossy().len() > 0)
+    assert(nghttp2_http2_strerror(0).unwrap().to_str_lossy() == "NO_ERROR")
+    assert(nghttp2_check_header_name("content-type" as []u8) != 0)
+    assert(nghttp2_check_header_name("Bad-Upper" as []u8) == 0)
+    assert(nghttp2_check_method("GET" as []u8) != 0)
+    assert(nghttp2_check_path("/api/v1/health" as []u8) != 0)
+    assert(nghttp2_check_authority("example.com:443" as []u8) != 0)
+
+    // 2. Client + Server HTTP/2 session with callbacks, request/response & mem_send/mem_recv
+    let (rc_cc, client_cbs_opt) = SessionCallbacks.new()
+    assert(rc_cc == 0)
+    let client_cbs = client_cbs_opt.unwrap()
+    client_cbs.set_on_frame_recv_callback(on_client_frame_recv)
+    client_cbs.set_on_header_callback(on_client_header)
+    client_cbs.set_on_stream_close_callback(on_client_stream_close)
+
+    let (rc_sc, server_cbs_opt) = SessionCallbacks.new()
+    assert(rc_sc == 0)
+    let server_cbs = server_cbs_opt.unwrap()
+    server_cbs.set_on_frame_recv_callback(on_server_frame_recv)
+    server_cbs.set_on_begin_headers_callback(on_server_begin_headers)
+    server_cbs.set_on_header_callback(on_server_header)
+
+    let (rc_c, client_opt) = Session.client_new(&client_cbs)
+    assert(rc_c == 0)
+    let client = client_opt.unwrap()
+    let (rc_s, server_opt) = Session.server_new(&server_cbs)
+    assert(rc_s == 0)
+    let server = server_opt.unwrap()
+    assert(client.check_server_session() == 0)
+    assert(server.check_server_session() != 0)
+
+    // Initial SETTINGS exchange
+    let iv = [nghttp2_settings_entry { settings_id: NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS as i32, value: 128 as u32 }]
+    assert(client.submit_settings(NGHTTP2_FLAG_NONE as u8, iv) == 0)
+    assert(server.submit_settings(NGHTTP2_FLAG_NONE as u8, iv) == 0)
+
+    // Submit HTTP/2 GET request on stream 1
+    let req_headers = [
+        (":method", "GET"),
+        (":scheme", "https"),
+        (":authority", "example.com"),
+        (":path", "/hello"),
+        ("user-agent", "with-uat"),
+    ]
+    let stream_id = client.submit_request2(&req_headers)
+    assert(stream_id == 1)
+
+    // Client -> Server wire exchange (magic + SETTINGS + HEADERS)
+    let c2s = pump(&client, &server)
+    assert(c2s > 24)
+    assert(g_server_begin_headers.load(Order.SeqCst) == 1)
+    assert(g_server_headers.load(Order.SeqCst) == 5)
+    assert(g_server_frames.load(Order.SeqCst) >= 2)
+    assert(server.get_last_proc_stream_id() == 1)
+
+    // Server submits 200 OK response on stream 1 -> Client
+    let resp_headers = [
+        (":status", "200"),
+        ("content-type", "text/plain"),
+        ("x-served-by", "nghttp2"),
+    ]
+    assert(server.submit_response2(stream_id, &resp_headers) == 0)
+    let s2c = pump(&server, &client)
+    assert(s2c > 0)
+    let _ = pump(&client, &server)
+    assert(g_client_headers.load(Order.SeqCst) == 3)
+    assert(g_client_frames.load(Order.SeqCst) >= 2)
+    assert(g_client_stream_closes.load(Order.SeqCst) == 1)
+    assert(client.get_remote_settings(NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS) == 128)
+
+    // 3. HPACK deflate + inflate roundtrip
+    let (rc_d, deflater_opt) = HdDeflater.new(4096)
+    assert(rc_d == 0)
+    let deflater = deflater_opt.unwrap()
+    let (rc_i, inflater_opt) = HdInflater.new()
+    assert(rc_i == 0)
+    let inflater = inflater_opt.unwrap()
+    let hpack_in = [
+        (":method", "POST"),
+        (":path", "/submit"),
+        ("content-type", "application/json"),
+        ("x-custom-key", "with-hpack-value"),
+    ]
+    let bound = deflater.deflate_bound(&hpack_in)
+    assert(bound > 0)
+    var wire: [u8; 512] = [0 as u8; 512]
+    let deflated_len = deflater.deflate_hd2(wire, &hpack_in)
+    assert(deflated_len > 0 and deflated_len <= 512)
+    assert(deflater.deflate_get_dynamic_table_size() > 0)
+
+    var decoded_names: List[List[u8]] = []
+    var decoded_vals: List[List[u8]] = []
+    var offset: isize = 0
+    while true:
+        let (consumed, kv, flags) = inflater.inflate_hd3(wire[offset..deflated_len as isize], 1)
+        let (k, v) = kv
+        assert(consumed >= 0)
+        offset += consumed as isize
+        if (flags & (NGHTTP2_HD_INFLATE_EMIT as i32)) != 0:
+            decoded_names.push(k)
+            decoded_vals.push(v)
+        if (flags & (NGHTTP2_HD_INFLATE_FINAL as i32)) != 0:
+            assert(inflater.inflate_end_headers() == 0)
+            break
+        if (flags & (NGHTTP2_HD_INFLATE_EMIT as i32)) == 0 and offset >= deflated_len as isize:
+            break
+
+    assert(decoded_names.len() == 4)
+    assert(bytes_eq(&decoded_names[0], ":method") and bytes_eq(&decoded_vals[0], "POST"))
+    assert(bytes_eq(&decoded_names[1], ":path") and bytes_eq(&decoded_vals[1], "/submit"))
+    assert(bytes_eq(&decoded_names[2], "content-type") and bytes_eq(&decoded_vals[2], "application/json"))
+    assert(bytes_eq(&decoded_names[3], "x-custom-key") and bytes_eq(&decoded_vals[3], "with-hpack-value"))
+
+    print(f"libnghttp2 c2s={c2s} s2c={s2c} hpack={deflated_len}B decoded={decoded_names.len()}")
+    print("libnghttp2 ok")
