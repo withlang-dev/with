@@ -1,0 +1,177 @@
+// libevent 2.1.12 (conan-center-index recipes/libevent). Every clause cites
+// event2/*.h installed by the package.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - event_set_mem_functions, event_set_log_callback, event_set_fatal_callback,
+//   evthread_set_lock_callbacks, evthread_set_condition_callbacks,
+//   evthread_set_id_callback: global allocator/threading/log callback tables.
+// - event_assign, event_base_dump_events: caller-managed struct event storage
+//   or raw C FILE * handles.
+// - evbuffer_add_printf, evbuffer_add_vprintf: printf-style variadics.
+// - evbuffer_add_reference, evbuffer_peek, evbuffer_reserve_space,
+//   evbuffer_commit_space, evbuffer_pullup: zero-copy raw iovec/pointer views
+//   whose lifetime depends on subsequent buffer mutations.
+// - evdns_*, evrpc_*, evconnlistener_*: asynchronous networking callbacks with
+//   raw sockaddr / DNS / RPC pointer payloads.
+c facts libevent:
+    resource EventConfig wraps *mut event_config
+        from event_config_new    // event2/event.h 2.1.12:467: allocates event_config freed by event_config_free
+        drop event_config_free    // event2/event.h 2.1.12:475: frees event_config
+    resource EventBase wraps *mut event_base
+        from event_base_new    // event2/event.h 2.1.12:344: allocates event_base freed by event_base_free
+        from event_base_new_with_config    // event2/event.h 2.1.12:678: allocates configured event_base freed by event_base_free
+        drop event_base_free    // event2/event.h 2.1.12:692: frees event_base
+    resource EvBuffer wraps *mut evbuffer
+        from evbuffer_new    // event2/buffer.h 2.1.12:152: allocates evbuffer freed by evbuffer_free
+        drop evbuffer_free    // event2/buffer.h 2.1.12:159: frees evbuffer
+    resource EvHttp wraps *mut evhttp
+        from evhttp_new    // event2/http.h 2.1.12:86: allocates HTTP server attached to event_base, freed by evhttp_free
+        drop evhttp_free    // event2/http.h 2.1.12:216: stops and frees HTTP server
+        borrows param 0    // event2/http.h 2.1.12:86: evhttp depends on its event_base
+    resource EvHttpBoundSocket wraps *mut evhttp_bound_socket
+    handle EvHttpRequest wraps *mut evhttp_request    // event2/http.h 2.1.12:262: callback-scope HTTP request handle
+    resource BufferEvent wraps *mut bufferevent
+        from bufferevent_socket_new    // event2/bufferevent.h 2.1.12:190: allocates socket bufferevent attached to event_base, freed by bufferevent_free
+        drop bufferevent_free    // event2/bufferevent.h 2.1.12:305: frees bufferevent
+        borrows param 0    // event2/bufferevent.h 2.1.12:190: bufferevent depends on its event_base
+    fn event_config_avoid_method
+        of EventConfig    // event2/event.h 2.1.12:490: configures backend method to avoid
+        lend    // event2/event.h 2.1.12:490: borrows cfg and copies method name
+    fn event_config_require_features
+        of EventConfig    // event2/event.h 2.1.12:609: requires event_base feature flags
+        lend    // event2/event.h 2.1.12:609: borrows cfg
+    fn event_config_set_flag
+        of EventConfig    // event2/event.h 2.1.12:618: sets event_base configuration flags
+        lend    // event2/event.h 2.1.12:618: borrows cfg
+    fn event_config_set_num_cpus_hint
+        of EventConfig    // event2/event.h 2.1.12:630: sets CPU count hint
+        lend    // event2/event.h 2.1.12:630: borrows cfg
+    fn event_base_new_with_config
+        lend    // event2/event.h 2.1.12:678: reads cfg without retaining it
+    fn event_base_dispatch
+        of EventBase    // event2/event.h 2.1.12:373: runs event dispatching loop
+        lend    // event2/event.h 2.1.12:373: borrows base
+    fn event_base_loop
+        of EventBase    // event2/event.h 2.1.12:826: runs event loop with flags
+        lend    // event2/event.h 2.1.12:826: borrows base
+    fn event_base_loopexit
+        of EventBase    // event2/event.h 2.1.12:844: schedules loop exit after timeout
+        lend    // event2/event.h 2.1.12:844: borrows base
+        reads param 1    // event2/event.h 2.1.12:844: reads struct timeval without retaining it
+        nullable param 1    // event2/event.h 2.1.12:844: NULL exits immediately after active events
+    fn event_base_loopbreak
+        of EventBase    // event2/event.h 2.1.12:860: aborts active event loop immediately
+        lend    // event2/event.h 2.1.12:860: borrows base
+    fn event_base_loopcontinue
+        of EventBase    // event2/event.h 2.1.12:880: tells loop to re-scan for events
+        lend    // event2/event.h 2.1.12:880: borrows base
+    fn event_base_got_exit
+        of EventBase    // event2/event.h 2.1.12:895: checks whether loop exited via loopexit
+        lend    // event2/event.h 2.1.12:895: borrows base
+    fn event_base_got_break
+        of EventBase    // event2/event.h 2.1.12:910: checks whether loop exited via loopbreak
+        lend    // event2/event.h 2.1.12:910: borrows base
+    fn event_base_get_method
+        of EventBase    // event2/event.h 2.1.12:382: returns name of backend method in use
+        lend    // event2/event.h 2.1.12:382: borrows base
+        returns static CStr    // event2/event.h 2.1.12:382: static backend name string
+    fn event_base_get_features
+        of EventBase    // event2/event.h 2.1.12:584: returns supported feature bitmask
+        lend    // event2/event.h 2.1.12:584: borrows base
+    fn event_base_get_num_events
+        of EventBase    // event2/event.h 2.1.12:441: counts events in base
+        lend    // event2/event.h 2.1.12:441: borrows base
+    fn event_base_once
+        of EventBase    // event2/event.h 2.1.12:1209: schedules one-shot event or timer callback on base
+        lend    // event2/event.h 2.1.12:1209: borrows base
+        callback param 3 userdata param 4    // event2/event.h 2.1.12:1209: callback receives (fd, events, arg)
+        retains param 3 by param 0    // event2/event.h 2.1.12:1209: retained by base until fired or base freed
+        retains param 4 by param 0    // event2/event.h 2.1.12:1209: userdata retained by base until fired or base freed
+        callback_thread registering    // event2/event.h 2.1.12:1209: invoked on the thread running event_base_loop
+        reads param 5    // event2/event.h 2.1.12:1209: copies timeout struct timeval
+    fn evbuffer_get_length
+        of EvBuffer    // event2/buffer.h 2.1.12:234: returns total bytes stored in evbuffer
+        lend    // event2/buffer.h 2.1.12:234: borrows buf
+    fn evbuffer_add
+        of EvBuffer    // event2/buffer.h 2.1.12:336: appends datlen bytes from data into buf
+        lend    // event2/buffer.h 2.1.12:336: borrows buf and copies data
+        buffer param 1 len param 2    // event2/buffer.h 2.1.12:336: reads datlen bytes from data
+    fn evbuffer_remove
+        of EvBuffer    // event2/buffer.h 2.1.12:351: drains up to datlen bytes from buf into data
+        lend    // event2/buffer.h 2.1.12:351: borrows buf
+        buffer param 1 capacity param 2    // event2/buffer.h 2.1.12:351: writes at most datlen bytes into data
+    fn evbuffer_copyout
+        of EvBuffer    // event2/buffer.h 2.1.12:365: copies up to datlen bytes from buf without draining
+        lend    // event2/buffer.h 2.1.12:365: borrows buf
+        buffer param 1 capacity param 2    // event2/buffer.h 2.1.12:365: writes at most datlen bytes into data_out
+    fn evbuffer_drain
+        of EvBuffer    // event2/buffer.h 2.1.12:692: removes len bytes from front of buf
+        lend    // event2/buffer.h 2.1.12:692: borrows buf
+    fn evbuffer_add_buffer
+        of EvBuffer    // event2/buffer.h 2.1.12:454: moves all data from inbuf to outbuf
+        lend    // event2/buffer.h 2.1.12:454: borrows both buffers
+    fn evbuffer_freeze
+        of EvBuffer    // event2/buffer.h 2.1.12:1034: freezes front or back of evbuffer
+        lend    // event2/buffer.h 2.1.12:1034: borrows buf
+    fn evhttp_bind_socket
+        of EvHttp    // event2/http.h 2.1.12:101: binds HTTP server to address and port
+        lend    // event2/http.h 2.1.12:101: borrows http
+    fn evhttp_bind_socket_with_handle
+        of EvHttp    // event2/http.h 2.1.12:115: binds HTTP server and returns borrowed bound-socket handle
+        lend    // event2/http.h 2.1.12:115: borrows http
+        returns borrow EvHttpBoundSocket from param 0    // event2/http.h 2.1.12:106: valid until http is freed
+    fn evhttp_bound_socket_get_fd
+        of EvHttpBoundSocket    // event2/http.h 2.1.12:205: returns listening socket fd
+        lend    // event2/http.h 2.1.12:205: borrows bound_socket
+    fn evhttp_set_gencb
+        of EvHttp    // event2/http.h 2.1.12:280: registers default HTTP request handler
+        lend    // event2/http.h 2.1.12:280: borrows http
+        callback param 1 userdata param 2    // event2/http.h 2.1.12:280: handler receives (req, arg)
+        retains param 1 by param 0    // event2/http.h 2.1.12:280: retained by http until replaced or freed
+        retains param 2 by param 0    // event2/http.h 2.1.12:280: userdata retained by http until replaced or freed
+        callback_thread registering    // event2/http.h 2.1.12:280: invoked on event_base loop thread
+    fn evhttp_set_cb
+        of EvHttp    // event2/http.h 2.1.12:261: registers path-specific HTTP request handler
+        lend    // event2/http.h 2.1.12:261: borrows http
+        callback param 2 userdata param 3    // event2/http.h 2.1.12:261: handler receives (req, cb_arg)
+        retains param 2 by param 0    // event2/http.h 2.1.12:261: retained by http until removed or freed
+        retains param 3 by param 0    // event2/http.h 2.1.12:261: userdata retained by http until removed or freed
+        callback_thread registering    // event2/http.h 2.1.12:261: invoked on event_base loop thread
+    fn evhttp_request_get_uri
+        of EvHttpRequest    // event2/http.h 2.1.12:819: returns request URI string
+        lend    // event2/http.h 2.1.12:819: borrows req
+        returns borrow CStr from param 0    // event2/http.h 2.1.12:819: URI owned by request
+    fn evhttp_request_get_command
+        of EvHttpRequest    // event2/http.h 2.1.12:815: returns HTTP method enum
+        lend    // event2/http.h 2.1.12:815: borrows req
+    fn evhttp_send_reply
+        of EvHttpRequest    // event2/http.h 2.1.12:418: sends HTTP reply draining caller-owned databuf
+        lend    // event2/http.h 2.1.12:408: borrows req and drains databuf without freeing it
+    fn evhttp_send_error
+        of EvHttpRequest    // event2/http.h 2.1.12:401: sends HTTP error response
+        lend    // event2/http.h 2.1.12:401: borrows req
+    fn bufferevent_enable
+        of BufferEvent    // event2/bufferevent.h 2.1.12:463: enables read/write events on bufferevent
+        lend    // event2/bufferevent.h 2.1.12:463: borrows bufev
+    fn bufferevent_disable
+        of BufferEvent    // event2/bufferevent.h 2.1.12:474: disables read/write events on bufferevent
+        lend    // event2/bufferevent.h 2.1.12:474: borrows bufev
+    fn bufferevent_get_enabled
+        of BufferEvent    // event2/bufferevent.h 2.1.12:480: queries enabled event flags
+        lend    // event2/bufferevent.h 2.1.12:480: borrows bufev
+    fn bufferevent_write
+        of BufferEvent    // event2/bufferevent.h 2.1.12:386: appends size bytes from data to output buffer
+        lend    // event2/bufferevent.h 2.1.12:386: borrows bufev and copies data
+        buffer param 1 len param 2    // event2/bufferevent.h 2.1.12:386: reads size bytes from data
+    fn bufferevent_read
+        of BufferEvent    // event2/bufferevent.h 2.1.12:414: drains up to size bytes from input buffer
+        lend    // event2/bufferevent.h 2.1.12:414: borrows bufev
+        buffer param 1 capacity param 2    // event2/bufferevent.h 2.1.12:414: writes at most size bytes into data
+    fn bufferevent_get_input
+        of BufferEvent    // event2/bufferevent.h 2.1.12:437: returns borrowed input evbuffer
+        lend    // event2/bufferevent.h 2.1.12:437: borrows bufev
+        returns borrow EvBuffer from param 0    // event2/bufferevent.h 2.1.12:437: owned by bufferevent
+    fn bufferevent_get_output
+        of BufferEvent    // event2/bufferevent.h 2.1.12:452: returns borrowed output evbuffer
+        lend    // event2/bufferevent.h 2.1.12:452: borrows bufev
+        returns borrow EvBuffer from param 0    // event2/bufferevent.h 2.1.12:452: owned by bufferevent

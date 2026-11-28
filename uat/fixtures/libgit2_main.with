@@ -1,0 +1,69 @@
+// Zero-unsafe UAT for c.libgit2 (#3162): git_libgit2_init, open repository,
+// walk commits via git_revwalk, inspect HEAD blob content & metadata, diff two
+// trees + diff stats, and git_libgit2_shutdown.
+use contracts.libgit2
+use c_import("git2.h")
+
+fn main:
+    assert(git_libgit2_init() >= 1)
+    let repo = Repository.open("sample").unwrap()
+    assert(repo.is_bare() == 0)
+    assert(repo.is_empty() == 0)
+
+    // 1. Walk commits from HEAD using Revwalk.
+    let walk = Revwalk.new(repo).unwrap()
+    assert(walk.sorting(GIT_SORT_TOPOLOGICAL as u32 | GIT_SORT_TIME as u32) == 0)
+    assert(walk.push_head() == 0)
+    let (rc1, head_oid) = walk.next()
+    assert(rc1 == 0)
+    let (rc2, base_oid) = walk.next()
+    assert(rc2 == 0)
+    let (rc3, _) = walk.next()
+    assert(rc3 != 0)
+
+    // 2. Inspect both commits and format HEAD oid prefix.
+    let head_commit = Commit.lookup(repo, &head_oid).unwrap()
+    let base_commit = Commit.lookup(repo, &base_oid).unwrap()
+    assert(head_commit.message().unwrap().to_str_lossy().contains("second commit"))
+    assert(base_commit.message().unwrap().to_str_lossy().contains("initial commit"))
+    assert(head_commit.parentcount() == 1)
+    assert(base_commit.parentcount() == 0)
+    var hex: [u8; 8] = [0 as u8; 8]
+    assert(git_oid_nfmt(hex, &head_oid) == 0)
+
+    // 3. Look up trees and read the blob at HEAD.
+    let head_tree = Tree.lookup(repo, head_commit.tree_id().unwrap()).unwrap()
+    let base_tree = Tree.lookup(repo, base_commit.tree_id().unwrap()).unwrap()
+    assert(head_tree.entrycount() == 1)
+    let entry = TreeEntry.bypath(head_tree, "hello.txt").unwrap()
+    assert(entry.name().unwrap().to_str_lossy() == "hello.txt")
+    assert(entry.git_tree_entry_type() == GIT_OBJECT_BLOB)
+    let blob = Blob.lookup(repo, entry.id().unwrap()).unwrap()
+    let expected = "hello v2\n"
+    assert(blob.rawsize() == expected.len() as i64)
+    assert(blob.is_binary() == 0)
+    let check_patch = Patch.from_blob_and_buffer(blob, "hello.txt", expected as []u8, "hello.txt").unwrap()
+    assert(check_patch.num_hunks() == 0)
+
+    // 4. Diff the two trees and verify delta + line stats.
+    let diff = Diff.tree_to_tree(repo, base_tree, head_tree).unwrap()
+    assert(diff.num_deltas() == 1)
+    assert(diff.num_deltas_of_type(GIT_DELTA_MODIFIED) == 1)
+    let stats = DiffStats.get_stats(diff).unwrap()
+    assert(stats.files_changed() == 1)
+    assert(stats.insertions() == 1)
+    assert(stats.deletions() == 1)
+
+    drop(stats)
+    drop(diff)
+    drop(check_patch)
+    drop(blob)
+    drop(entry)
+    drop(base_tree)
+    drop(head_tree)
+    drop(base_commit)
+    drop(head_commit)
+    drop(walk)
+    drop(repo)
+    assert(git_libgit2_shutdown() >= 0)
+    print("libgit2 ok")

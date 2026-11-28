@@ -1,0 +1,11 @@
+scenario: c.yyjson parses, walks iterators, builds a mutable doc, and serializes without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: with get c.yyjson
+write src/main.with from yyjson_main.with
+run: with run
+expect exit: 0
+expect stdout contains: yyjson ok

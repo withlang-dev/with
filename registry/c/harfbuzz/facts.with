@@ -1,0 +1,177 @@
+// harfbuzz 15.2.0 (conan-center-index recipes/harfbuzz). Every clause cites
+// harfbuzz/*.h installed by the package.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - hb_blob_create, hb_blob_create_or_fail: borrow caller memory under a
+//   runtime hb_memory_mode_t enum + destroy callback contract.
+// - hb_blob_get_data, hb_blob_get_data_writable: return raw `char *` paired
+//   with an out-length pointer (not NUL-terminated text).
+// - hb_buffer_get_glyph_infos, hb_buffer_get_glyph_positions: return raw
+//   mutable element pointers paired with an out-length pointer; use
+//   `hb_buffer_serialize_glyphs` for safe formatted glyph/position inspection.
+// - hb_*_set_user_data, hb_*_get_user_data: keyed void* attachment tables with
+//   destroy callbacks.
+// - hb_face_create_for_tables, hb_font_set_funcs, hb_unicode_funcs_set_*:
+//   callback vtable registration APIs.
+// - hb_shape_list_shapers, hb_face_list_loaders, hb_buffer_serialize_list_formats:
+//   return NULL-terminated `const char **` arrays.
+c facts harfbuzz:
+    resource Blob wraps *mut hb_blob_t
+        from hb_blob_create_or_fail    // harfbuzz/hb-blob.h 15.2.0:94: copies data under HB_MEMORY_MODE_DUPLICATE into blob, released by hb_blob_destroy
+        from hb_blob_create_from_file    // harfbuzz/hb-blob.h 15.2.0:101: maps/reads font file into blob, released by hb_blob_destroy
+        from hb_blob_create_from_file_or_fail    // harfbuzz/hb-blob.h 15.2.0:104: maps/reads font file or returns NULL, released by hb_blob_destroy
+        from hb_blob_get_empty    // harfbuzz/hb-blob.h 15.2.0:121: returns empty singleton blob safe to pass to hb_blob_destroy
+        drop hb_blob_destroy    // harfbuzz/hb-blob.h 15.2.0:127: decrements refcount and frees blob
+    resource Face wraps *mut hb_face_t
+        from hb_face_create    // harfbuzz/hb-face.h 15.2.0:59: creates face referencing blob (increments blob refcount), released by hb_face_destroy
+        from hb_face_create_or_fail    // harfbuzz/hb-face.h 15.2.0:63: creates face referencing blob or returns NULL, released by hb_face_destroy
+        from hb_face_create_from_file_or_fail    // harfbuzz/hb-face.h 15.2.0:72: creates face from font file or returns NULL, released by hb_face_destroy
+        drop hb_face_destroy    // harfbuzz/hb-face.h 15.2.0:117: decrements refcount and frees face
+    resource Font wraps *mut hb_font_t
+        from hb_font_create    // harfbuzz/hb-font.h 15.2.0:1117: creates font referencing face (increments face refcount), released by hb_font_destroy
+        drop hb_font_destroy    // harfbuzz/hb-font.h 15.2.0:1151: decrements refcount and frees font
+    resource Buffer wraps *mut hb_buffer_t
+        from hb_buffer_create    // harfbuzz/hb-buffer.h 15.2.0:253: allocates shaping buffer, released by hb_buffer_destroy
+        drop hb_buffer_destroy    // harfbuzz/hb-buffer.h 15.2.0:269: decrements refcount and frees buffer
+    resource Map wraps *mut hb_map_t
+        from hb_map_create    // harfbuzz/hb-map.h 15.2.0:59: allocates codepoint map, released by hb_map_destroy
+        drop hb_map_destroy    // harfbuzz/hb-map.h 15.2.0:68: decrements refcount and frees map
+    fn hb_version_string
+        returns static CStr    // harfbuzz/hb-version.h 15.2.0:85: returns static library version string
+    fn hb_direction_to_string
+        returns static CStr    // harfbuzz/hb-common.h 15.2.0:269: returns static direction name
+    fn hb_language_to_string
+        returns static CStr    // harfbuzz/hb-common.h 15.2.0:342: returns static language tag string
+    fn hb_direction_from_string
+        lend    // harfbuzz/hb-common.h 15.2.0:266: parses direction string without retaining it
+        buffer param 0 len param 1    // harfbuzz/hb-common.h 15.2.0:266: reads len bytes from str
+    fn hb_script_from_string
+        lend    // harfbuzz/hb-common.h 15.2.0:368: parses script tag string without retaining it
+        buffer param 0 len param 1    // harfbuzz/hb-common.h 15.2.0:368: reads len bytes from str
+    fn hb_blob_create_or_fail
+        buffer param 0 len param 1    // harfbuzz/hb-blob.h 15.2.0:95: reads length bytes from data
+        param 2 fixed 0    // harfbuzz/hb-blob.h 15.2.0:70: HB_MEMORY_MODE_DUPLICATE copies data immediately without retaining it
+        param 3 fixed null    // harfbuzz/hb-blob.h 15.2.0:97: unused user_data for duplicate mode
+        param 4 fixed null    // harfbuzz/hb-blob.h 15.2.0:98: unused destroy callback for duplicate mode
+    fn hb_blob_get_length
+        of Blob    // harfbuzz/hb-blob.h 15.2.0:150: returns byte length of blob
+        lend    // harfbuzz/hb-blob.h 15.2.0:150: borrows blob
+    fn hb_blob_make_immutable
+        of Blob    // harfbuzz/hb-blob.h 15.2.0:143: marks blob immutable
+        lend    // harfbuzz/hb-blob.h 15.2.0:143: borrows blob
+    fn hb_blob_is_immutable
+        of Blob    // harfbuzz/hb-blob.h 15.2.0:146: checks blob immutability
+        lend    // harfbuzz/hb-blob.h 15.2.0:146: borrows blob
+    fn hb_face_count
+        of Blob    // harfbuzz/hb-face.h 15.2.0:43: counts font faces in blob
+        lend    // harfbuzz/hb-face.h 15.2.0:43: borrows blob
+    fn hb_face_create
+        of Face    // harfbuzz/hb-face.h 15.2.0:59: constructor taking blob
+        lend    // harfbuzz/hb-face.h 15.2.0:59: increments internal refcount on blob
+    fn hb_face_create_or_fail
+        of Face    // harfbuzz/hb-face.h 15.2.0:63: constructor taking blob
+        lend    // harfbuzz/hb-face.h 15.2.0:63: increments internal refcount on blob
+    fn hb_face_make_immutable
+        of Face    // harfbuzz/hb-face.h 15.2.0:131: marks face immutable
+        lend    // harfbuzz/hb-face.h 15.2.0:131: borrows face
+    fn hb_face_is_immutable
+        of Face    // harfbuzz/hb-face.h 15.2.0:134: checks face immutability
+        lend    // harfbuzz/hb-face.h 15.2.0:134: borrows face
+    fn hb_face_get_index
+        of Face    // harfbuzz/hb-face.h 15.2.0:149: returns face index
+        lend    // harfbuzz/hb-face.h 15.2.0:149: borrows face
+    fn hb_face_set_upem
+        of Face    // harfbuzz/hb-face.h 15.2.0:152: sets units-per-em
+        lend    // harfbuzz/hb-face.h 15.2.0:152: borrows face
+    fn hb_face_get_upem
+        of Face    // harfbuzz/hb-face.h 15.2.0:156: returns units-per-em
+        lend    // harfbuzz/hb-face.h 15.2.0:156: borrows face
+    fn hb_face_get_glyph_count
+        of Face    // harfbuzz/hb-face.h 15.2.0:163: returns glyph count in face
+        lend    // harfbuzz/hb-face.h 15.2.0:163: borrows face
+    fn hb_font_create
+        of Font    // harfbuzz/hb-font.h 15.2.0:1117: constructor taking face
+        lend    // harfbuzz/hb-font.h 15.2.0:1117: increments internal refcount on face
+    fn hb_font_set_scale
+        of Font    // harfbuzz/hb-font.h 15.2.0:1208: sets x/y scale
+        lend    // harfbuzz/hb-font.h 15.2.0:1208: borrows font
+    fn hb_font_get_scale
+        of Font    // harfbuzz/hb-font.h 15.2.0:1213: queries x/y scale
+        lend    // harfbuzz/hb-font.h 15.2.0:1213: borrows font
+        fills param 1    // harfbuzz/hb-font.h 15.2.0:1214: writes x_scale
+        fills param 2    // harfbuzz/hb-font.h 15.2.0:1215: writes y_scale
+    fn hb_font_set_ppem
+        of Font    // harfbuzz/hb-font.h 15.2.0:1221: sets pixels-per-em
+        lend    // harfbuzz/hb-font.h 15.2.0:1221: borrows font
+    fn hb_font_get_nominal_glyph
+        of Font    // harfbuzz/hb-font.h 15.2.0:923: maps Unicode codepoint to nominal glyph id
+        lend    // harfbuzz/hb-font.h 15.2.0:923: borrows font
+        fills param 2    // harfbuzz/hb-font.h 15.2.0:925: writes resolved glyph id
+    fn hb_font_get_glyph_h_advance
+        of Font    // harfbuzz/hb-font.h 15.2.0:940: returns horizontal advance for glyph
+        lend    // harfbuzz/hb-font.h 15.2.0:940: borrows font
+    fn hb_font_get_glyph_v_advance
+        of Font    // harfbuzz/hb-font.h 15.2.0:943: returns vertical advance for glyph
+        lend    // harfbuzz/hb-font.h 15.2.0:943: borrows font
+    fn hb_font_get_glyph_name
+        of Font    // harfbuzz/hb-font.h 15.2.0:1005: writes glyph name into caller buffer
+        lend    // harfbuzz/hb-font.h 15.2.0:1005: borrows font
+        buffer param 2 capacity param 3    // harfbuzz/hb-font.h 15.2.0:1007: writes at most size bytes into name
+    fn hb_buffer_reset
+        of Buffer    // harfbuzz/hb-buffer.h 15.2.0:259: resets buffer to newly created state
+        lend    // harfbuzz/hb-buffer.h 15.2.0:259: borrows buffer
+    fn hb_buffer_clear_contents
+        of Buffer    // harfbuzz/hb-buffer.h 15.2.0:568: clears contents while preserving properties
+        lend    // harfbuzz/hb-buffer.h 15.2.0:568: borrows buffer
+    fn hb_buffer_set_direction
+        of Buffer    // harfbuzz/hb-buffer.h 15.2.0:313: sets text direction
+        lend    // harfbuzz/hb-buffer.h 15.2.0:313: borrows buffer
+    fn hb_buffer_get_direction
+        of Buffer    // harfbuzz/hb-buffer.h 15.2.0:317: returns text direction
+        lend    // harfbuzz/hb-buffer.h 15.2.0:317: borrows buffer
+    fn hb_buffer_set_script
+        of Buffer    // harfbuzz/hb-buffer.h 15.2.0:320: sets text script
+        lend    // harfbuzz/hb-buffer.h 15.2.0:320: borrows buffer
+    fn hb_buffer_get_script
+        of Buffer    // harfbuzz/hb-buffer.h 15.2.0:324: returns text script
+        lend    // harfbuzz/hb-buffer.h 15.2.0:324: borrows buffer
+    fn hb_buffer_guess_segment_properties
+        of Buffer    // harfbuzz/hb-buffer.h 15.2.0:343: guesses unset direction, script, and language
+        lend    // harfbuzz/hb-buffer.h 15.2.0:343: borrows buffer
+    fn hb_buffer_add
+        of Buffer    // harfbuzz/hb-buffer.h 15.2.0:592: appends single codepoint and cluster
+        lend    // harfbuzz/hb-buffer.h 15.2.0:592: borrows buffer
+    fn hb_buffer_add_utf8
+        of Buffer    // harfbuzz/hb-buffer.h 15.2.0:597: appends UTF-8 text slice to buffer
+        lend    // harfbuzz/hb-buffer.h 15.2.0:597: borrows buffer and copies text
+        buffer param 1 len param 2    // harfbuzz/hb-buffer.h 15.2.0:598: reads text_length bytes from text
+    fn hb_buffer_get_length
+        of Buffer    // harfbuzz/hb-buffer.h 15.2.0:642: returns number of glyphs/codepoints in buffer
+        lend    // harfbuzz/hb-buffer.h 15.2.0:642: borrows buffer
+    fn hb_buffer_has_positions
+        of Buffer    // harfbuzz/hb-buffer.h 15.2.0:655: checks whether buffer holds glyph positions
+        lend    // harfbuzz/hb-buffer.h 15.2.0:655: borrows buffer
+    fn hb_buffer_reverse
+        of Buffer    // harfbuzz/hb-buffer.h 15.2.0:579: reverses buffer contents
+        lend    // harfbuzz/hb-buffer.h 15.2.0:579: borrows buffer
+    fn hb_buffer_serialize_glyphs
+        of Buffer    // harfbuzz/hb-buffer.h 15.2.0:726: serializes shaped glyph infos and positions into buffer
+        lend    // harfbuzz/hb-buffer.h 15.2.0:726: borrows buffer and font
+        buffer param 3 capacity param 4    // harfbuzz/hb-buffer.h 15.2.0:729: writes at most buf_size bytes into buf
+        fills param 5    // harfbuzz/hb-buffer.h 15.2.0:731: writes number of bytes written to buf_consumed
+    fn hb_shape
+        of Font    // harfbuzz/hb-shape.h 15.2.0:44: shapes buffer with font and optional OpenType features
+        lend    // harfbuzz/hb-shape.h 15.2.0:44: borrows font, buffer, and features
+        buffer param 2 len param 3 elements    // harfbuzz/hb-shape.h 15.2.0:46: reads num_features hb_feature_t entries
+    fn hb_map_set
+        of Map    // harfbuzz/hb-map.h 15.2.0:106: inserts key -> value into map
+        lend    // harfbuzz/hb-map.h 15.2.0:106: borrows map
+    fn hb_map_clear
+        of Map    // harfbuzz/hb-map.h 15.2.0:90: removes all entries from map
+        lend    // harfbuzz/hb-map.h 15.2.0:90: borrows map
+    fn hb_map_is_empty
+        of Map    // harfbuzz/hb-map.h 15.2.0:93: checks whether map is empty
+        lend    // harfbuzz/hb-map.h 15.2.0:93: borrows map
+    fn hb_map_get_population
+        of Map    // harfbuzz/hb-map.h 15.2.0:96: returns entry count in map
+        lend    // harfbuzz/hb-map.h 15.2.0:96: borrows map

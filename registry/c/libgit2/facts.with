@@ -1,0 +1,302 @@
+// libgit2 1.9.1 (conan-center-index recipes/libgit2). Every clause cites
+// git2/*.h installed by the package.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - git_blob_rawcontent, git_odb_object_data: return uncounted `const void *`
+//   whose byte length is queried by a separate call (`git_blob_rawsize`).
+// - git_commit_create_v: C variadic parent commit list.
+// - git_libgit2_opts: C variadic global option setter/getter.
+// - git_remote_*, git_clone, git_fetch, git_push, git_checkout_*: network and
+//   working-tree operations carrying callback option tables (`git_*_options`)
+//   with raw function pointers and user payloads.
+// - git_diff_foreach, git_diff_print, git_tree_walk, git_status_foreach_ext,
+//   git_tag_foreach, git_config_foreach: iterator callbacks carrying raw
+//   `git_diff_delta *` / `git_diff_hunk *` / `git_diff_line *` or unmodeled
+//   option tables.
+// - git_buf_* / git_strarray_*: caller-allocated C buffers holding raw heap
+//   `char *` / `char **` pointers.
+// - git_oid_tostr: returns a raw `char *` aliasing its caller-provided buffer
+//   (use `git_oid_nfmt` for safe buffer formatting).
+// - git_tree_entry_byname, git_tree_entry_byindex, git_tree_entry_byid:
+//   return borrowed `const git_tree_entry *` while `TreeEntry` wraps owned
+//   `*mut git_tree_entry` (use `TreeEntry.bypath` for safe lookup).
+c facts libgit2:
+    resource Repository wraps *mut git_repository
+        from git_repository_open(out param 0)    // git2/repository.h 1.9.1:43: opens repository into out, freed by git_repository_free
+        from git_repository_open_bare(out param 0)    // git2/repository.h 1.9.1:202: opens bare repository into out, freed by git_repository_free
+        from git_repository_init(out param 0)    // git2/repository.h 1.9.1:236: initializes repository into out, freed by git_repository_free
+        drop git_repository_free    // git2/repository.h 1.9.1:215: frees repository
+        ok 0    // git2/errors.h 1.9.1: 0 indicates success
+    resource Revwalk wraps *mut git_revwalk
+        from git_revwalk_new(out param 0)    // git2/revwalk.h 1.9.1:73: allocates revision walker for repo, freed by git_revwalk_free
+        drop git_revwalk_free    // git2/revwalk.h 1.9.1:263: frees revision walker
+        borrows param 1    // git2/revwalk.h 1.9.1:73: walker borrows its repository
+        ok 0    // git2/revwalk.h 1.9.1:73: 0 indicates success
+    resource Commit wraps *mut git_commit
+        from git_commit_lookup(out param 0)    // git2/commit.h 1.9.1:40: looks up commit in repo, freed by git_commit_free
+        drop git_commit_free    // git2/commit.h 1.9.1:74: frees commit
+        borrows param 1    // git2/commit.h 1.9.1:40: commit depends on its repository
+        ok 0    // git2/commit.h 1.9.1:40: 0 indicates success
+    resource Tree wraps *mut git_tree
+        from git_tree_lookup(out param 0)    // git2/tree.h 1.9.1:32: looks up tree in repo, freed by git_tree_free
+        drop git_tree_free    // git2/tree.h 1.9.1:63: frees tree
+        borrows param 1    // git2/tree.h 1.9.1:32: tree depends on its repository
+        ok 0    // git2/tree.h 1.9.1:32: 0 indicates success
+    resource TreeEntry wraps *mut git_tree_entry
+        from git_tree_entry_bypath(out param 0)    // git2/tree.h 1.9.1:142: resolves path under tree into owned entry, freed by git_tree_entry_free
+        drop git_tree_entry_free    // git2/tree.h 1.9.1:168: frees owned tree entry
+        ok 0    // git2/tree.h 1.9.1:142: 0 indicates success
+    resource Blob wraps *mut git_blob
+        from git_blob_lookup(out param 0)    // git2/blob.h 1.9.1:37: looks up blob in repo, freed by git_blob_free
+        drop git_blob_free    // git2/blob.h 1.9.1:67: frees blob
+        borrows param 1    // git2/blob.h 1.9.1:37: blob depends on its repository
+        ok 0    // git2/blob.h 1.9.1:37: 0 indicates success
+    resource Diff wraps *mut git_diff
+        from git_diff_tree_to_tree(out param 0)    // git2/diff.h 1.9.1:881: computes diff between two trees, freed by git_diff_free
+        drop git_diff_free    // git2/diff.h 1.9.1:862: frees diff
+        borrows param 1    // git2/diff.h 1.9.1:881: diff depends on its repository
+        ok 0    // git2/diff.h 1.9.1:881: 0 indicates success
+    resource DiffStats wraps *mut git_diff_stats
+        from git_diff_get_stats(out param 0)    // git2/diff.h 1.9.1:1398: computes diff stats, freed by git_diff_stats_free
+        drop git_diff_stats_free    // git2/diff.h 1.9.1:1450: frees diff stats
+        ok 0    // git2/diff.h 1.9.1:1398: 0 indicates success
+    resource Patch wraps *mut git_patch
+        from git_patch_from_diff(out param 0)    // git2/patch.h 1.9.1:59: builds patch for diff delta idx, freed by git_patch_free
+        from git_patch_from_blobs(out param 0)    // git2/patch.h 1.9.1:78: builds patch comparing two blobs, freed by git_patch_free
+        from git_patch_from_blob_and_buffer(out param 0)    // git2/patch.h 1.9.1:103: builds patch comparing blob and buffer, freed by git_patch_free
+        drop git_patch_free    // git2/patch.h 1.9.1:145: frees patch
+        ok 0    // git2/patch.h 1.9.1:59: 0 indicates success
+    resource Reference wraps *mut git_reference
+        from git_repository_head(out param 0)    // git2/repository.h 1.9.1:444: resolves HEAD reference, freed by git_reference_free
+        borrows param 1    // git2/repository.h 1.9.1:444: reference depends on its repository
+        from git_reference_lookup(out param 0)    // git2/refs.h 1.9.1:37: looks up reference by name, freed by git_reference_free
+        borrows param 1    // git2/refs.h 1.9.1:37: reference depends on its repository
+        drop git_reference_free    // git2/refs.h 1.9.1:507: frees reference
+        ok 0    // git2/refs.h 1.9.1:37: 0 indicates success
+    resource Index wraps *mut git_index
+        from git_repository_index(out param 0)    // git2/repository.h 1.9.1:695: opens repository index, freed by git_index_free
+        drop git_index_free    // git2/index.h 1.9.1:300: frees index
+        borrows param 1    // git2/repository.h 1.9.1:695: index depends on its repository
+        ok 0    // git2/repository.h 1.9.1:695: 0 indicates success
+    resource Object wraps *mut git_object
+        from git_revparse_single(out param 0)    // git2/revparse.h 1.9.1:37: resolves revspec to object, freed by git_object_free
+        borrows param 1    // git2/revparse.h 1.9.1:37: object depends on its repository
+        from git_object_lookup(out param 0)    // git2/object.h 1.9.1:45: looks up object by oid and type, freed by git_object_free
+        borrows param 1    // git2/object.h 1.9.1:45: object depends on its repository
+        drop git_object_free    // git2/object.h 1.9.1:161: frees object
+        ok 0    // git2/object.h 1.9.1:45: 0 indicates success
+    resource Signature wraps *mut git_signature
+        from git_signature_now(out param 0)    // git2/signature.h 1.9.1:53: creates signature with current timestamp, freed by git_signature_free
+        from git_signature_new(out param 0)    // git2/signature.h 1.9.1:41: creates signature with explicit timestamp, freed by git_signature_free
+        drop git_signature_free    // git2/signature.h 1.9.1:143: frees signature
+        ok 0    // git2/signature.h 1.9.1:41: 0 indicates success
+    resource Tag wraps *mut git_tag
+        from git_tag_lookup(out param 0)    // git2/tag.h 1.9.1:33: looks up annotated tag, freed by git_tag_free
+        drop git_tag_free    // git2/tag.h 1.9.1:61: frees tag
+        borrows param 1    // git2/tag.h 1.9.1:33: tag depends on its repository
+        ok 0    // git2/tag.h 1.9.1:33: 0 indicates success
+    fn git_repository_is_bare
+        of Repository    // git2/repository.h 1.9.1:607: checks whether repository is bare
+        lend    // git2/repository.h 1.9.1:607: borrows repo
+    fn git_repository_is_empty
+        of Repository    // git2/repository.h 1.9.1:507: checks whether repository is empty
+        lend    // git2/repository.h 1.9.1:507: borrows repo
+    fn git_repository_path
+        of Repository    // git2/repository.h 1.9.1:556: returns .git directory path
+        lend    // git2/repository.h 1.9.1:556: borrows repo
+        returns borrow CStr from param 0    // git2/repository.h 1.9.1:556: path owned by repo
+    fn git_repository_workdir
+        of Repository    // git2/repository.h 1.9.1:567: returns working directory path or NULL for bare repo
+        lend    // git2/repository.h 1.9.1:567: borrows repo
+        returns borrow CStr from param 0    // git2/repository.h 1.9.1:567: workdir owned by repo
+    fn git_revwalk_reset
+        of Revwalk    // git2/revwalk.h 1.9.1:89: resets walker state
+        lend    // git2/revwalk.h 1.9.1:89: borrows walker
+    fn git_revwalk_push
+        of Revwalk    // git2/revwalk.h 1.9.1:108: pushes commit oid as starting point
+        lend    // git2/revwalk.h 1.9.1:108: borrows walk
+        reads param 1    // git2/revwalk.h 1.9.1:108: reads git_oid by value
+    fn git_revwalk_push_head
+        of Revwalk    // git2/revwalk.h 1.9.1:134: pushes repository HEAD
+        lend    // git2/revwalk.h 1.9.1:134: borrows walk
+    fn git_revwalk_push_ref
+        of Revwalk    // git2/revwalk.h 1.9.1:187: pushes named reference
+        lend    // git2/revwalk.h 1.9.1:187: borrows walk
+    fn git_revwalk_hide
+        of Revwalk    // git2/revwalk.h 1.9.1:149: hides commit oid and ancestors
+        lend    // git2/revwalk.h 1.9.1:149: borrows walk
+        reads param 1    // git2/revwalk.h 1.9.1:149: reads git_oid
+    fn git_revwalk_hide_head
+        of Revwalk    // git2/revwalk.h 1.9.1:176: hides repository HEAD
+        lend    // git2/revwalk.h 1.9.1:176: borrows walk
+    fn git_revwalk_sorting
+        of Revwalk    // git2/revwalk.h 1.9.1:230: sets traversal sorting flags
+        lend    // git2/revwalk.h 1.9.1:230: borrows walk
+    fn git_revwalk_simplify_first_parent
+        of Revwalk    // git2/revwalk.h 1.9.1:255: restricts walk to first parents
+        lend    // git2/revwalk.h 1.9.1:255: borrows walk
+    fn git_revwalk_next
+        of Revwalk(param 1)    // git2/revwalk.h 1.9.1:218: advances walker and writes next commit oid
+        lend    // git2/revwalk.h 1.9.1:218: borrows walk
+        fills param 0    // git2/revwalk.h 1.9.1:218: fills caller git_oid on success
+    fn git_commit_lookup
+        reads param 2    // git2/commit.h 1.9.1:40: reads commit git_oid
+    fn git_commit_id
+        of Commit    // git2/commit.h 1.9.1:82: returns commit oid
+        lend    // git2/commit.h 1.9.1:82: borrows commit
+        returns borrow git_oid from param 0    // git2/commit.h 1.9.1:82: oid owned by commit
+    fn git_commit_message
+        of Commit    // git2/commit.h 1.9.1:113: returns full commit message
+        lend    // git2/commit.h 1.9.1:113: borrows commit
+        returns borrow CStr from param 0    // git2/commit.h 1.9.1:113: message owned by commit
+    fn git_commit_summary
+        of Commit    // git2/commit.h 1.9.1:132: returns short commit summary
+        lend    // git2/commit.h 1.9.1:132: borrows commit
+        returns borrow CStr from param 0    // git2/commit.h 1.9.1:132: summary owned by commit
+    fn git_commit_body
+        of Commit    // git2/commit.h 1.9.1:145: returns commit message body or NULL
+        lend    // git2/commit.h 1.9.1:145: borrows commit
+        returns borrow CStr from param 0    // git2/commit.h 1.9.1:145: body owned by commit
+    fn git_commit_time
+        of Commit    // git2/commit.h 1.9.1:153: returns commit timestamp
+        lend    // git2/commit.h 1.9.1:153: borrows commit
+    fn git_commit_tree_id
+        of Commit    // git2/commit.h 1.9.1:232: returns root tree oid of commit
+        lend    // git2/commit.h 1.9.1:232: borrows commit
+        returns borrow git_oid from param 0    // git2/commit.h 1.9.1:232: tree oid owned by commit
+    fn git_commit_parentcount
+        of Commit    // git2/commit.h 1.9.1:240: returns number of parents
+        lend    // git2/commit.h 1.9.1:240: borrows commit
+    fn git_commit_parent_id
+        of Commit    // git2/commit.h 1.9.1:264: returns nth parent oid
+        lend    // git2/commit.h 1.9.1:264: borrows commit
+        returns borrow git_oid from param 0    // git2/commit.h 1.9.1:264: parent oid owned by commit
+    fn git_tree_lookup
+        reads param 2    // git2/tree.h 1.9.1:32: reads tree git_oid
+    fn git_tree_id
+        of Tree    // git2/tree.h 1.9.1:71: returns tree oid
+        lend    // git2/tree.h 1.9.1:71: borrows tree
+        returns borrow git_oid from param 0    // git2/tree.h 1.9.1:71: oid owned by tree
+    fn git_tree_entrycount
+        of Tree    // git2/tree.h 1.9.1:87: returns number of entries in tree
+        lend    // git2/tree.h 1.9.1:87: borrows tree
+    fn git_tree_entry_name
+        of TreeEntry    // git2/tree.h 1.9.1:176: returns entry filename
+        lend    // git2/tree.h 1.9.1:176: borrows entry
+        returns borrow CStr from param 0    // git2/tree.h 1.9.1:176: name owned by entry
+    fn git_tree_entry_id
+        of TreeEntry    // git2/tree.h 1.9.1:184: returns entry target oid
+        lend    // git2/tree.h 1.9.1:184: borrows entry
+        returns borrow git_oid from param 0    // git2/tree.h 1.9.1:184: oid owned by entry
+    fn git_tree_entry_type
+        of TreeEntry    // git2/tree.h 1.9.1:192: returns entry object type
+        lend    // git2/tree.h 1.9.1:192: borrows entry
+    fn git_blob_lookup
+        reads param 2    // git2/blob.h 1.9.1:37: reads blob git_oid
+    fn git_blob_id
+        of Blob    // git2/blob.h 1.9.1:75: returns blob oid
+        lend    // git2/blob.h 1.9.1:75: borrows blob
+        returns borrow git_oid from param 0    // git2/blob.h 1.9.1:75: oid owned by blob
+    fn git_blob_rawsize
+        of Blob    // git2/blob.h 1.9.1:104: returns byte length of blob
+        lend    // git2/blob.h 1.9.1:104: borrows blob
+    fn git_blob_is_binary
+        of Blob    // git2/blob.h 1.9.1:328: checks whether blob appears binary
+        lend    // git2/blob.h 1.9.1:328: borrows blob
+    fn git_blob_create_from_buffer
+        of Repository(param 1)    // git2/blob.h 1.9.1:314: writes buffer into repository odb as blob
+        lend    // git2/blob.h 1.9.1:314: borrows repo and copies buffer
+        fills param 0    // git2/blob.h 1.9.1:314: fills created blob oid
+        buffer param 2 len param 3    // git2/blob.h 1.9.1:314: reads len bytes from buffer
+    fn git_blob_data_is_binary
+        lend    // git2/blob.h 1.9.1:340: inspects data buffer without retaining it
+        buffer param 0 len param 1    // git2/blob.h 1.9.1:340: reads len bytes from data
+    fn git_diff_tree_to_tree
+        param 4 fixed null    // git2/diff.h 1.9.1:886: NULL selects default git_diff_options
+    fn git_diff_num_deltas
+        of Diff    // git2/diff.h 1.9.1:1062: returns number of deltas in diff
+        lend    // git2/diff.h 1.9.1:1062: borrows diff
+    fn git_diff_num_deltas_of_type
+        of Diff    // git2/diff.h 1.9.1:1075: returns number of deltas matching git_delta_t
+        lend    // git2/diff.h 1.9.1:1075: borrows diff
+    fn git_diff_stats_files_changed
+        of DiffStats    // git2/diff.h 1.9.1:1408: returns total files changed
+        lend    // git2/diff.h 1.9.1:1408: borrows stats
+    fn git_diff_stats_insertions
+        of DiffStats    // git2/diff.h 1.9.1:1417: returns total line insertions
+        lend    // git2/diff.h 1.9.1:1417: borrows stats
+    fn git_diff_stats_deletions
+        of DiffStats    // git2/diff.h 1.9.1:1426: returns total line deletions
+        lend    // git2/diff.h 1.9.1:1426: borrows stats
+    fn git_patch_from_blobs
+        param 5 fixed null    // git2/patch.h 1.9.1:83: NULL selects default git_diff_options
+    fn git_patch_from_blob_and_buffer
+        buffer param 3 len param 4    // git2/patch.h 1.9.1:107: reads buffer_len bytes from buffer
+        param 6 fixed null    // git2/patch.h 1.9.1:110: NULL selects default git_diff_options
+    fn git_patch_num_hunks
+        of Patch    // git2/patch.h 1.9.1:162: returns number of hunks in patch
+        lend    // git2/patch.h 1.9.1:162: borrows patch
+    fn git_reference_name
+        of Reference    // git2/refs.h 1.9.1:284: returns full reference name
+        lend    // git2/refs.h 1.9.1:284: borrows ref
+        returns borrow CStr from param 0    // git2/refs.h 1.9.1:284: name owned by ref
+    fn git_reference_shorthand
+        of Reference    // git2/refs.h 1.9.1:769: returns short reference name
+        lend    // git2/refs.h 1.9.1:769: borrows ref
+        returns borrow CStr from param 0    // git2/refs.h 1.9.1:769: shorthand owned by ref
+    fn git_reference_target
+        of Reference    // git2/refs.h 1.9.1:243: returns target oid of direct reference
+        lend    // git2/refs.h 1.9.1:243: borrows ref
+        returns borrow git_oid from param 0    // git2/refs.h 1.9.1:243: oid owned by ref
+    fn git_reference_is_branch
+        of Reference    // git2/refs.h 1.9.1:628: checks whether reference is a local branch
+        lend    // git2/refs.h 1.9.1:628: borrows ref
+    fn git_reference_is_tag
+        of Reference    // git2/refs.h 1.9.1:648: checks whether reference is a tag
+        lend    // git2/refs.h 1.9.1:648: borrows ref
+    fn git_reference_name_to_id
+        of Repository(param 1)    // git2/refs.h 1.9.1:54: resolves reference name directly to oid
+        lend    // git2/refs.h 1.9.1:54: borrows repo
+        fills param 0    // git2/refs.h 1.9.1:54: fills resolved git_oid
+    fn git_index_read
+        of Index    // git2/index.h 1.9.1:373: reloads index from disk
+        lend    // git2/index.h 1.9.1:373: borrows index
+    fn git_index_write
+        of Index    // git2/index.h 1.9.1:382: writes index to disk
+        lend    // git2/index.h 1.9.1:382: borrows index
+    fn git_index_entrycount
+        of Index    // git2/index.h 1.9.1:473: returns number of entries in index
+        lend    // git2/index.h 1.9.1:473: borrows index
+    fn git_index_add_bypath
+        of Index    // git2/index.h 1.9.1:643: stages file by workdir-relative path
+        lend    // git2/index.h 1.9.1:643: borrows index
+    fn git_index_write_tree
+        of Index(param 1)    // git2/index.h 1.9.1:437: writes index as tree object
+        lend    // git2/index.h 1.9.1:437: borrows index
+        fills param 0    // git2/index.h 1.9.1:437: fills written tree oid
+    fn git_object_lookup
+        reads param 2    // git2/object.h 1.9.1:45: reads object oid
+    fn git_object_id
+        of Object    // git2/object.h 1.9.1:108: returns object oid
+        lend    // git2/object.h 1.9.1:108: borrows obj
+        returns borrow git_oid from param 0    // git2/object.h 1.9.1:108: oid owned by obj
+    fn git_object_type
+        of Object    // git2/object.h 1.9.1:130: returns object type
+        lend    // git2/object.h 1.9.1:130: borrows obj
+    fn git_tag_lookup
+        reads param 2    // git2/tag.h 1.9.1:33: reads tag oid
+    fn git_tag_name
+        of Tag    // git2/tag.h 1.9.1:113: returns tag name
+        lend    // git2/tag.h 1.9.1:113: borrows tag
+        returns borrow CStr from param 0    // git2/tag.h 1.9.1:113: name owned by tag
+    fn git_tag_message
+        of Tag    // git2/tag.h 1.9.1:129: returns tag message
+        lend    // git2/tag.h 1.9.1:129: borrows tag
+        returns borrow CStr from param 0    // git2/tag.h 1.9.1:129: message owned by tag
+    fn git_oid_fromstr
+        lend    // git2/oid.h 1.9.1:137: parses hex string into git_oid
+        fills param 0    // git2/oid.h 1.9.1:137: fills caller git_oid
+    fn git_oid_nfmt
+        lend    // git2/oid.h 1.9.1:196: formats oid hex prefix into out buffer
+        buffer param 0 capacity param 1    // git2/oid.h 1.9.1:196: writes n hex characters into out
+        reads param 2    // git2/oid.h 1.9.1:196: reads git_oid

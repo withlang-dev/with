@@ -1,0 +1,22 @@
+scenario: c.libgit2 opens a repository, walks commits, reads a blob at HEAD, and diffs two trees without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: git init sample
+run: git -C sample config user.name Test
+run: git -C sample config user.email test@example.com
+write sample/hello.txt:
+    hello v1
+run: git -C sample add hello.txt
+run: git -C sample commit -m "initial commit"
+write sample/hello.txt:
+    hello v2
+run: git -C sample add hello.txt
+run: git -C sample commit -m "second commit"
+run: with get c.libgit2
+write src/main.with from libgit2_main.with
+run: with run
+expect exit: 0
+expect stdout contains: libgit2 ok

@@ -667,10 +667,18 @@ impl Zcu:
         // of the same name. Kept, both registered and MIR lowered the
         // generated body, which Sema never checked (#2403: "call of
         // `xdoc_root` has callee kind 0").
+        // A later c_import in the same module may carry the concrete definition
+        // of a struct/union an earlier c_import saw only as a forward
+        // declaration (`type Foo = opaque`). Drop the superseded opaque decl
+        // so the module declares `Foo` once — as its concrete record.
         let written_methods: List[i32] = []
+        let concrete_ci_types: HashMap[i64, i32, Minted] = [:]
         for oi in 0..ordered.len():
             if ordered_ci[oi] == 0 and frontend_fn_decl_is_method(out, self.pool, ordered[oi]):
                 written_methods.push(out.get_data0(ordered[oi]))
+            else if ordered_ci[oi] != 0 and out.kind(ordered[oi]) == NodeKind.NK_TYPE_DECL and type_decl_sub_kind(out.get_data2(ordered[oi])) != TypeDeclKind.Opaque:
+                let key = ((out.get_data0(ordered[oi]) as i64) << 32) | ((self.pool.intern(ordered_paths[oi]) as i64) & 4294967295)
+                concrete_ci_types.insert(key, 1)
         let kept_paths = frontend_new_list_str()
         let kept_file_ids: List[i32] = []
         let kept_ci: List[i32] = []
@@ -679,6 +687,10 @@ impl Zcu:
         for oi in 0..ordered.len():
             if ordered_ci[oi] != 0 and frontend_fn_decl_is_method(out, self.pool, ordered[oi]) and frontend_list_contains_i32(written_methods, out.get_data0(ordered[oi])):
                 continue
+            if ordered_ci[oi] != 0 and out.kind(ordered[oi]) == NodeKind.NK_TYPE_DECL and type_decl_sub_kind(out.get_data2(ordered[oi])) == TypeDeclKind.Opaque:
+                let key = ((out.get_data0(ordered[oi]) as i64) << 32) | ((self.pool.intern(ordered_paths[oi]) as i64) & 4294967295)
+                if concrete_ci_types.contains(key):
+                    continue
             out.add_decl(ordered[oi])
             kept_paths.push(frontend_owned_text(ordered_paths[oi]))
             kept_file_ids.push(ordered_file_ids[oi])

@@ -1340,23 +1340,34 @@ fn ci_record_definition_exists(session: i64, name: &str, is_union: bool):
 fn ci_type_emitted_key(name: &str):
     "__cimport_type:" ++ name
 
+fn ci_type_concrete_emitted_key(name: &str):
+    "__cimport_type_concrete:" ++ name
+
 fn ci_type_name_is_emitted(name: &str) -> bool:
     with_cimport_is_name_emitted(ci_type_emitted_key(name)) != 0
 
 fn ci_mark_type_name_emitted(name: &str):
     with_cimport_mark_name_emitted(ci_type_emitted_key(name))
 
+fn ci_type_name_is_concrete_emitted(name: &str) -> bool:
+    with_cimport_is_name_emitted(ci_type_concrete_emitted_key(name)) != 0
+
+fn ci_mark_type_name_concrete_emitted(name: &str):
+    with_cimport_mark_name_emitted(ci_type_concrete_emitted_key(name))
+
 // Frontend owns `only:` selection. A discarded declaration must not reserve
 // either its value name or its type name in the translator's dedup table.
 fn ci_forget_filtered_name(name: &str):
     cimport_forget_emitted_name(name)
     cimport_forget_emitted_name(ci_type_emitted_key(name))
+    cimport_forget_emitted_name(ci_type_concrete_emitted_key(name))
     // The AST carries the escaped With name; the bridge carries the C name.
     if name.ends_with("_"):
         let raw_name = name.slice(0, name.len() - 1)
         if ci_escape_reserved(raw_name) == name:
             cimport_forget_emitted_name(raw_name)
             cimport_forget_emitted_name(ci_type_emitted_key(raw_name))
+            cimport_forget_emitted_name(ci_type_concrete_emitted_key(raw_name))
 
 fn ci_type_decl_name_exists(session: i64, name: &str): ci_decl_name_has(session, name, CI_NAME_TYPE)
 
@@ -2272,7 +2283,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
             let spname = with_cimport_fn_param_name(session, idx, spi)
             let sptype = ci_migrated_param_type(session, idx, spi)
             if si_unsupported.len() == 0 and ci_starts_with(sptype, "__UNSUPPORTED:"): si_unsupported = sptype.slice(14, sptype.len())
-            if ci_cimport_param_type_requires_raw_abi(sptype):
+            if ci_cimport_type_is_raw_abi(sptype):
                 si_raw = true
             let actual_pname = ci_param_signature_name(ci_escape_reserved(spname), spi)
             si_params = si_params ++ actual_pname ++ ": " ++ sptype
@@ -2661,12 +2672,14 @@ fn ci_emit_member_fn_wrapper(session: i64, idx: i32, struct_name: &str, method_n
     // *const &T). Cast-to-raw of a non-Box source neither consumes nor
     // escapes, so the receiver mode stays consistent with effects.
     var call_args = "(self as " ++ self_type ++ ")"
+    let is_inline = with_cimport_fn_is_inline(session, idx) != 0
     pi = 1
     while pi < param_count:
         let pname = with_cimport_fn_param_name(session, idx, pi)
         let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
         if ci_cimport_param_type_requires_raw_abi(ptype):
             raw_wrapper = true
+        let param_render = if is_inline: ci_migrated_param_type(session, idx, pi) else: ci_unsafe_fn_ptr_type(ptype)
         // The wrapper is a method of the struct in the struct's own module,
         // where a field is in scope by its bare name (§9.5): a C parameter
         // named like a field (`holder_init(h, cmp)` over `holder.cmp`) would
@@ -2675,14 +2688,15 @@ fn ci_emit_member_fn_wrapper(session: i64, idx: i32, struct_name: &str, method_n
         let actual_name = ci_param_signature_name(ci_escape_reserved(pname), pi)
         if params.len() > 0:
             params = params ++ ", "
-        params = params ++ actual_name ++ ": " ++ ptype
+        params = params ++ actual_name ++ ": " ++ param_render
         call_args = call_args ++ ", " ++ actual_name
         pi = pi + 1
 
-    let ret_prefix = if ret == "Unit": "" else: "return "
+    let ret_render = ci_unsafe_fn_ptr_type(ret)
+    let ret_prefix = if ret_render == "Unit": "" else: "return "
     let mode_kw = if recv_mut: "mut fn " else: "fn "
     let fn_kw = (if raw_wrapper: "unsafe " else: "") ++ mode_kw
-    let method_text = ci_render_generated_fn_body("    " ++ fn_kw ++ safe_method ++ "(" ++ params ++ ")" ++ ci_ret_suffix(ret), "        " ++ ret_prefix ++ safe_fn_name ++ "(" ++ call_args ++ ")")
+    let method_text = ci_render_generated_fn_body("    " ++ fn_kw ++ safe_method ++ "(" ++ params ++ ")" ++ ci_ret_suffix(ret_render), "        " ++ ret_prefix ++ safe_fn_name ++ "(" ++ call_args ++ ")")
     if migrate_prefer_brace():
         return "impl " ++ safe_struct ++ " {\n" ++ method_text ++ "\n}\n"
     "impl " ++ safe_struct ++ ":\n" ++ method_text ++ "\n"
@@ -2708,21 +2722,23 @@ fn ci_emit_constructor_wrapper(session: i64, idx: i32, struct_name: &str, method
     var params = ""
     var call_args = ""
     var raw_wrapper = ci_cimport_type_is_raw_abi(ret)
+    let is_inline = with_cimport_fn_is_inline(session, idx) != 0
     pi = 0
     while pi < param_count:
         let pname = with_cimport_fn_param_name(session, idx, pi)
         let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
         if ci_cimport_param_type_requires_raw_abi(ptype):
             raw_wrapper = true
+        let param_render = if is_inline: ci_migrated_param_type(session, idx, pi) else: ci_unsafe_fn_ptr_type(ptype)
         let actual_name = if pname.len() > 0: ci_escape_param_name(pname) else: f"p{pi}"
         if pi > 0:
             params = params ++ ", "
             call_args = call_args ++ ", "
-        params = params ++ actual_name ++ ": " ++ ptype
+        params = params ++ actual_name ++ ": " ++ param_render
         call_args = call_args ++ actual_name
         pi = pi + 1
     let fn_kw = if raw_wrapper: "unsafe fn " else: "fn "
-    ci_render_generated_fn_body(fn_kw ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ")" ++ ci_ret_suffix(ret), "    " ++ safe_fn_name ++ "(" ++ call_args ++ ")") ++ "\n"
+    ci_render_generated_fn_body(fn_kw ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ")" ++ ci_ret_suffix(ci_unsafe_fn_ptr_type(ret)), "    " ++ safe_fn_name ++ "(" ++ call_args ++ ")") ++ "\n"
 
 fn ci_cimport_type_is_raw_abi(ty: &str) -> bool:
     let t = ci_trim(ty)
@@ -3068,10 +3084,11 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
             ci_mark_type_name_emitted(name)
             return ""
 
-    // Skip already-emitted type names. C struct/union tags live in a separate
-    // namespace from variables, and With can represent a type and value with
-    // the same spelling, so do not use the value emission table here.
-    if ci_type_name_is_emitted(name):
+    // Skip already-emitted concrete type names. An earlier c_import that saw
+    // only a forward declaration emitted `type Foo = opaque`; a later header
+    // carrying the concrete definition must still emit its fields so structs
+    // in that header embedding `Foo` by value resolve to the concrete record.
+    if ci_type_name_is_concrete_emitted(name):
         return ""
 
     // Skip forward declarations that have a definition elsewhere in the TU —
@@ -3082,6 +3099,8 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
     // Check if pre-scan marked this type as demoted (bitfield, forward decl,
     // unsupported field, or cascaded from a field whose type was demoted)
     if ci_str_contains(demoted_types, "|" ++ name ++ "|"):
+        if ci_type_name_is_emitted(name):
+            return ""
         ci_mark_type_name_emitted(name)
         let safe_name = ci_escape_type_name(name)
         let loc = ci_get_decl_location(session, name)
@@ -3096,6 +3115,8 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
     // TU's definition upgrades it in the shared defs whatever the file order
     // (c-algorithms' test-trie.c sorts before trie.c, which defines _Trie).
     if with_cimport_struct_is_opaque(session, idx):
+        if ci_type_name_is_emitted(name):
+            return ""
         ci_mark_type_name_emitted(name)
         let safe_name = ci_escape_type_name(name)
         let rendered = "type " ++ safe_name ++ " = opaque\n"
@@ -3107,6 +3128,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
     if field_count == 0:
         // Empty struct definition → emit with padding byte for ABI compatibility
         ci_mark_type_name_emitted(name)
+        ci_mark_type_name_concrete_emitted(name)
         let safe_name = ci_escape_type_name(name)
         let empty_rendered = if is_union: "type " ++ safe_name ++ " = union \{ __pad0: u8 = 0 }\nimpl Copy for " ++ safe_name ++ "\n" else: "type " ++ safe_name ++ " \{ __pad0: u8 = 0 }\nimpl Copy for " ++ safe_name ++ "\n"
         if ci_migrate_shared_decl_add("type", name, empty_rendered):
@@ -3114,6 +3136,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
         return empty_rendered
 
     ci_mark_type_name_emitted(name)
+    ci_mark_type_name_concrete_emitted(name)
     let safe_name = ci_escape_type_name(name)
     let decl_cursor = ci_find_decl_cursor_for_idx(session, idx)
 
@@ -13066,7 +13089,7 @@ impl CiExprPool:
             first_three.push(arg_ids[1])
             first_three.push(arg_ids[2])
             return self.build_libc_call_value_expr(session, cursor, "memset", first_three, types)
-        if callee_text == "__builtin_object_size":
+        if callee_text == "__builtin_object_size" or callee_text == "__builtin_constant_p":
             let zero_idx = self.add_string("0")
             return self.int_lit(zero_idx, 0)
         if callee_text == "__builtin_offsetof":
@@ -16317,7 +16340,8 @@ fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -
         if with_ci_cursor_kind(session, child) == 10:  // CXCursor_ParmDecl
             let cpname = ci_escape_reserved(with_ci_cursor_spelling(session, child))
             if cpname.len() > 0:
-                let sig_name = ci_param_signature_name(cpname, param_index)
+                let decl_pname = ci_escape_reserved(with_cimport_fn_param_name(session, decl_idx, param_index))
+                let sig_name = ci_param_signature_name(decl_pname, param_index)
                 var storage_name = with_str_clone_ref(sig_name)
                 let raw_ptype = ci_migrated_param_type(session, decl_idx, param_index)
                 var ptype = ci_pointer_type_explicit_mut(raw_ptype)

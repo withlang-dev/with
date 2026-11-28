@@ -1,0 +1,302 @@
+// yyjson 0.12.0 (conan-center-index recipes/yyjson). Every clause cites
+// yyjson.h installed by the package.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - yyjson_alc_pool_init, yyjson_alc_dyn_new, yyjson_alc_dyn_free: custom
+//   allocator function-pointer tables (malloc/realloc/free + void *ctx).
+// - yyjson_read_opts with YYJSON_READ_INSITU, yyjson_incr_new/read/free:
+//   in-situ parsing mutates and retains caller input buffer pointers.
+// - yyjson_read_fp, yyjson_write_fp, yyjson_mut_write_fp, yyjson_val_write_fp,
+//   yyjson_mut_val_write_fp: take raw C FILE * handles.
+// - yyjson_mut_str, yyjson_mut_strn, yyjson_mut_obj_add_str*,
+//   yyjson_mut_arr_add_str*: store caller's raw const char * without copying
+//   (use yyjson_mut_strcpy / yyjson_mut_arr_add_strcpy for safe copies).
+// - yyjson_write_number: writes into uncounted caller char *buf.
+// - unsafe_yyjson_*: internal low-level helpers with unchecked invariants.
+c facts yyjson:
+    text utf8    // yyjson.h 0.12.0: JSON strings and serialized JSON output are UTF-8
+    resource Doc wraps *mut yyjson_doc
+        from yyjson_read    // yyjson.h 0.12.0:983: parses UTF-8 JSON buffer into immutable document freed by yyjson_doc_free
+        from yyjson_read_file    // yyjson.h 0.12.0:942: reads and parses JSON file into immutable document freed by yyjson_doc_free
+        from yyjson_mut_doc_imut_copy    // yyjson.h 0.12.0:2319: deep-copies mutable document into immutable document freed by yyjson_doc_free
+        drop yyjson_doc_free    // yyjson.h 0.12.0:1729: frees immutable document and its value pool
+    resource Val wraps *mut yyjson_val
+    resource ArrIter wraps yyjson_arr_iter
+    resource ObjIter wraps yyjson_obj_iter
+    resource MutDoc wraps *mut yyjson_mut_doc
+        from yyjson_mut_doc_new    // yyjson.h 0.12.0:2281: allocates empty mutable document freed by yyjson_mut_doc_free
+        from yyjson_doc_mut_copy    // yyjson.h 0.12.0:2287: deep-copies immutable document into mutable document freed by yyjson_mut_doc_free
+        drop yyjson_mut_doc_free    // yyjson.h 0.12.0:2277: frees mutable document and its value/string pools
+    resource MutVal wraps *mut yyjson_mut_val
+    fn yyjson_read
+        buffer param 0 len param 1    // yyjson.h 0.12.0:983: reads len bytes from dat without modifying or retaining dat
+    fn yyjson_read_file
+        param 2 fixed null    // yyjson.h 0.12.0:942: NULL selects default allocator
+        param 3 fixed null    // yyjson.h 0.12.0:942: NULL declines optional error struct
+    fn yyjson_mut_doc_new
+        rename new    // yyjson.h 0.12.0:2281: MutDoc.new()
+        param 0 fixed null    // yyjson.h 0.12.0:2281: NULL selects default allocator
+    fn yyjson_doc_mut_copy
+        lend    // yyjson.h 0.12.0:2287: reads doc without modifying or retaining it
+        param 1 fixed null    // yyjson.h 0.12.0:2287: NULL selects default allocator
+    fn yyjson_mut_doc_imut_copy
+        lend    // yyjson.h 0.12.0:2319: reads doc without modifying or retaining it
+        param 1 fixed null    // yyjson.h 0.12.0:2319: NULL selects default allocator
+    fn yyjson_doc_get_root
+        of Doc    // yyjson.h 0.12.0:1714: returns root value borrowed from doc
+        lend    // yyjson.h 0.12.0:1714: borrows doc
+        returns borrow Val from param 0    // yyjson.h 0.12.0:1714: root lives as long as doc
+    fn yyjson_doc_get_read_size
+        of Doc    // yyjson.h 0.12.0:1720: returns read byte size of doc
+        lend    // yyjson.h 0.12.0:1720: borrows doc
+    fn yyjson_doc_get_val_count
+        of Doc    // yyjson.h 0.12.0:1724: returns value count in doc
+        lend    // yyjson.h 0.12.0:1724: borrows doc
+    fn yyjson_write
+        of Doc    // yyjson.h 0.12.0:1356: serializes immutable doc to owned UTF-8 JSON string
+        lend    // yyjson.h 0.12.0:1356: borrows doc
+        param 2 discarded    // yyjson.h 0.12.0:1358: output byte length is also NUL-terminated
+        text return, owned, freed by free    // yyjson.h 0.12.0:1356: returns malloc'd NUL-terminated UTF-8 JSON string freed by free
+    fn yyjson_write_file
+        of Doc(param 1)    // yyjson.h 0.12.0:1311: writes doc to file path
+        lend    // yyjson.h 0.12.0:1311: borrows doc
+        param 3 fixed null    // yyjson.h 0.12.0:1311: NULL selects default allocator
+        param 4 fixed null    // yyjson.h 0.12.0:1311: NULL declines optional error struct
+    fn yyjson_get_type
+        of Val    // yyjson.h 0.12.0:1750: returns value type tag
+        lend    // yyjson.h 0.12.0:1750: borrows val
+    fn yyjson_get_subtype
+        of Val    // yyjson.h 0.12.0:1754: returns value subtype tag
+        lend    // yyjson.h 0.12.0:1754: borrows val
+    fn yyjson_get_type_desc
+        of Val    // yyjson.h 0.12.0:1762: returns static type description string
+        lend    // yyjson.h 0.12.0:1762: borrows val
+        returns static CStr    // yyjson.h 0.12.0:1762: returns string literal describing JSON type
+    fn yyjson_is_null
+        of Val    // yyjson.h 0.12.0:1770: tests null type
+        lend    // yyjson.h 0.12.0:1770: borrows val
+    fn yyjson_is_true
+        of Val    // yyjson.h 0.12.0:1774: tests true boolean
+        lend    // yyjson.h 0.12.0:1774: borrows val
+    fn yyjson_is_false
+        of Val    // yyjson.h 0.12.0:1778: tests false boolean
+        lend    // yyjson.h 0.12.0:1778: borrows val
+    fn yyjson_is_bool
+        of Val    // yyjson.h 0.12.0:1782: tests boolean type
+        lend    // yyjson.h 0.12.0:1782: borrows val
+    fn yyjson_is_uint
+        of Val    // yyjson.h 0.12.0:1786: tests unsigned integer
+        lend    // yyjson.h 0.12.0:1786: borrows val
+    fn yyjson_is_sint
+        of Val    // yyjson.h 0.12.0:1790: tests signed integer
+        lend    // yyjson.h 0.12.0:1790: borrows val
+    fn yyjson_is_int
+        of Val    // yyjson.h 0.12.0:1794: tests integer type
+        lend    // yyjson.h 0.12.0:1794: borrows val
+    fn yyjson_is_real
+        of Val    // yyjson.h 0.12.0:1798: tests floating-point type
+        lend    // yyjson.h 0.12.0:1798: borrows val
+    fn yyjson_is_num
+        of Val    // yyjson.h 0.12.0:1802: tests number type
+        lend    // yyjson.h 0.12.0:1802: borrows val
+    fn yyjson_is_str
+        of Val    // yyjson.h 0.12.0:1806: tests string type
+        lend    // yyjson.h 0.12.0:1806: borrows val
+    fn yyjson_is_arr
+        of Val    // yyjson.h 0.12.0:1810: tests array type
+        lend    // yyjson.h 0.12.0:1810: borrows val
+    fn yyjson_is_obj
+        of Val    // yyjson.h 0.12.0:1814: tests object type
+        lend    // yyjson.h 0.12.0:1814: borrows val
+    fn yyjson_is_ctn
+        of Val    // yyjson.h 0.12.0:1818: tests container type
+        lend    // yyjson.h 0.12.0:1818: borrows val
+    fn yyjson_get_bool
+        of Val    // yyjson.h 0.12.0:1822: reads boolean value
+        lend    // yyjson.h 0.12.0:1822: borrows val
+    fn yyjson_get_uint
+        of Val    // yyjson.h 0.12.0:1826: reads uint64 value
+        lend    // yyjson.h 0.12.0:1826: borrows val
+    fn yyjson_get_sint
+        of Val    // yyjson.h 0.12.0:1830: reads int64 value
+        lend    // yyjson.h 0.12.0:1830: borrows val
+    fn yyjson_get_int
+        of Val    // yyjson.h 0.12.0:1834: reads int value
+        lend    // yyjson.h 0.12.0:1834: borrows val
+    fn yyjson_get_real
+        of Val    // yyjson.h 0.12.0:1838: reads double value
+        lend    // yyjson.h 0.12.0:1838: borrows val
+    fn yyjson_get_num
+        of Val    // yyjson.h 0.12.0:1842: reads numeric value as double
+        lend    // yyjson.h 0.12.0:1842: borrows val
+    fn yyjson_get_str
+        of Val    // yyjson.h 0.12.0:1846: reads string value
+        lend    // yyjson.h 0.12.0:1846: borrows val
+        returns borrow CStr from param 0    // yyjson.h 0.12.0:1846: string lives in owning document
+    fn yyjson_get_len
+        of Val    // yyjson.h 0.12.0:1850: returns string/array/object length
+        lend    // yyjson.h 0.12.0:1850: borrows val
+    fn yyjson_equals_str
+        of Val    // yyjson.h 0.12.0:1854: compares string value with C string
+        lend    // yyjson.h 0.12.0:1854: borrows val
+    fn yyjson_arr_size
+        of Val    // yyjson.h 0.12.0:1969: returns array element count
+        lend    // yyjson.h 0.12.0:1969: borrows arr
+    fn yyjson_arr_get
+        of Val    // yyjson.h 0.12.0:1975: returns element at index
+        lend    // yyjson.h 0.12.0:1975: borrows arr
+        returns borrow Val from param 0    // yyjson.h 0.12.0:1975: element lives in owning document
+    fn yyjson_arr_get_first
+        of Val    // yyjson.h 0.12.0:1981: returns first array element
+        lend    // yyjson.h 0.12.0:1981: borrows arr
+        returns borrow Val from param 0    // yyjson.h 0.12.0:1981: element lives in owning document
+    fn yyjson_arr_get_last
+        of Val    // yyjson.h 0.12.0:1986: returns last array element
+        lend    // yyjson.h 0.12.0:1986: borrows arr
+        returns borrow Val from param 0    // yyjson.h 0.12.0:1986: element lives in owning document
+    fn yyjson_obj_size
+        of Val    // yyjson.h 0.12.0:2072: returns object key-value pair count
+        lend    // yyjson.h 0.12.0:2072: borrows obj
+    fn yyjson_obj_get
+        of Val    // yyjson.h 0.12.0:2078: looks up object member by key
+        lend    // yyjson.h 0.12.0:2078: borrows obj
+        returns borrow Val from param 0    // yyjson.h 0.12.0:2078: member lives in owning document
+    fn yyjson_obj_iter_get_val
+        of Val    // yyjson.h 0.12.0:2162: returns value adjacent to key in immutable object
+        lend    // yyjson.h 0.12.0:2162: borrows key
+        returns borrow Val from param 0    // yyjson.h 0.12.0:2162: value lives in owning document
+    fn yyjson_arr_iter_with
+        of Val    // yyjson.h 0.12.0:2017: constructs array iterator over arr
+        lend    // yyjson.h 0.12.0:2017: borrows arr
+        returns borrow ArrIter from param 0    // yyjson.h 0.12.0:2017: iterator cursor borrows owning document
+    fn yyjson_arr_iter_has_next
+        of ArrIter    // yyjson.h 0.12.0:2025: tests whether array iterator has remaining elements
+        lend    // yyjson.h 0.12.0:2025: borrows iter
+    fn yyjson_arr_iter_next
+        of ArrIter    // yyjson.h 0.12.0:2031: advances array iterator
+        lend    // yyjson.h 0.12.0:2031: borrows iter
+        returns borrow Val from param 0    // yyjson.h 0.12.0:2031: next element lives in owning document
+    fn yyjson_obj_iter_with
+        of Val    // yyjson.h 0.12.0:2142: constructs object iterator over obj
+        lend    // yyjson.h 0.12.0:2142: borrows obj
+        returns borrow ObjIter from param 0    // yyjson.h 0.12.0:2142: iterator cursor borrows owning document
+    fn yyjson_obj_iter_has_next
+        of ObjIter    // yyjson.h 0.12.0:2150: tests whether object iterator has remaining entries
+        lend    // yyjson.h 0.12.0:2150: borrows iter
+    fn yyjson_obj_iter_next
+        of ObjIter    // yyjson.h 0.12.0:2156: advances object iterator
+        lend    // yyjson.h 0.12.0:2156: borrows iter
+        returns borrow Val from param 0    // yyjson.h 0.12.0:2156: next key lives in owning document
+    fn yyjson_mut_doc_get_root
+        of MutDoc    // yyjson.h 0.12.0:2235: returns root mutable value
+        lend    // yyjson.h 0.12.0:2235: borrows doc
+        preserves param 0    // yyjson.h 0.12.0:2235: read-only root pointer query
+        returns borrow MutVal from param 0    // yyjson.h 0.12.0:2235: root lives in doc
+    fn yyjson_mut_doc_set_root
+        of MutDoc    // yyjson.h 0.12.0:2239: sets root mutable value of doc
+        lend    // yyjson.h 0.12.0:2239: borrows doc and root
+        preserves param 0    // yyjson.h 0.12.0:2239: only updates doc->root pointer; existing pool values stay valid
+    fn yyjson_mut_doc_set_str_pool_size
+        of MutDoc    // yyjson.h 0.12.0:2255: sets string pool size
+        lend    // yyjson.h 0.12.0:2255: borrows doc
+        preserves param 0    // yyjson.h 0.12.0:2255: sets next chunk size; existing chunks are never moved
+    fn yyjson_mut_doc_set_val_pool_size
+        of MutDoc    // yyjson.h 0.12.0:2271: sets value pool size
+        lend    // yyjson.h 0.12.0:2271: borrows doc
+        preserves param 0    // yyjson.h 0.12.0:2271: sets next chunk size; existing chunks are never moved
+    fn yyjson_mut_null
+        of MutDoc    // yyjson.h 0.12.0:2599: creates null mutable value in doc
+        lend    // yyjson.h 0.12.0:2599: borrows doc
+        preserves param 0    // yyjson.h 0.12.0:2599: arena pool appends new chunks without moving existing values
+        returns borrow MutVal from param 0    // yyjson.h 0.12.0:2599: allocated from doc pool
+    fn yyjson_mut_bool
+        of MutDoc    // yyjson.h 0.12.0:2608: creates boolean mutable value in doc
+        lend    // yyjson.h 0.12.0:2608: borrows doc
+        preserves param 0    // yyjson.h 0.12.0:2608: arena pool appends new chunks without moving existing values
+        returns borrow MutVal from param 0    // yyjson.h 0.12.0:2608: allocated from doc pool
+    fn yyjson_mut_uint
+        of MutDoc    // yyjson.h 0.12.0:2612: creates uint64 mutable value in doc
+        lend    // yyjson.h 0.12.0:2612: borrows doc
+        preserves param 0    // yyjson.h 0.12.0:2612: arena pool appends new chunks without moving existing values
+        returns borrow MutVal from param 0    // yyjson.h 0.12.0:2612: allocated from doc pool
+    fn yyjson_mut_sint
+        of MutDoc    // yyjson.h 0.12.0:2616: creates int64 mutable value in doc
+        lend    // yyjson.h 0.12.0:2616: borrows doc
+        preserves param 0    // yyjson.h 0.12.0:2616: arena pool appends new chunks without moving existing values
+        returns borrow MutVal from param 0    // yyjson.h 0.12.0:2616: allocated from doc pool
+    fn yyjson_mut_int
+        of MutDoc    // yyjson.h 0.12.0:2620: creates int64 mutable value in doc
+        lend    // yyjson.h 0.12.0:2620: borrows doc
+        preserves param 0    // yyjson.h 0.12.0:2620: arena pool appends new chunks without moving existing values
+        returns borrow MutVal from param 0    // yyjson.h 0.12.0:2620: allocated from doc pool
+    fn yyjson_mut_real
+        of MutDoc    // yyjson.h 0.12.0:2632: creates double mutable value in doc
+        lend    // yyjson.h 0.12.0:2632: borrows doc
+        preserves param 0    // yyjson.h 0.12.0:2632: arena pool appends new chunks without moving existing values
+        returns borrow MutVal from param 0    // yyjson.h 0.12.0:2632: allocated from doc pool
+    fn yyjson_mut_strcpy
+        of MutDoc    // yyjson.h 0.12.0:2653: creates copied UTF-8 string value in doc pool
+        lend    // yyjson.h 0.12.0:2653: borrows doc and copies str
+        preserves param 0    // yyjson.h 0.12.0:2653: arena pool appends new chunks without moving existing values
+        returns borrow MutVal from param 0    // yyjson.h 0.12.0:2653: allocated from doc pool
+    fn yyjson_mut_arr
+        of MutDoc    // yyjson.h 0.12.0:2800: creates empty mutable array in doc
+        lend    // yyjson.h 0.12.0:2800: borrows doc
+        preserves param 0    // yyjson.h 0.12.0:2800: arena pool appends new chunks without moving existing values
+        returns borrow MutVal from param 0    // yyjson.h 0.12.0:2800: allocated from doc pool
+    fn yyjson_mut_obj
+        of MutDoc    // yyjson.h 0.12.0:3670: creates empty mutable object in doc
+        lend    // yyjson.h 0.12.0:3670: borrows doc
+        preserves param 0    // yyjson.h 0.12.0:3670: arena pool appends new chunks without moving existing values
+        returns borrow MutVal from param 0    // yyjson.h 0.12.0:3670: allocated from doc pool
+    fn yyjson_mut_arr_append
+        of MutVal    // yyjson.h 0.12.0:3176: appends mutable value to mutable array
+        lend    // yyjson.h 0.12.0:3176: borrows arr and val
+        preserves param 0    // yyjson.h 0.12.0:3176: intrusive circular list link; existing pool pointers stay valid
+    fn yyjson_mut_arr_add_val
+        of MutVal    // yyjson.h 0.12.0:3276: adds mutable value to mutable array
+        lend    // yyjson.h 0.12.0:3276: borrows arr and val
+        preserves param 0    // yyjson.h 0.12.0:3276: intrusive circular list link; existing pool pointers stay valid
+    fn yyjson_mut_arr_add_int
+        of MutDoc    // yyjson.h 0.12.0:3353: appends int64 to mutable array
+        lend    // yyjson.h 0.12.0:3353: borrows doc and arr
+        preserves param 0    // yyjson.h 0.12.0:3353: arena pool appends new chunks without moving existing values
+    fn yyjson_mut_arr_add_strcpy
+        of MutDoc    // yyjson.h 0.12.0:3431: appends copied string to mutable array
+        lend    // yyjson.h 0.12.0:3431: borrows doc and arr, copies str
+        preserves param 0    // yyjson.h 0.12.0:3431: arena pool appends new chunks without moving existing values
+    fn yyjson_mut_obj_add
+        of MutVal    // yyjson.h 0.12.0:3725: inserts key-value pair into mutable object
+        lend    // yyjson.h 0.12.0:3725: borrows obj, key, val
+        preserves param 0    // yyjson.h 0.12.0:3725: intrusive circular list link; existing pool pointers stay valid
+    fn yyjson_mut_write
+        of MutDoc    // yyjson.h 0.12.0:1461: serializes mutable doc to owned UTF-8 JSON string
+        lend    // yyjson.h 0.12.0:1461: borrows doc
+        preserves param 0    // yyjson.h 0.12.0:1461: read-only serialization of doc
+        param 2 discarded    // yyjson.h 0.12.0:1463: output byte length is also NUL-terminated
+        text return, owned, freed by free    // yyjson.h 0.12.0:1461: returns malloc'd NUL-terminated UTF-8 JSON string freed by free
+    fn yyjson_mut_write_file
+        of MutDoc(param 1)    // yyjson.h 0.12.0:1415: writes mutable doc to file path
+        lend    // yyjson.h 0.12.0:1415: borrows doc
+        param 3 fixed null    // yyjson.h 0.12.0:1415: NULL selects default allocator
+        param 4 fixed null    // yyjson.h 0.12.0:1415: NULL declines optional error struct
+    fn yyjson_val_mut_copy
+        of MutDoc    // yyjson.h 0.12.0:2301: deep-copies immutable val into mutable doc
+        rename copy_val    // yyjson.h 0.12.0:2301: avoids name clash with yyjson_mut_val_mut_copy
+        lend    // yyjson.h 0.12.0:2301: borrows doc and val
+        returns borrow MutVal from param 0    // yyjson.h 0.12.0:2301: allocated from doc pool
+    fn yyjson_mut_val_mut_copy
+        of MutDoc    // yyjson.h 0.12.0:2310: deep-copies mutable val into mutable doc
+        rename copy_mut_val    // yyjson.h 0.12.0:2310: distinct from yyjson_val_mut_copy
+        lend    // yyjson.h 0.12.0:2310: borrows doc and val
+        returns borrow MutVal from param 0    // yyjson.h 0.12.0:2310: allocated from doc pool
+    fn yyjson_merge_patch
+        of MutDoc    // yyjson.h 0.12.0:4728: applies RFC 7396 merge patch to immutable values
+        rename merge_patch_val    // yyjson.h 0.12.0:4728: distinct from yyjson_mut_merge_patch
+        lend    // yyjson.h 0.12.0:4728: borrows doc, orig, patch
+        returns borrow MutVal from param 0    // yyjson.h 0.12.0:4728: allocated from doc pool
+    fn yyjson_mut_merge_patch
+        of MutDoc    // yyjson.h 0.12.0:4740: applies RFC 7396 merge patch to mutable values
+        rename merge_patch_mut    // yyjson.h 0.12.0:4740: distinct from yyjson_merge_patch
+        lend    // yyjson.h 0.12.0:4740: borrows doc, orig, patch
+        returns borrow MutVal from param 0    // yyjson.h 0.12.0:4740: allocated from doc pool

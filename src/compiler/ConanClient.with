@@ -2509,6 +2509,9 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
     migrate_parse_c_as_c_import()
     let library = conan_library_units(build_dir, libs, corpus)
     if library.note.len() > 0: library.units = corpus.units
+    if library.units.len() == 0 and g_migrate_facade_without_bodies == 0:
+        conan_write_header_only_binary_contract(name, version, dep_dir)
+        return
     let summary = migrate_c_facade_for_package(library.units, corpus.include_paths, corpus.defines, source_dir, name, version, registry.path, import_dirs, link_lib, dep_dir ++ "/contract.with", report_path)
     if library.note.len() > 0 and runtime_file_exists(report_path) != 0:
         let _noted = runtime_write_file(report_path, runtime_read_file(report_path) ++ "  " ++ library.note ++ "\n")
@@ -2560,10 +2563,12 @@ fn conan_facade_of_binary(name: &str, version: &str, project_root: &str, dep_dir
     let tools = conan_source_tools(name)
     if tools.problem.len() > 0:
         runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ tools.problem)
+        conan_write_header_only_binary_contract(name, version, dep_dir)
         return
     let fetched = conan_fetch_recipe(name, version)
     if fetched.problem.len() > 0:
         runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ fetched.problem)
+        conan_write_header_only_binary_contract(name, version, dep_dir)
         return
     let cmake_env_name = conan_package_cmake_env_name(name)
     let cmake_env = conan_package_cmake_env(name)
@@ -2573,21 +2578,73 @@ fn conan_facade_of_binary(name: &str, version: &str, project_root: &str, dep_dir
     let req_res = conan_install_recipe_requirements(name, version, fetched.recipe, recipe_env, project_root, depth, false)
     if not req_res.ok:
         runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ req_res.problem)
+        conan_write_header_only_binary_contract(name, version, dep_dir)
         return
     let resolved = req_res.resolved
     let tree = conan_fetch_source_tree(name, version, fetched, work)
     if tree.problem.len() > 0:
         runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ tree.problem)
         let _gone = runtime_remove_tree(work)
+        conan_write_header_only_binary_contract(name, version, dep_dir)
         return
     let configured = conan_configure_source(name, version, project_root, dep_dir, work, tree.source_dir, resolved, fetched.recipe, fetched.recipe_cmake, recipe_env, cmake_env, cmake_env_name, tools)
     if configured.len() > 0:
         runtime_eprint("  facade: no proofs from the source of " ++ name ++ "/" ++ version ++ ": " ++ configured)
         let _gone = runtime_remove_tree(work)
+        conan_write_header_only_binary_contract(name, version, dep_dir)
         return
     conan_generate_headers(tools, work ++ "/b")
     conan_write_binary_contract(name, version, dep_dir, tree.source_dir, work ++ "/b")
     conan_remove_build_tree(work)
+
+// Drafts a prebuilt binary's contract from its installed headers and the
+// registry when no CMake source tree could be configured (Meson/Autotools/Make
+// recipes such as lz4 or libsodium). No proofs are drawn from source (§31.6.3).
+fn conan_write_header_only_binary_contract(name: &str, version: &str, dep_dir: &str):
+    let reg = conan_registry_facts(name, dep_dir)
+    if reg.path.len() == 0: return
+    let meta = runtime_read_file(dep_dir ++ "/metadata.json")
+    let inc_dirs = []
+    for rel in json_extract_string_array(meta, "include_paths"): inc_dirs.push(dep_dir ++ "/" ++ rel)
+    if inc_dirs.len() == 0: return
+    let scratch = dep_dir ++ "/.hdr-draft"
+    let _rm0 = runtime_remove_tree(scratch)
+    if runtime_mkdir_p(scratch) != 0: return
+    var inc_flags = ""
+    for dir in inc_dirs: inc_flags = inc_flags ++ " -I " ++ dir
+    let q = "\x22"
+    var entries = ""
+    var idx = 0
+    for pass in 0..2:
+        if pass == 1 and idx > 0: break
+        for dir in inc_dirs:
+            for path in with_fs_list_files(dir).split("\n"):
+                if not path.ends_with(".h") or not path.starts_with(dir) or path.len() <= dir.len() + 1: continue
+                let rel = path.slice(dir.len() + 1, path.len())
+                if pass == 0 and rel.contains("/"): continue
+                if pass == 1 and rel.split("/").len() != 2: continue
+                let unit_name = f"hdr_{idx}.c"
+                let unit_path = scratch ++ "/" ++ unit_name
+                if runtime_write_file(unit_path, "#include " ++ q ++ rel ++ q ++ "\n") != 0: continue
+                if entries.len() > 0: entries = entries ++ ",\n"
+                entries = entries ++ "  {\n    " ++ q ++ "directory" ++ q ++ ": " ++ q ++ conan_json_escape(scratch) ++ q ++ ",\n    " ++ q ++ "command" ++ q ++ ": " ++ q ++ conan_json_escape("cc" ++ inc_flags ++ " -c " ++ unit_name) ++ q ++ ",\n    " ++ q ++ "file" ++ q ++ ": " ++ q ++ conan_json_escape(unit_path) ++ q ++ "\n  }"
+                idx += 1
+    if idx == 0:
+        let _rm1 = runtime_remove_tree(scratch)
+        return
+    if runtime_write_file(scratch ++ "/compile_commands.json", "[\n" ++ entries ++ "\n]\n") != 0:
+        let _rm2 = runtime_remove_tree(scratch)
+        return
+    g_migrate_facade_without_bodies = 1
+    conan_write_facade(name, version, dep_dir, scratch, scratch)
+    g_migrate_facade_without_bodies = 0
+    let _rm3 = runtime_remove_tree(scratch)
+    let drafted = runtime_read_file(dep_dir ++ "/contract.with")
+    if drafted.len() == 0: return
+    var text = ""
+    for line in drafted.split("\n"):
+        text = text ++ line.replace(", proven from the package's own source (§16.2b.15, D121).", " from its headers and the registry; the library is linked as a prebuilt binary, so nothing here is proven from its source (§31.6.3).").replace("// Every clause records its proof; a project may override any single fact.", "// Every clause records where it comes from; a project may override any single fact.") ++ "\n"
+    let _retitled = runtime_write_file(dep_dir ++ "/contract.with", text.slice(0, text.len() - 1))
 
 // The contract of a package linked as a prebuilt binary, from a configured
 // source tree that is not the build linked (§31.6.3): what the units show
