@@ -10163,12 +10163,6 @@ impl Sema:
             return MirIntrinsic.NONE
         if type_name == "SlotMap":
             if method_name == "new": return MirIntrinsic.SLOTMAP_NEW
-            if method_name == "slot": return MirIntrinsic.SLOTMAP_SLOT
-            if method_name == "get_disjoint": return MirIntrinsic.SLOTMAP_GET_DISJOINT
-            return MirIntrinsic.NONE
-        if type_name == "SlotMapSlot":
-            if method_name == "get": return MirIntrinsic.SLOTMAPSLOT_GET
-            if method_name == "set": return MirIntrinsic.SLOTMAPSLOT_SET
             return MirIntrinsic.NONE
         if type_name == "ListRange":
             if method_name == "get": return MirIntrinsic.VECRANGE_GET
@@ -28970,10 +28964,7 @@ impl Sema:
             if set_slot != MirIntrinsic.NONE and set_slot != MirIntrinsic.MAP_VALUE_AT and set_slot != MirIntrinsic.MAP_TAKE_AT:
                 return true
         if owner_sym == self.syms.slotmap:
-            if field == self.syms.new or field == self.syms.slot or field == self.syms.get_disjoint:
-                return true
-        if owner_sym == self.syms.slotmapslot:
-            if field == self.syms.get or self.pool_resolve(field) == "set":
+            if field == self.syms.new:
                 return true
         if owner_sym == self.syms.option:
             let option_method_name = self.pool_resolve(field)
@@ -35366,6 +35357,25 @@ impl Sema:
         if bb_tp != 0:
             self.put_generic_subst(bb_tp, concrete_owner, node)
 
+        // Enforce trait bounds on the impl block (`impl[T: Copy] SlotMapSlot[T]`),
+        // the method's own type parameters, and any `where` clause, matching
+        // check_generic_call.
+        let method_bounds_errors_before = self.diags.count_by_severity(DiagSeverity.Error)
+        if self.method_impl_nodes.contains(method_fn_sym):
+            let method_impl_nd = self.method_impl_nodes.get(method_fn_sym).unwrap()
+            let impl_tp_meta = self.ast.find_impl_type_params(method_impl_nd)
+            if impl_tp_meta >= 0:
+                self.check_generic_trait_bounds(self.ast.state.impl_type_params[(impl_tp_meta + 1)], self.ast.state.impl_type_params[(impl_tp_meta + 2)], node)
+        if fn_tp_count > 0:
+            self.check_generic_trait_bounds(fn_tp_start, fn_tp_count, node)
+        let method_where_idx = self.ast.find_where_meta(fn_node)
+        if method_where_idx >= 0:
+            self.check_generic_trait_bounds(self.ast.state.where_meta[(method_where_idx + 1)], self.ast.state.where_meta[(method_where_idx + 2)], node)
+        if self.diags.count_by_severity(DiagSeverity.Error) != method_bounds_errors_before:
+            self.generic_subst_param_syms = saved_generic_method_subst_syms
+            self.generic_subst_type_ids = saved_generic_method_subst_tys
+            return 0
+
         let param_offset = (not (is_static != 0)) as i32
         // arg_count < 0: a compiler-synthesized call whose receiver alone
         // decides the specialization (D69's `for` over a generic Gen impl);
@@ -36924,22 +36934,6 @@ impl Sema:
         if owner_sym == self.syms.slotmap:
             if field == self.syms.new:
                 return recv_type
-            if tk == TypeKind.TY_GENERIC_INST:
-                let elem_ty = self.get_generic_inst_arg(resolved as i32, 0)
-                if field == self.syms.slot:
-                    return self.ensure_slotmapslot_type_for(elem_ty)
-                if field == self.syms.get_disjoint:
-                    let slot_ty = self.ensure_slotmapslot_type_for(elem_ty)
-                    let elems: List[i32] = []
-                    elems.push(slot_ty)
-                    elems.push(slot_ty)
-                    return self.ensure_tuple_type(elems, 2) as i32
-        if owner_sym == self.syms.slotmapslot:
-            if tk == TypeKind.TY_GENERIC_INST:
-                if field == self.syms.get:
-                    return self.get_generic_inst_arg(resolved as i32, 0)
-                if method_name == "set":
-                    return self.ty_void as i32
         if owner_sym == self.syms.option:
             if field == self.syms.is_some or field == self.syms.is_none:
                 return self.ty_bool as i32
@@ -37189,7 +37183,7 @@ impl Sema:
         // #669: storing methods (mirror method_arg_stores_value) must publish the
         // stored element type, or a contextual enum arg (`slot.set(Some(x))`)
         // never learns its enum and codegen has no aggregate destination.
-        if owner_sym == self.syms.listslot or owner_sym == self.syms.slotmapslot:
+        if owner_sym == self.syms.listslot:
             if method_name == "set" and arg_index == 0:
                 return self.get_generic_inst_arg(resolved as i32, 0)
         if owner_sym == self.syms.listrange:
@@ -38039,11 +38033,6 @@ impl Sema:
                 return ReceiverMode.Mut
         if type_name_sym == self.syms.listrange:
             if field == self.syms.split_at_mut:
-                return ReceiverMode.Mut
-        // The same rule for a SlotMap's slots (§6): `sm.slot(h)` through a
-        // `&SlotMap` parameter wrote the element.
-        if type_name_sym == self.syms.slotmap:
-            if field == self.syms.slot or field == self.syms.get_disjoint:
                 return ReceiverMode.Mut
         if type_name_sym == self.syms.hashmap:
             if field == self.syms.insert or field == self.syms.remove or field == self.syms.clear:
@@ -39632,26 +39621,6 @@ impl Sema:
                 // D110: insert(value: T) stores it; contains/remove(value: &T) observe.
                 if arg_count >= 1:
                     self.check_builtin_key_arg(mc_call_name, recv_type, node, 0, arg_types[0], self.ast.get_extra(extra_start))
-            else if type_name_sym == self.syms.slotmap:
-                let sm_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                let sm_handle_ty = self.ensure_handle_type_for(sm_elem_ty)
-                if field == self.syms.slot:
-                    if arg_count >= 1:
-                        let h_ty = arg_types[0]
-                        if sm_handle_ty != 0 and h_ty != 0:
-                            self.check_builtin_method_call_arg(mc_call_name, 0, sm_handle_ty, h_ty, self.ast.get_extra(extra_start))
-                else if field == self.syms.get_disjoint:
-                    for sm_hi in 0..2:
-                        if arg_count > sm_hi:
-                            let h_ty3 = arg_types[sm_hi]
-                            if sm_handle_ty != 0 and h_ty3 != 0:
-                                self.check_builtin_method_call_arg(mc_call_name, sm_hi, sm_handle_ty, h_ty3, self.ast.get_extra(extra_start + sm_hi))
-            else if type_name_sym == self.syms.slotmapslot:
-                if mc_method_name_raw == "set" and arg_count >= 1:
-                    let slot_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let set_arg_ty = arg_types[0]
-                    if slot_elem_ty != 0 and set_arg_ty != 0:
-                        self.check_builtin_method_call_arg(mc_call_name, 0, slot_elem_ty, set_arg_ty, self.ast.get_extra(extra_start))
             // Return types for builtin generic methods
             let generic_len_ret = self.collection_len_method_return_type(mc_method_name_raw)
             if type_name_sym == self.syms.fixed_string:
@@ -39787,21 +39756,6 @@ impl Sema:
                         return set_slot_ret
                 if generic_len_ret != 0:
                     return generic_len_ret
-            if type_name_sym == self.syms.slotmap:
-                let sm_elem_ret_ty = self.get_generic_inst_arg(recv_type, 0)
-                if field == self.syms.slot:
-                    return self.ensure_slotmapslot_type_for(sm_elem_ret_ty)
-                if field == self.syms.get_disjoint:
-                    let sm_slot_ty = self.ensure_slotmapslot_type_for(sm_elem_ret_ty)
-                    let sm_tuple_elems: List[i32] = []
-                    sm_tuple_elems.push(sm_slot_ty)
-                    sm_tuple_elems.push(sm_slot_ty)
-                    return self.ensure_tuple_type(sm_tuple_elems, 2) as i32
-            if type_name_sym == self.syms.slotmapslot:
-                if field == self.syms.get:
-                    return self.check_slot_get_copy("SlotMapSlot.get", self.get_generic_inst_arg(recv_type, 0), node)
-                if mc_method_name_raw == "set":
-                    return self.ty_void as i32
             if type_name_sym == self.syms.option:
                 // TODO(D22): Option/Result payload projection is transparent to
                 // view origins. These return-type branches currently recover the

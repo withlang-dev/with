@@ -1013,7 +1013,7 @@ fn analysis_audit_call_contracts(mut report: AnalysisReport, sema: &Sema, mir_mo
             let required = body.call_requires_contract(ci as i32)
             let argc = body.call_arg_counts[ci]
             let intrinsic = body.call_intrinsic(ci as i32)
-            if intrinsic == MirIntrinsic.VECSLOT_GET or intrinsic == MirIntrinsic.SLOTMAPSLOT_GET or intrinsic == MirIntrinsic.VECRANGE_GET or intrinsic == MirIntrinsic.ENTRY_GET or intrinsic == MirIntrinsic.ENTRY_OR_INSERT:
+            if intrinsic == MirIntrinsic.VECSLOT_GET or intrinsic == MirIntrinsic.VECRANGE_GET or intrinsic == MirIntrinsic.ENTRY_GET or intrinsic == MirIntrinsic.ENTRY_OR_INSERT:
                 let start = body.call_arg_starts[ci]
                 if argc > 0:
                     let recv_ty = mir_validate_operand_type(mir_mod, body, body.call_arg_operands[start])

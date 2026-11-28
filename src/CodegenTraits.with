@@ -1749,7 +1749,7 @@ impl Codegen:
             return true
         if intrinsic == MirIntrinsic.MAP_NEW or intrinsic == MirIntrinsic.MAP_INSERT or intrinsic == MirIntrinsic.MAP_GET or intrinsic == MirIntrinsic.MAP_CONTAINS or intrinsic == MirIntrinsic.MAP_LEN or intrinsic == MirIntrinsic.MAP_LEN32 or intrinsic == MirIntrinsic.MAP_LEN64 or intrinsic == MirIntrinsic.MAP_ULEN32 or intrinsic == MirIntrinsic.MAP_REMOVE or intrinsic == MirIntrinsic.MAP_CLEAR or intrinsic == MirIntrinsic.MAP_INCREMENT or intrinsic == MirIntrinsic.MAP_DECREMENT or intrinsic == MirIntrinsic.MAP_UPDATE:
             return true
-        if intrinsic == MirIntrinsic.SLOTMAP_NEW or intrinsic == MirIntrinsic.SLOTMAP_SLOT or intrinsic == MirIntrinsic.SLOTMAP_GET_DISJOINT or intrinsic == MirIntrinsic.SLOTMAPSLOT_GET or intrinsic == MirIntrinsic.SLOTMAPSLOT_SET:
+        if intrinsic == MirIntrinsic.SLOTMAP_NEW:
             return true
         false
 

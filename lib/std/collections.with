@@ -733,6 +733,19 @@ impl[T] SlotMap[T]:
         unsafe { *slot = value }
         Some(old)
 
+    /// Scoped mutable handle to the slot `h` names.
+    pub mut fn slot(h: Handle[T]) -> SlotMapSlot[T]:
+        SlotMapSlot { map_ptr: self.ptr as i64, index: h.index, generation: h.generation }
+
+    /// Two distinct scoped mutable handles into the same map.
+    pub mut fn get_disjoint(a: Handle[T], b: Handle[T]) -> (SlotMapSlot[T], SlotMapSlot[T]):
+        if with_slotmap_contains(self.ptr as *mut u8, a.index, a.generation) == 0 or with_slotmap_contains(self.ptr as *mut u8, b.index, b.generation) == 0 or (a.index == b.index and a.generation == b.generation):
+            panic("SlotMap.get_disjoint requires distinct valid handles")
+        (
+            SlotMapSlot { map_ptr: self.ptr as i64, index: a.index, generation: a.generation },
+            SlotMapSlot { map_ptr: self.ptr as i64, index: b.index, generation: b.generation },
+        )
+
 /// Scoped mutable slot handle returned by SlotMap.slot/get_disjoint.
 /// Use `.get()` / `.set(value)` inside the `with` block, matching ListSlot.
 pub type SlotMapSlot[T] ephemeral {
@@ -740,6 +753,21 @@ pub type SlotMapSlot[T] ephemeral {
     index: u32,
     generation: u32,
 }
+
+impl[T: Copy] SlotMapSlot[T]:
+    /// Copy out the value stored in this slot. Requires `T: Copy`.
+    pub fn get() -> T:
+        let slot = with_slotmap_get_ptr(self.map_ptr as *mut u8, self.index, self.generation) as *const T
+        if slot == null: panic("SlotMapSlot.get requires a valid handle")
+        unsafe { *slot }
+
+impl[T] SlotMapSlot[T]:
+    /// Replace the value stored in this slot, dropping the previous occupant.
+    pub mut fn set(value: T):
+        let slot = with_slotmap_get_ptr(self.map_ptr as *mut u8, self.index, self.generation) as *mut T
+        if slot == null: panic("SlotMapSlot.set requires a valid handle")
+        let _old: T = unsafe { *slot }
+        unsafe { *slot = value }
 
 /// Memory ordering for atomic operations.
 pub enum Order: i32:

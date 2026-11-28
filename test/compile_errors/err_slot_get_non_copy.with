@@ -1,6 +1,6 @@
 //! expect-error: cannot copy `OwnedBox` out of `ListSlot.get` because `OwnedBox` is not `Copy`
 //! expect-error: cannot copy `OwnedBox` out of `ListRange.get` because `OwnedBox` is not `Copy`
-//! expect-error: cannot copy `OwnedBox` out of `SlotMapSlot.get` because `OwnedBox` is not `Copy`
+//! expect-error: type 'OwnedBox' does not implement trait 'Copy' required by bound 'T: Copy'
 //! expect-error: cannot copy `OwnedBox` out of `HashMapEntry.or_insert` because `OwnedBox` is not `Copy`
 //! expect-error: cannot copy `OwnedBox` out of `HashMapEntry.get` because `OwnedBox` is not `Copy`
 
