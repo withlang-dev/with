@@ -1,0 +1,157 @@
+// Zero-unsafe UAT for c.libuv (#3160):
+// 1. uv_fs_open / uv_fs_read / uv_fs_close / uv_fs_req_cleanup
+// 2. uv_timer_init / uv_timer_start / uv_timer_stop + uv_close
+// 3. TCP echo server: uv_tcp_init / uv_ip4_addr / uv_tcp_bind / uv_tcp_getsockname
+//    / uv_listen / uv_accept / uv_read_start (alloc + read callbacks) / uv_write
+// 4. Deterministic uv_close callback ordering (TIMER -> SERVER -> CLIENT).
+use contracts.libuv
+use c_import("uv.h")
+use std.fs
+use std.net
+use std.sync
+use std.thread
+
+var g_server_port: AtomicI64 = atomic_new(0)
+var g_timer_ticks: AtomicI64 = atomic_new(0)
+var g_timer_closed: AtomicI64 = atomic_new(0)
+var g_server_closed: AtomicI64 = atomic_new(0)
+var g_alloc_calls: AtomicI64 = atomic_new(0)
+var g_read_bytes: AtomicI64 = atomic_new(0)
+var g_write_ok: AtomicI64 = atomic_new(0)
+var g_client_ok: AtomicI64 = atomic_new(0)
+var g_close_count: AtomicI64 = atomic_new(0)
+var g_close_seq: AtomicI64 = atomic_new(0)
+
+fn record_close(tag: i64):
+    let idx = g_close_count.fetch_add(1, Order.SeqCst)
+    var mult: i64 = 1
+    if idx == 1: mult = 10
+    else if idx == 2: mult = 100
+    let _ = g_close_seq.fetch_add(tag * mult, Order.SeqCst)
+
+fn on_timer_close(_h: UvHandle):
+    record_close(1)
+    g_timer_closed.store(1, Order.SeqCst)
+
+fn on_timer(h: TimerHandle):
+    let _ = g_timer_ticks.fetch_add(1, Order.SeqCst)
+    assert(h.stop() == 0)
+    h.close(Some(on_timer_close))
+
+fn on_server_close(_h: UvHandle):
+    record_close(2)
+    g_server_closed.store(1, Order.SeqCst)
+
+fn on_client_close(_h: UvHandle):
+    record_close(3)
+
+fn on_alloc(_h: UvHandle, suggested: usize) -> usize:
+    let _ = g_alloc_calls.fetch_add(1, Order.SeqCst)
+    if suggested > 4096: 4096 else: suggested
+
+fn on_write(_req: WriteReqHandle, status: i32):
+    if status == 0:
+        let _ = g_write_ok.fetch_add(1, Order.SeqCst)
+
+fn on_read(stream: StreamHandle, nread: isize, data: []u8):
+    if nread > 0:
+        let _ = g_read_bytes.fetch_add(nread as i64, Order.SeqCst)
+        assert(stream.write(data, Some(on_write)) == 0)
+    else:
+        stream.close(Some(on_client_close))
+
+fn on_connection(srv: StreamHandle, status: i32):
+    assert(status == 0)
+    let lp = srv.get_loop().unwrap()
+    let client = Tcp.init_on(&lp).unwrap()
+    assert(client.accept(&srv) == 0)
+    assert(client.read_start(on_alloc, on_read) == 0)
+    srv.close(Some(on_server_close))
+
+fn client_worker() -> i32:
+    // Wait until timer has fired and its uv_close callback has run (close #1).
+    var spins = 0
+    while g_timer_closed.load(Order.SeqCst) == 0 and spins < 500:
+        uv_sleep(5)
+        spins += 1
+    if g_timer_closed.load(Order.SeqCst) == 0: return 1
+
+    let port = g_server_port.load(Order.SeqCst) as i32
+    let fd = tcp_connect_timeout("127.0.0.1", port, 2000)
+    if fd < 0: return 2
+    set_timeout(fd, 2000)
+
+    // Wait until server's uv_close callback has run (close #2) before completing
+    // echo + closing client socket (close #3), guaranteeing deterministic order.
+    spins = 0
+    while g_server_closed.load(Order.SeqCst) == 0 and spins < 500:
+        uv_sleep(5)
+        spins += 1
+    if g_server_closed.load(Order.SeqCst) == 0:
+        socket_close(fd)
+        return 3
+
+    let payload = "hello libuv echo!"
+    let _ = send(fd, payload)
+    let echoed = recv(fd, 128)
+    socket_close(fd)
+    if echoed == payload:
+        g_client_ok.store(1, Order.SeqCst)
+        return 0
+    4
+
+fn ntohs_u16(n: u16) -> i32:
+    (((n & 0xFF) << 8) | (n >> 8)) as i32
+
+fn main:
+    let ver = uv_version_string().unwrap().to_str_lossy()
+    assert(ver.len() > 0)
+
+    let lp = Loop.init().unwrap()
+
+    // 1. uv_fs reads (open, read, close, automatic uv_fs_req_cleanup via Drop).
+    let sample_text = "libuv filesystem read check"
+    let _ = write_file("uv_sample.txt", sample_text)
+    let (fd, open_req) = FsReq.open(&lp, "uv_sample.txt", O_RDONLY as i32, 0).unwrap()
+    assert(fd >= 0 and open_req.get_result() == fd as isize)
+    var fs_buf: [u8; 64] = [0 as u8; 64]
+    let (nread, read_req) = FsReq.read(&lp, fd, fs_buf, 0).unwrap()
+    assert(nread == sample_text.len() as i32 and read_req.get_result() == nread as isize)
+    let expected = sample_text as []u8
+    for i in 0..expected.len():
+        assert(fs_buf[i] == expected[i])
+    let close_req = FsReq.close(&lp, fd).unwrap()
+    assert(close_req.get_result() == 0)
+
+    // 2. Timer (uv_timer_init / start / stop / close).
+    let timer = Timer.init(&lp).unwrap()
+    assert(timer.start(on_timer, 15, 0) == 0)
+
+    // 3. TCP echo server (uv_tcp_init / ip4_addr / bind / getsockname / listen).
+    let server = Tcp.init(&lp).unwrap()
+    let (ip_rc, bind_addr) = uv_ip4_addr("127.0.0.1", 0)
+    assert(ip_rc == 0)
+    assert(server.bind(&bind_addr, 0) == 0)
+    let (sn_rc, bound_addr) = server.getsockname()
+    assert(sn_rc == 0)
+    let port = ntohs_u16(bound_addr.sin_port)
+    assert(port > 0)
+    g_server_port.store(port as i64, Order.SeqCst)
+    assert(server.listen(128, on_connection) == 0)
+
+    // 4. Run client thread + event loop and verify echo + close callback order.
+    let client_thr = spawn_os(client_worker)
+    assert(lp.run(UV_RUN_DEFAULT) == 0)
+    assert(join(client_thr) == 0)
+
+    assert(g_timer_ticks.load(Order.SeqCst) == 1)
+    assert(g_alloc_calls.load(Order.SeqCst) >= 1)
+    assert(g_read_bytes.load(Order.SeqCst) == 17)
+    assert(g_write_ok.load(Order.SeqCst) == 1)
+    assert(g_client_ok.load(Order.SeqCst) == 1)
+    assert(g_close_count.load(Order.SeqCst) == 3)
+    // Order encoded base-10: close #0 = 1 (timer), #1 = 2 (server), #2 = 3 (client) -> 321.
+    assert(g_close_seq.load(Order.SeqCst) == 321)
+
+    print(f"libuv {ver}: port={port} fs={nread} echo={g_read_bytes.load(Order.SeqCst)} close_seq={g_close_seq.load(Order.SeqCst)}")
+    print("libuv ok")
