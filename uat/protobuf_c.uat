@@ -1,0 +1,15 @@
+scenario: c.protobuf-c unpacks and packs a protoc-c generated message with repeated and nested fields without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: with get c.protobuf-c
+write src/person.pb-c.h from person.pb-c.h
+write person.pb-c.c from person.pb-c.c
+run: with cc -c person.pb-c.c -I src -I .with/deps/c/protobuf-c/1.5.2/include -o person.pb-c.o
+write src/main.with from protobuf_c_main.with
+run: with build src/main.with --link-object person.pb-c.o -o proto_app
+run: ./proto_app
+expect exit: 0
+expect stdout contains: protobuf-c ok

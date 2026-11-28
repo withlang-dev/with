@@ -312,23 +312,27 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             ptr_cites = []
         if stripped.starts_with("resource "):
             in_resource = true
-            in_value = not stripped.contains(" wraps *mut ")
+            let is_const_ptr = stripped.contains(" wraps *const ")
+            in_value = not stripped.contains(" wraps *mut ") and not is_const_ptr
             if in_value:
-                // A by-value token (§16.2b.3): `resource R wraps Record`.
+                // A by-value token (§16.2b.3): `resource R wraps Record [extends Base]`.
                 let words = stripped.fields()
-                if words.len() != 4 or words[2] != "wraps": return Err(facts_error(path, line_no, "a resource is `resource R wraps *mut record` or `resource R wraps Record`"))
+                let valid_val = (words.len() == 4 or (words.len() == 6 and words[4] == "extends")) and words[2] == "wraps"
+                if not valid_val: return Err(facts_error(path, line_no, "a resource is `resource R wraps *mut record`, `resource R wraps *const record`, or `resource R wraps Record`"))
                 if words[1] == words[3]: return Err(facts_error(path, line_no, "a by-value resource needs a name of its own: `" ++ words[1] ++ "` is the record's"))
                 facts_push_unique(facts.value_resources, words[1])
                 facts.value_text = facts.value_text ++ "    " ++ stripped ++ "\n"
                 continue
-            let at = stripped.find(" wraps *mut ")
+            let ptr_kw = if is_const_ptr: " wraps *const " else: " wraps *mut "
+            let at = stripped.find(ptr_kw)
             let words = stripped.slice(0, at).fields()
-            if words.len() != 2: return Err(facts_error(path, line_no, "a resource is `resource R wraps *mut record` or `resource R wraps Record`"))
-            record = stripped.slice(at + 12, stripped.len()).trim()
+            if words.len() != 2: return Err(facts_error(path, line_no, "a resource is `resource R wraps *mut record`, `resource R wraps *const record`, or `resource R wraps Record`"))
+            record = stripped.slice(at + ptr_kw.len(), stripped.len()).trim()
             if record.len() == 0 or record.contains(" ") or record.contains("|"): return Err(facts_error(path, line_no, "a resource wraps one C record"))
             ptr_header = stripped.to_owned()
             ptr_name = words[1].to_owned()
             ptr_record = record.to_owned()
+            if record == "c_void" or is_const_ptr: ptr_carry = true
             continue
         if is_top_level and stripped.starts_with("message "):
             in_resource = false
@@ -352,10 +356,12 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
         if clause.starts_with("handle "):
             in_resource = false
             let at = clause.find(" wraps *mut ")
-            if at < 0: return Err(facts_error(path, line_no, "a handle is `handle Name wraps *mut Record`"))
+            if at < 0: return Err(facts_error(path, line_no, "a handle is `handle Name wraps *mut Record [extends Base]`"))
             let hwords = clause.slice(0, at).fields()
-            let hrec = clause.slice(at + 12, clause.len()).trim()
-            if hwords.len() != 2 or hrec.len() == 0 or hrec.contains(" "): return Err(facts_error(path, line_no, "a handle is `handle Name wraps *mut Record`"))
+            let htail = clause.slice(at + 12, clause.len()).fields()
+            let hvalid = hwords.len() == 2 and (htail.len() == 1 or (htail.len() == 3 and htail[1] == "extends"))
+            if not hvalid: return Err(facts_error(path, line_no, "a handle is `handle Name wraps *mut Record [extends Base]`"))
+            let hrec = htail[0]
             facts_push_unique(facts.value_resources, hwords[1])
             facts_push_unique(facts.value_records, hrec)
             facts.value_record_names.push((hrec.to_owned(), hwords[1].to_owned()))
@@ -445,7 +451,7 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
                 facts_push_unique(facts.value_res_fns, ishort)
                 facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
                 continue
-            if in_value and words.len() >= 2 and (words[0] == "ok" or words[0] == "message" or words[0] == "borrows" or words[0] == "thread" or words[0] == "requires"):
+            if in_value and words.len() >= 2 and (words[0] == "ok" or words[0] == "message" or words[0] == "borrows" or words[0] == "thread" or words[0] == "requires" or words[0] == "async_close"):
                 facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
                 continue
             if in_value and (clause == "independent" or clause == "movable"):
@@ -505,14 +511,14 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
         if current_fn.len() == 0: return Err(facts_error(path, line_no, "a fact belongs to a `resource` or an `fn` item"))
         let cwords = clause.fields()
         let is_of_clause = (cwords.len() == 2 and cwords[0] == "of") or (cwords.len() == 3 and cwords[0] == "of" and cwords[1].ends_with("(param") and cwords[2].ends_with(")") and cwords[1].len() > 6 and cwords[2].len() > 1)
-        let is_buffer_param = cwords.len() >= 5 and cwords[0] == "buffer" and cwords[1] == "param" and (cwords[3] == "len" or cwords[3] == "capacity")
+        let is_buffer_param = (cwords.len() >= 5 and cwords[0] == "buffer" and cwords[1] == "param" and (cwords[3] == "len" or cwords[3] == "capacity")) or (cwords.len() >= 9 and cwords[0] == "buffer" and cwords[1] == "out" and cwords[2] == "param")
         let is_discarded = cwords.len() == 3 and cwords[0] == "param" and cwords[2] == "discarded"
         let is_fixed = cwords.len() >= 4 and cwords[0] == "param" and cwords[2] == "fixed"
         let is_ok = cwords.len() >= 2 and cwords[0] == "ok"
         let is_static_cstr = clause == "returns static CStr"
         let is_borrow_cstr = clause.starts_with("returns borrow CStr from param ")
-        let is_fills_updates = cwords.len() == 3 and (cwords[0] == "fills" or cwords[0] == "updates" or cwords[0] == "detaches") and cwords[1] == "param"
-        let is_contract_clause = (cwords.len() == 2 and cwords[0] == "rename") or clause.starts_with("preserves domain ") or clause.starts_with("preserves param ") or clause == "callbacks none" or clause.starts_with("present cases") or clause == "valid on failed" or clause == "override lend" or clause.starts_with("null status ") or clause.starts_with("establishes domain ") or clause.starts_with("ends domain ") or clause.starts_with("requires domain ") or (clause.starts_with("consumes param ") and clause.contains(" destroyed_by ")) or (clause.starts_with("callback param ") and (clause.contains(" userdata ") or clause.contains(" argv "))) or clause.starts_with("user_data from ") or (clause.starts_with("returns borrow ") and (clause.contains(" from domain ") or clause.contains(" from parent ") or clause.contains(" from params ")))
+        let is_fills_updates = (cwords.len() == 3 and (cwords[0] == "fills" or cwords[0] == "updates" or cwords[0] == "detaches") and cwords[1] == "param") or (cwords.len() >= 5 and (cwords[0] == "reads" or cwords[0] == "fills" or cwords[0] == "updates") and cwords[1] == "param" and cwords[3] == "as")
+        let is_contract_clause = (cwords.len() == 2 and cwords[0] == "rename") or clause.starts_with("preserves domain ") or clause.starts_with("preserves param ") or clause == "callbacks none" or clause.starts_with("present cases") or clause == "valid on failed" or clause == "override lend" or clause.starts_with("null status ") or clause.starts_with("establishes domain ") or clause.starts_with("ends domain ") or clause.starts_with("requires domain ") or clause.starts_with("async_req param ") or clause.starts_with("read_pair alloc param ") or clause.starts_with("close_release via ") or (clause.starts_with("consumes param ") and clause.contains(" destroyed_by ")) or (clause.starts_with("callback param ") and (clause.contains(" userdata ") or clause.contains(" argv "))) or clause.starts_with("user_data from ") or (clause.starts_with("returns borrow ") and (clause.contains(" from domain ") or clause.contains(" from parent ") or clause.contains(" from params ")))
         if is_of_clause or is_buffer_param or is_discarded or is_fixed or is_ok or is_static_cstr or is_borrow_cstr or is_fills_updates or is_contract_clause:
             fn_carry = true
             fn_clauses.push(clause.to_owned())

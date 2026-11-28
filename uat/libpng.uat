@@ -1,0 +1,11 @@
+scenario: c.libpng writes a PNG and reads it back into RGBA rows with setjmp-free error handling without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: with get c.libpng
+write src/main.with from libpng_main.with
+run: with run
+expect exit: 0
+expect stdout contains: libpng ok

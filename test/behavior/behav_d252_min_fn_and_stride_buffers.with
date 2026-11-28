@@ -1,0 +1,30 @@
+//! expect-stdout: packed=4 first=42
+//! expect-stdout: stride_sum=18
+//! expect-stdout: ok
+
+// D252 (§16.2b.8): implicit-length buffers checked against `min <fn>(param A)`
+// and `stride param S width param W height param H table <TBL>[param F]`.
+
+use c_import("#include <stddef.h>\ntypedef struct { int payload; } msg_t;\nstatic inline msg_t *msg_new(void) { static msg_t m; m.payload = 42; return &m; }\nstatic inline void msg_free(msg_t *m) { (void)m; }\nstatic inline size_t msg_packed_size(const msg_t *m) { (void)m; return 4; }\nstatic inline size_t msg_pack(const msg_t *m, unsigned char *out) { out[0] = (unsigned char)m->payload; out[1] = 1; out[2] = 2; out[3] = 3; return 4; }\nstatic const int px_bpp[2] = { 3, 4 };\nstatic inline int img_sum(const unsigned char *src, int w, int pitch, int h, int fmt) { int row = pitch > 0 ? pitch : w * px_bpp[fmt]; int s = 0; for (int y = 0; y < h; y++) for (int x = 0; x < w * px_bpp[fmt]; x++) s += src[y * row + x]; return s; }\n")
+
+c contract d252_min:
+    resource Msg wraps *mut msg_t
+        from msg_new
+        drop msg_free
+    fn msg_packed_size
+        lend
+    fn msg_pack
+        lend
+        buffer param 1 capacity min msg_packed_size(param 0)
+    fn img_sum
+        buffer param 0 len stride param 2 width param 1 height param 3 table px_bpp[param 4]
+
+fn main:
+    let m = Msg.new().unwrap()
+    var buf: [u8; 8] = [0 as u8; 8]
+    let n = m.pack(buf)
+    print(f"packed={n} first={buf[0]}")
+    let pixels: [u8; 12] = [1, 2, 3, 1, 2, 3, 1, 2, 3, 0, 0, 0]
+    let s = img_sum(pixels[..], 2, 0, 1, 0) + img_sum(pixels[..], 1, 0, 1, 0)
+    print(f"stride_sum={s}")
+    print("ok")

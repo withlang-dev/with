@@ -12,6 +12,11 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D255 — C struct-prefix subtyping, fat-pointer/iovec buffers, and async event-loop handles/requests (delegated; #3160)](2026-11-27-D255-c-subtypes-iovec-and-async-handles.md)
+- [D254 — Dependent-resource parent drop, retained resource parameters, const-widened handle accessors, and row-pointer image buffers (delegated; #3153)](2026-11-27-D254-parent-drop-retained-resource-and-row-buffers.md)
+- [D253 — Borrow-only `*const T` resources from immutable C globals (delegated; #3163)](2026-11-27-D253-borrow-only-const-globals.md)
+- [D252 — Implicit-length size-checked buffers (`min <fn>(param A)` and `stride ... table <TBL>[param F]`) (delegated; #3154, #3163)](2026-11-27-D252-min-fn-and-stride-buffers.md)
+- [D251 — Out-allocated owned byte buffers (`buffer out param P len param L freed by F`) (delegated; #3154)](2026-11-27-D251-out-allocated-buffers.md)
 - [D250 — Retained buffer and value-record parameters (`retains param N by param 0`) (delegated; #3149)](2026-11-27-D250-retained-buffer-params.md)
 - [D249 — Positioned in-place initializers (`init F(param N)`) and bridged `init` rendering (delegated; #3149)](2026-11-27-D249-positioned-init.md)
 - [D248 — Fixed-size and offset-derived buffer contracts (`buffer param P len|capacity <N>` and `capacity param L +/- <N>`) (delegated; #3142, #3148)](2026-11-27-D248-fixed-and-derived-buffers.md)

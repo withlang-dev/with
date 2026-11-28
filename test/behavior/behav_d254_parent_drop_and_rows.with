@@ -1,0 +1,61 @@
+//! expect-stdout: sum=21 freed_info=1 freed_ctx=1
+//! expect-stdout: ok
+// D254 (#3153): dependent resource drop taking its borrowed parent,
+// and `buffer param P capacity|len rows height ... rowbytes ...`.
+use c_import("
+#include <stdlib.h>
+#include <stdint.h>
+typedef struct img_ctx { int tag; } img_ctx;
+typedef struct img_info { uint32_t h; size_t rb; } img_info;
+static int g_freed_info = 0;
+static int g_freed_ctx = 0;
+static inline img_ctx *ctx_new(void) { img_ctx *c = (img_ctx *)malloc(sizeof(img_ctx)); c->tag = 1; return c; }
+static inline void ctx_free(img_ctx **cp) { if (cp && *cp) { g_freed_ctx++; free(*cp); *cp = NULL; } }
+static inline img_info *info_new(const img_ctx *c) {
+    if (!c) return NULL;
+    img_info *i = (img_info *)malloc(sizeof(img_info));
+    i->h = 2;
+    i->rb = 3;
+    return i;
+}
+static inline void info_free(const img_ctx *c, img_info **ip) {
+    if (c && ip && *ip) { g_freed_info++; free(*ip); *ip = NULL; }
+}
+static inline uint32_t info_height(const img_ctx *c, const img_info *i) { return (c && i) ? i->h : 0; }
+static inline size_t info_rowbytes(const img_ctx *c, const img_info *i) { return (c && i) ? i->rb : 0; }
+static inline void ctx_fill_rows(img_ctx *c, uint8_t **rows) {
+    if (!c || !rows) return;
+    for (int y = 0; y < 2; y++)
+        for (int x = 0; x < 3; x++)
+            rows[y][x] = (uint8_t)(y * 3 + x + 1);
+}
+static inline int get_freed_info(void) { return g_freed_info; }
+static inline int get_freed_ctx(void) { return g_freed_ctx; }
+")
+
+c contract d254_img:
+    resource ImgCtx wraps *mut img_ctx
+        from ctx_new
+        drop ctx_free
+    resource ImgInfo wraps *mut img_info
+        from info_new
+        drop info_free(param 1)
+    fn ctx_fill_rows
+        of ImgCtx
+        lend
+        buffer param 1 capacity rows height info_height(param 0, ImgInfo) rowbytes info_rowbytes(param 0, ImgInfo)
+
+fn run() -> i32:
+    let ctx = ImgCtx.ctx_new().unwrap()
+    let info = ctx.info_new().unwrap()
+    var buf: [u8; 6] = [0 as u8; 6]
+    ctx.ctx_fill_rows(buf, &info)
+    var sum: i32 = 0
+    for b in buf:
+        sum += b as i32
+    sum
+
+fn main:
+    let s = run()
+    print(f"sum={s} freed_info={get_freed_info()} freed_ctx={get_freed_ctx()}")
+    print("ok")

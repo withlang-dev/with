@@ -5052,19 +5052,30 @@ impl Parser:
             self.advance()
             let repr = self.parse_type_expr()
             if repr == 0: return 0
+            var extends_clause: i32 = 0
+            if self.current_ident_is("extends"):
+                let ex_start = self.current_start()
+                self.advance()
+                let base_sym = self.expect_ident()
+                if base_sym == 0: return 0
+                let ex_extra = self.pool.extra_len()
+                self.pool.add_extra(base_sym)
+                extends_clause = self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, ex_start, self.prev_end(), FacadeAsyncClause.Extends as i32, ex_extra, 1) as i32
             let head_end = self.prev_end()
             let (clauses, ok) = self.parse_facade_clauses(col, true)
             if not ok: return 0
             let extra_start = self.pool.extra_len()
             self.pool.add_extra(repr as i32)
+            var total_clauses = clauses.len() as i32
+            if extends_clause != 0:
+                self.pool.add_extra(extends_clause)
+                total_clauses += 1
             for clause in clauses: self.pool.add_extra(clause)
-            return self.pool.add_node(NodeKind.NK_FACADE_RESOURCE, start, self.facade_item_end(head_end, clauses), name, extra_start, clauses.len() as i32) as i32
+            return self.pool.add_node(NodeKind.NK_FACADE_RESOURCE, start, self.facade_item_end(head_end, clauses), name, extra_start, total_clauses) as i32
         if self.current_ident_is("handle"):
-            // `handle Name wraps *mut T` (§16.2b.9, ruling Amendment 1): a
-            // callback-scope representation. It is a resource item whose one
-            // clause is the FACADE_CLAUSE_HANDLE marker, so an operation is
-            // assigned to it (`of Name`) as to a resource; nothing produces
-            // or destroys it, so it states no clauses of its own.
+            // `handle Name wraps *mut T [extends Base]` (§16.2b.9, D255): a
+            // callback-scope representation. It is a resource item whose
+            // marker clause is FACADE_CLAUSE_HANDLE (plus optional EXTENDS).
             self.advance()
             let name = self.expect_ident()
             if name == 0: return 0
@@ -5074,6 +5085,15 @@ impl Parser:
             self.advance()
             let repr = self.parse_type_expr()
             if repr == 0: return 0
+            var extends_clause: i32 = 0
+            if self.current_ident_is("extends"):
+                let ex_start = self.current_start()
+                self.advance()
+                let base_sym = self.expect_ident()
+                if base_sym == 0: return 0
+                let ex_extra = self.pool.extra_len()
+                self.pool.add_extra(base_sym)
+                extends_clause = self.pool.add_node(NodeKind.NK_FACADE_CLAUSE, ex_start, self.prev_end(), FacadeAsyncClause.Extends as i32, ex_extra, 1) as i32
             let (clauses, ok) = self.parse_facade_clauses(col, true)
             if not ok: return 0
             if clauses.len() > 0:
@@ -5084,7 +5104,11 @@ impl Parser:
             let extra_start = self.pool.extra_len()
             self.pool.add_extra(repr as i32)
             self.pool.add_extra(marker as i32)
-            return self.pool.add_node(NodeKind.NK_FACADE_RESOURCE, start, self.prev_end(), name, extra_start, 1) as i32
+            var hcount: i32 = 1
+            if extends_clause != 0:
+                self.pool.add_extra(extends_clause)
+                hcount += 1
+            return self.pool.add_node(NodeKind.NK_FACADE_RESOURCE, start, self.prev_end(), name, extra_start, hcount) as i32
         if self.current_ident_is("message"):
             // D216: `message Name wraps CRecord`, a polled tagged message. It
             // has no producer-and-drop lifecycle, so it is its own item.
@@ -5774,16 +5798,24 @@ impl Parser:
                 self.emit_error("expected 'text param <ref>' or 'text return, owned, freed by <fn>' (§16.2b.8)")
                 return 0
         else if word == "reads" or word == "fills" or word == "updates":
-            // D198 (§16.2b.5 "Value records"): `reads param N`, `fills param N`,
-            // `updates param N` — what the callee does with a pointer to one
-            // complete record that is no resource's representation. The word is
-            // the clause's second operand.
+            // D198 / D255 (§16.2b.5 "Value records"): `reads param N [as Type]`,
+            // `fills param N [as Type [len param L]]`, `updates param N [as Type]`.
             kind = FACADE_CLAUSE_VALUE_RECORD
             let word_sym = self.intern.intern(word)
             let record_ref = self.parse_facade_param_ref()
             if record_ref == 0: return 0
             ops.push(record_ref)
             ops.push(word_sym)
+            if self.peek() == TokenKind.TK_KW_AS:
+                self.advance()
+                let as_ty = self.parse_type_expr()
+                if as_ty == 0: return 0
+                ops.push(as_ty as i32)
+                if self.current_ident_is("len"):
+                    self.advance()
+                    let len_ref = self.parse_facade_param_ref()
+                    if len_ref == 0: return 0
+                    ops.push(len_ref)
         else if word == "nullable":
             // `nullable param N` (§16.2b.8: where the header does not
             // establish nullability, the facade must): the parameter
@@ -5919,6 +5951,36 @@ impl Parser:
                 ops.push(1)
             else:
                 ops.push(0)
+        else if word == "buffer" and self.current_ident_is("out"):
+            // D251 (§16.2b.8): `buffer out param P len param L freed by F` —
+            // C allocates an output byte buffer through `*mut *mut u8` P and
+            // writes its length through `*mut <int>` L; the bridge copies it
+            // into an owned `List[u8]` and releases P with F.
+            kind = FACADE_CLAUSE_BUFFER
+            self.advance()
+            let p = self.parse_facade_param_ref()
+            if p == 0: return 0
+            if not self.current_ident_is("len"):
+                self.emit_error("an out-allocated buffer is written 'buffer out param <P> len param <L> freed by <fn>' (§16.2b.8)")
+                return 0
+            self.advance()
+            let l = self.parse_facade_param_ref()
+            if l == 0: return 0
+            if not self.current_ident_is("freed"):
+                self.emit_error("an out-allocated buffer is written 'buffer out param <P> len param <L> freed by <fn>' (§16.2b.8)")
+                return 0
+            self.advance()
+            if not self.current_ident_is("by"):
+                self.emit_error("an out-allocated buffer is written 'buffer out param <P> len param <L> freed by <fn>' (§16.2b.8)")
+                return 0
+            self.advance()
+            let free_fn = self.expect_ident()
+            if free_fn == 0: return 0
+            ops.push(p)
+            ops.push(l)
+            ops.push(9)
+            ops.push(0)
+            ops.push(free_fn)
         else if word == "buffer":
             // `buffer param P len param L` / `buffer param P capacity param L`
             // / `buffer param P capacity param L inout` (D64/D243, §16.2b.8):
@@ -5936,12 +5998,87 @@ impl Parser:
             var l: i32 = 0
             var mode: i32 = 0
             var fixed_sym: i32 = 0
+            var extra_w: i32 = 0
+            var extra_h: i32 = 0
+            var extra_f: i32 = 0
             if self.peek() == TokenKind.TK_INT_LIT:
                 // D248 (§16.2b.8): fixed-size buffer (`buffer param P len 32`
                 // / `buffer param P capacity 64`), no separate length param.
                 fixed_sym = self.intern_current()
                 self.advance()
                 mode = if is_cap: 6 else: 5
+            else if self.current_ident_is("min"):
+                // D252 (§16.2b.8): implicit-length buffer checked against a C
+                // size-query function (`min protobuf_c_message_get_packed_size(param 0)`).
+                self.advance()
+                fixed_sym = self.expect_ident()
+                if fixed_sym == 0: return 0
+                if self.expect(TokenKind.TK_L_PAREN) == 0: return 0
+                l = self.parse_facade_param_ref()
+                if l == 0: return 0
+                if self.expect(TokenKind.TK_R_PAREN) == 0: return 0
+                mode = if is_cap: 11 else: 10
+            else if self.current_ident_is("stride"):
+                // D252 (§16.2b.8): 2D pixel buffer checked against
+                // `stride param S width param W height param H table <TBL>[param F]`.
+                self.advance()
+                l = self.parse_facade_param_ref()
+                if l == 0: return 0
+                if not self.current_ident_is("width"):
+                    self.emit_error("a strided buffer is written 'buffer param <P> len|capacity stride param <S> width param <W> height param <H> table <TBL>[param <F>]' (§16.2b.8)")
+                    return 0
+                self.advance()
+                extra_w = self.parse_facade_param_ref()
+                if extra_w == 0: return 0
+                if not self.current_ident_is("height"):
+                    self.emit_error("a strided buffer is written 'buffer param <P> len|capacity stride param <S> width param <W> height param <H> table <TBL>[param <F>]' (§16.2b.8)")
+                    return 0
+                self.advance()
+                extra_h = self.parse_facade_param_ref()
+                if extra_h == 0: return 0
+                if not self.current_ident_is("table"):
+                    self.emit_error("a strided buffer is written 'buffer param <P> len|capacity stride param <S> width param <W> height param <H> table <TBL>[param <F>]' (§16.2b.8)")
+                    return 0
+                self.advance()
+                fixed_sym = self.expect_ident()
+                if fixed_sym == 0: return 0
+                if self.expect(TokenKind.TK_L_BRACKET) == 0: return 0
+                extra_f = self.parse_facade_param_ref()
+                if extra_f == 0: return 0
+                if self.expect(TokenKind.TK_R_BRACKET) == 0: return 0
+                mode = if is_cap: 13 else: 12
+            else if self.current_ident_is("rows"):
+                // D254 (§16.2b.8): 2D row-pointer array (`T **`) synthesized from
+                // a flat byte slice checked against `height <H_FN>(param A, <R>)
+                // rowbytes <RB_FN>(param A, <R>)` (`png_read_image`, `png_write_image`).
+                self.advance()
+                if not self.current_ident_is("height"):
+                    self.emit_error("a rows buffer is written 'buffer param <P> len|capacity rows height <H_FN>(param <A>, <Resource>) rowbytes <RB_FN>(param <A>, <Resource>)' (§16.2b.8)")
+                    return 0
+                self.advance()
+                fixed_sym = self.expect_ident()
+                if fixed_sym == 0: return 0
+                if self.expect(TokenKind.TK_L_PAREN) == 0: return 0
+                l = self.parse_facade_param_ref()
+                if l == 0: return 0
+                if self.expect(TokenKind.TK_COMMA) == 0: return 0
+                extra_w = self.expect_ident()
+                if extra_w == 0: return 0
+                if self.expect(TokenKind.TK_R_PAREN) == 0: return 0
+                if not self.current_ident_is("rowbytes"):
+                    self.emit_error("a rows buffer is written 'buffer param <P> len|capacity rows height <H_FN>(param <A>, <Resource>) rowbytes <RB_FN>(param <A>, <Resource>)' (§16.2b.8)")
+                    return 0
+                self.advance()
+                extra_h = self.expect_ident()
+                if extra_h == 0: return 0
+                if self.expect(TokenKind.TK_L_PAREN) == 0: return 0
+                let l2 = self.parse_facade_param_ref()
+                if l2 == 0: return 0
+                if self.expect(TokenKind.TK_COMMA) == 0: return 0
+                extra_f = self.expect_ident()
+                if extra_f == 0: return 0
+                if self.expect(TokenKind.TK_R_PAREN) == 0: return 0
+                mode = if is_cap: 15 else: 14
             else:
                 l = self.parse_facade_param_ref()
                 if l == 0: return 0
@@ -5972,6 +6109,14 @@ impl Parser:
                     fixed_sym = self.intern_current()
                     self.advance()
                     mode = if is_plus: 7 else: 8
+                else if self.current_ident_is("via"):
+                    // D255 (§16.2b.8): fat-pointer / iovec buffer struct array
+                    // (`const uv_buf_t bufs[], unsigned int nbufs`) constructed
+                    // via a C helper (`uv_buf_init`).
+                    self.advance()
+                    fixed_sym = self.expect_ident()
+                    if fixed_sym == 0: return 0
+                    mode = if is_cap: 17 else: 16
                 else if is_cap:
                     // D243 (§16.2b.8): writable output buffer with a by-value
                     // capacity (`BZ2_bzread`, `read`, `gzread`).
@@ -5983,6 +6128,10 @@ impl Parser:
             if elements: self.advance()
             ops.push((elements) as i32)
             ops.push(fixed_sym)
+            if mode >= 12 and mode <= 15:
+                ops.push(extra_w)
+                ops.push(extra_h)
+                ops.push(extra_f)
         else if word == "variadic":
             // `variadic param N selected by param P:` with `case CONST:
             // <type>` lines beneath it (D66, §16.2b.5): the closed set of
@@ -6110,6 +6259,89 @@ impl Parser:
                 prefix = self.expect_ident()
                 if prefix == 0: return 0
             ops.push(prefix)
+        else if word == "async_close":
+            // D255: `async_close <close_fn> check <check_fn>` on a resource
+            // closed asynchronously on an event loop (`uv_close` / `uv_is_closing`).
+            kind = FacadeAsyncClause.AsyncClose as i32
+            let close_fn = self.expect_ident()
+            if close_fn == 0: return 0
+            if not self.current_ident_is("check"):
+                self.emit_error("an async-close resource is written 'async_close <close_fn> check <check_fn>' (D255)")
+                return 0
+            self.advance()
+            let check_fn = self.expect_ident()
+            if check_fn == 0: return 0
+            ops.push(close_fn)
+            ops.push(check_fn)
+        else if word == "async_req":
+            // D255: `async_req param N via <set_fn>, <get_fn>` — heap-allocated
+            // async request freed when its completion callback runs (`uv_write`).
+            kind = FacadeAsyncClause.AsyncReq as i32
+            let req_ref = self.parse_facade_param_ref()
+            if req_ref == 0: return 0
+            if not self.current_ident_is("via"):
+                self.emit_error("an async request clause is written 'async_req param <N> via <set_fn>, <get_fn>' (D255)")
+                return 0
+            self.advance()
+            let set_fn = self.expect_ident()
+            if set_fn == 0: return 0
+            if self.expect(TokenKind.TK_COMMA) == 0: return 0
+            let get_fn = self.expect_ident()
+            if get_fn == 0: return 0
+            ops.push(req_ref)
+            ops.push(set_fn)
+            ops.push(get_fn)
+        else if word == "read_pair":
+            // D255: `read_pair alloc param A via <buf_init> read param R via <set_fn>, <get_fn>`
+            // (`uv_read_start`: pairs alloc callback + read callback with safe buffer ownership).
+            kind = FacadeAsyncClause.ReadAllocPair as i32
+            if not self.current_ident_is("alloc"):
+                self.emit_error("a read-alloc pair is written 'read_pair alloc param <A> via <buf_init> read param <R> via <set_fn>, <get_fn>' (D255)")
+                return 0
+            self.advance()
+            let a_ref = self.parse_facade_param_ref()
+            if a_ref == 0: return 0
+            if not self.current_ident_is("via"):
+                self.emit_error("expected 'via <buf_init>' in 'read_pair' (D255)")
+                return 0
+            self.advance()
+            let buf_init = self.expect_ident()
+            if buf_init == 0: return 0
+            if not self.current_ident_is("read"):
+                self.emit_error("expected 'read param <R>' in 'read_pair' (D255)")
+                return 0
+            self.advance()
+            let r_ref = self.parse_facade_param_ref()
+            if r_ref == 0: return 0
+            if not self.current_ident_is("via"):
+                self.emit_error("expected 'via <set_fn>, <get_fn>' in 'read_pair' (D255)")
+                return 0
+            self.advance()
+            let set_fn = self.expect_ident()
+            if set_fn == 0: return 0
+            if self.expect(TokenKind.TK_COMMA) == 0: return 0
+            let get_fn = self.expect_ident()
+            if get_fn == 0: return 0
+            ops.push(a_ref)
+            ops.push(buf_init)
+            ops.push(r_ref)
+            ops.push(set_fn)
+            ops.push(get_fn)
+        else if word == "close_release":
+            // D255: `close_release via <get_fn>, <set_fn>` (`uv_close`: runs user close
+            // callback and releases any close-owned handle state attached via set_fn).
+            kind = FacadeAsyncClause.CloseRelease as i32
+            if not self.current_ident_is("via"):
+                self.emit_error("a close-release clause is written 'close_release via <get_fn>, <set_fn>' (D255)")
+                return 0
+            self.advance()
+            let get_fn = self.expect_ident()
+            if get_fn == 0: return 0
+            if self.expect(TokenKind.TK_COMMA) == 0: return 0
+            let set_fn = self.expect_ident()
+            if set_fn == 0: return 0
+            ops.push(get_fn)
+            ops.push(set_fn)
         else if word == "param":
             // `param N fixed <literal>` (D64, §16.2b.11): the C parameter is
             // bound to the literal and leaves the presented signature.

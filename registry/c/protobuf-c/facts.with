@@ -1,0 +1,68 @@
+// protobuf-c 1.5.2 (conan-center-index recipes/protobuf-c).
+// Every clause cites the installed include/protobuf-c/protobuf-c.h header.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - protobuf_c_message_pack_to_buffer: takes a C vtable struct (ProtobufCBuffer)
+//   containing a raw `append` function pointer.
+// - protobuf_c_message_init: initializes an untyped `void *message` buffer whose
+//   required size is `descriptor->sizeof_message`.
+// - protobuf_c_service_destroy: invokes vtable `service->destroy` on a C struct.
+// - protobuf_c_buffer_simple_append: C subclass downcast from `ProtobufCBuffer *`
+//   to `ProtobufCBufferSimple *`.
+// - protobuf_c_service_generated_init: internal protoc-c vtable initializer.
+// - protobuf_c_service_invoke_internal: RPC dispatch with untyped `void *closure_data`.
+c facts protobuf-c:
+    resource MessageDescriptor wraps *const ProtobufCMessageDescriptor
+    resource EnumDescriptor wraps *const ProtobufCEnumDescriptor
+    resource ServiceDescriptor wraps *const ProtobufCServiceDescriptor
+    resource Message wraps *mut ProtobufCMessage
+        from protobuf_c_message_unpack    // protobuf-c.h 1.5.2:960: allocates unpacked message tree owned by caller
+        drop protobuf_c_message_free_unpacked    // protobuf-c.h 1.5.2:980: recursively frees unpacked message tree
+        independent    // protobuf-c.h 1.5.2:666: descriptor pointers refer to static protoc-c descriptor tables
+
+    // ── Library version ──
+    fn protobuf_c_version
+        returns static CStr    // protobuf-c.h 1.5.2:781: static library version string
+
+    // ── Message unpack, check, size, pack, free ──
+    fn protobuf_c_message_unpack
+        of Message    // protobuf-c.h 1.5.2:960: Message.unpack(&desc, data)
+        param 1 fixed null    // protobuf-c.h 1.5.2:947: NULL selects default system allocator
+        buffer param 3 len param 2    // protobuf-c.h 1.5.2:950-952: reads serialized wire bytes data[0..len)
+    fn protobuf_c_message_free_unpacked
+        param 1 fixed null    // protobuf-c.h 1.5.2:975: NULL selects default system allocator
+    fn protobuf_c_message_get_packed_size
+        of Message    // protobuf-c.h 1.5.2:900: computes packed wire byte length of message
+        lend    // protobuf-c.h 1.5.2:900: reads message without retaining it
+    fn protobuf_c_message_pack
+        of Message    // protobuf-c.h 1.5.2:920: serializes message into caller buffer
+        lend    // protobuf-c.h 1.5.2:920: reads message without retaining it
+        buffer param 1 capacity min protobuf_c_message_get_packed_size(param 0)    // protobuf-c.h 1.5.2:911-914: out must hold at least protobuf_c_message_get_packed_size(message) bytes
+    fn protobuf_c_message_check
+        of Message    // protobuf-c.h 1.5.2:997: validates required fields recursively
+        lend    // protobuf-c.h 1.5.2:997: reads message without retaining it
+
+    // ── Descriptor reflection lookups ──
+    fn protobuf_c_message_descriptor_get_field_by_name
+        of MessageDescriptor    // protobuf-c.h 1.5.2:867: looks up field descriptor by proto name
+        text param 1    // protobuf-c.h 1.5.2:869: NUL-terminated field name
+        preserves param 0    // protobuf-c.h 1.5.2:868: const descriptor lookup does not mutate or invalidate descriptor storage
+        returns borrow ProtobufCFieldDescriptor from param 0    // protobuf-c.h 1.5.2:866: borrowed pointer into descriptor table, NULL if absent
+    fn protobuf_c_message_descriptor_get_field
+        of MessageDescriptor    // protobuf-c.h 1.5.2:886: looks up field descriptor by tag id
+        preserves param 0    // protobuf-c.h 1.5.2:887: const descriptor lookup does not mutate or invalidate descriptor storage
+        returns borrow ProtobufCFieldDescriptor from param 0    // protobuf-c.h 1.5.2:885: borrowed pointer into descriptor table, NULL if absent
+    fn protobuf_c_enum_descriptor_get_value_by_name
+        of EnumDescriptor    // protobuf-c.h 1.5.2:827: looks up enum value by proto name
+        text param 1    // protobuf-c.h 1.5.2:829: NUL-terminated value name
+        preserves param 0    // protobuf-c.h 1.5.2:828: const enum descriptor lookup does not mutate descriptor storage
+        returns borrow ProtobufCEnumValue from param 0    // protobuf-c.h 1.5.2:826: borrowed pointer into enum descriptor table, NULL if absent
+    fn protobuf_c_enum_descriptor_get_value
+        of EnumDescriptor    // protobuf-c.h 1.5.2:848: looks up enum value by numeric value
+        preserves param 0    // protobuf-c.h 1.5.2:849: const enum descriptor lookup does not mutate descriptor storage
+        returns borrow ProtobufCEnumValue from param 0    // protobuf-c.h 1.5.2:847: borrowed pointer into enum descriptor table, NULL if absent
+    fn protobuf_c_service_descriptor_get_method_by_name
+        of ServiceDescriptor    // protobuf-c.h 1.5.2:1041: looks up method descriptor by name
+        text param 1    // protobuf-c.h 1.5.2:1043: NUL-terminated method name
+        preserves param 0    // protobuf-c.h 1.5.2:1042: const service descriptor lookup does not mutate descriptor storage
+        returns borrow ProtobufCMethodDescriptor from param 0    // protobuf-c.h 1.5.2:1040: borrowed pointer into service descriptor table, NULL if absent

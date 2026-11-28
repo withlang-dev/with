@@ -284,7 +284,7 @@ pub const FACADE_CLAUSE_CALLBACK: i32 = 44          // [callback_ref]  (`callbac
 pub const FACADE_CLAUSE_CALLBACK_USERDATA: i32 = 21 // [callback_ref, userdata_ref]  (`callback param N userdata param M`, §16.2b.9)
 pub const FACADE_CLAUSE_VALID_ON_FAILED: i32 = 22  // []  (`valid on failed`: presented on the failed-state resource too, §16.2b.4)
 pub const FACADE_CLAUSE_NULLABLE: i32 = 23         // [param_ref]  (`nullable param N`: the facade establishes nullability, §16.2b.8)
-pub const FACADE_CLAUSE_BUFFER: i32 = 24           // [ptr_ref, len_ref, mode(0=len|1=capacity-inout|2=capacity|3=len-updates|4=capacity-updates|5=len-const|6=capacity-const|7=capacity-plus|8=capacity-minus), elements(0|1), fixed_sym(0|sym)] (D64/D243/D247/D248 §16.2b.8)
+pub const FACADE_CLAUSE_BUFFER: i32 = 24           // [ptr_ref, len_ref, mode(0=len|1=capacity-inout|2=capacity|3=len-updates|4=capacity-updates|5=len-const|6=capacity-const|7=capacity-plus|8=capacity-minus|9=out-alloc|10=len-min-fn|11=capacity-min-fn|12=len-stride|13=capacity-stride), elements(0|1), fixed_sym(0|sym), ...] (D64/D243/D247/D248/D251/D252 §16.2b.8)
 pub const FACADE_CLAUSE_FIXED: i32 = 25            // [param_ref, literal(node)]  (`param N fixed <literal>`, D64 §16.2b.11)
 pub const FACADE_CLAUSE_VARIADIC: i32 = 26         // [vararg_ref, selector_ref, case(node)...]  (`variadic param N selected by param P:`, D66 §16.2b.5)
 pub const FACADE_CLAUSE_VARIADIC_CASE: i32 = 27    // [selector_sym, type(node), callback_ref|0, userdata_selector_ref|0, retainer_ref|0, length_ref|0, length_type(node)|0, until_sym...] (D194: the last three; d2 is the count, so the `until` names are extras 7..d2)
@@ -300,9 +300,16 @@ fn facade_clause_bridges(kind: i32) -> bool:
     // A `text return` on a free operation renders its bridge too (the copy
     // and the release): unlisted, the bridge was rendered and a call by the
     // C name never reached it.
-    kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_BUFFER_FIELD or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_DISCARDED or kind == FACADE_CLAUSE_OK or kind == FACADE_CLAUSE_NULLABLE or kind == FACADE_CLAUSE_TEXT_PARAM or kind == FACADE_CLAUSE_VALUE_RECORD or kind == FACADE_CLAUSE_TEXT_RETURN
+    kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_BUFFER_FIELD or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_DISCARDED or kind == FACADE_CLAUSE_OK or kind == FACADE_CLAUSE_NULLABLE or kind == FACADE_CLAUSE_TEXT_PARAM or kind == FACADE_CLAUSE_VALUE_RECORD or kind == FACADE_CLAUSE_TEXT_RETURN or kind == FacadeAsyncClause.AsyncReq as i32 or kind == FacadeAsyncClause.ReadAllocPair as i32 or kind == FacadeAsyncClause.CloseRelease as i32
 pub const FACADE_CLAUSE_BUFFER_FIELD: i32 = 46     // [pointer_field_sym, count_field_sym]  (`buffer field P remaining field N`: a slice carried by two fields of the resource's record, D210 §16.2b.8)
 pub const FACADE_CLAUSE_DISCARDED: i32 = 48        // [param_ref]  (`param N discarded`: an out-pointer the wrapper hands scratch storage, D209 §16.2b.11)
+// D255: C struct-prefix subtyping and async event-loop handle/request clauses.
+enum FacadeAsyncClause: i32:
+    Extends = 56         // [base_sym]  (`extends Base`)
+    AsyncClose = 57      // [close_fn_sym, check_fn_sym]  (`async_close <close_fn> check <check_fn>`)
+    AsyncReq = 58        // [req_param_ref, set_fn_sym, get_fn_sym]  (`async_req param N via <set>, <get>`)
+    ReadAllocPair = 59   // [alloc_cb_ref, buf_init_sym, read_cb_ref, set_fn_sym, get_fn_sym]
+    CloseRelease = 60    // [get_fn_sym, set_fn_sym]  (`close_release via <get>, <set>`)
 // #3121 (§16.2b.4): `null status CONST` clause tag (numbered beside FACADE_CLAUSE_*).
 enum FacadeStatusClause: i32:
     NullStatus = 49 // [const_sym]

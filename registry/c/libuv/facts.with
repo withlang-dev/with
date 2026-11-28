@@ -1,27 +1,483 @@
-// libuv 1.53.0, the version `with get c.libuv` pins. Every citation is a line
-// of the package's installed header, include/uv.h.
+// libuv 1.53.0 (conan-center-index recipes/libuv). Every clause cites
+// include/uv.h (and include/uv/unix.h / include/uv/win.h) installed by the package.
 //
-// An event loop (uv_loop_t) and the cross-platform synchronization primitives
-// (uv_mutex_t, uv_rwlock_t, uv_cond_t, uv_barrier_t) are records the caller
-// allocates in place, initializes with an init function returning 0 on success
-// (negative UV_E* errno on error), and ends with a paired close/destroy
-// function. Handles attached to a loop (uv_timer_t, uv_tcp_t, ...) are closed
-// asynchronously via uv_close with a callback while the loop runs, so they are
-// not stated as synchronous Drop resources here.
-c facade libuv:
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - uv_replace_allocator: replaces process-global C allocator function pointers.
+// - uv_default_loop, uv_loop_new, uv_loop_delete: process-global singleton or
+//   deprecated allocator-backed loop APIs (use Loop.init()).
+// - uv_loop_configure: C variadic option API.
+// - uv_handle_get_data, uv_handle_set_data, uv_req_get_data, uv_req_set_data,
+//   uv_loop_get_data, uv_loop_set_data, uv_key_get, uv_key_set, uv_fs_get_ptr:
+//   untyped `void *` user-data accessors.
+// - uv_walk, uv_print_all_handles, uv_print_active_handles: untyped `void *`
+//   or raw C `FILE *` diagnostics.
+// - uv_spawn, uv_queue_work, uv_getaddrinfo, uv_getnameinfo, uv_random,
+//   uv_thread_create*, uv_dlopen, uv_dlsym, uv_once, uv_setup_args:
+//   untyped `void *` / `char **` / cross-thread C callback entry points or
+//   dynamic symbol loading.
+// - uv_cpu_info, uv_interface_addresses, uv_os_environ, uv_os_get_passwd*,
+//   uv_os_get_group: pointer-to-array-of-structs with count-paired custom free.
+// - uv_metrics_info: `uv_metrics_t` contains `uint64_t* reserved[13]` (pointer-holding record).
+// - uv_utf16_to_wtf8, uv_wtf8_to_utf16: raw UTF-16 `uint16_t *` buffers.
+c facts libuv:
     resource Loop wraps uv_loop_t
-        init uv_loop_init(self), ok 0    // uv.h 1.53.0 line 291: `int uv_loop_init(uv_loop_t* loop)` initializes a caller-allocated loop in place, returning 0 on success (line 295: "allocate the loop manually and use uv_loop_init instead")
-        drop uv_loop_close    // uv.h 1.53.0 line 292: `int uv_loop_close(uv_loop_t* loop)` releases all internal loop resources (line 302: "use uv_loop_close and free the memory manually instead")
-    resource Mutex wraps uv_mutex_t
-        init uv_mutex_init(self), ok 0    // uv.h 1.53.0 line 1863: `int uv_mutex_init(uv_mutex_t* handle)` initializes a mutex in place, returning 0 on success
-        init uv_mutex_init_recursive(self), ok 0    // uv.h 1.53.0 line 1864: `int uv_mutex_init_recursive(uv_mutex_t* handle)` initializes a recursive mutex in place, returning 0 on success
-        drop uv_mutex_destroy    // uv.h 1.53.0 line 1865: `void uv_mutex_destroy(uv_mutex_t* handle)` destroys a mutex initialized by uv_mutex_init or uv_mutex_init_recursive
-    resource RwLock wraps uv_rwlock_t
-        init uv_rwlock_init(self), ok 0    // uv.h 1.53.0 line 1870: `int uv_rwlock_init(uv_rwlock_t* rwlock)` initializes a read-write lock in place, returning 0 on success
-        drop uv_rwlock_destroy    // uv.h 1.53.0 line 1871: `void uv_rwlock_destroy(uv_rwlock_t* rwlock)` destroys a read-write lock initialized by uv_rwlock_init
-    resource Cond wraps uv_cond_t
-        init uv_cond_init(self), ok 0    // uv.h 1.53.0 line 1885: `int uv_cond_init(uv_cond_t* cond)` initializes a condition variable in place, returning 0 on success
-        drop uv_cond_destroy    // uv.h 1.53.0 line 1886: `void uv_cond_destroy(uv_cond_t* cond)` destroys a condition variable initialized by uv_cond_init
-    resource Barrier wraps uv_barrier_t
-        init uv_barrier_init(self), ok 0    // uv.h 1.53.0 line 1890: `int uv_barrier_init(uv_barrier_t* barrier, unsigned int count)` initializes a barrier in place, returning 0 on success
-        drop uv_barrier_destroy    // uv.h 1.53.0 line 1891: `void uv_barrier_destroy(uv_barrier_t* barrier)` destroys a barrier initialized by uv_barrier_init
+        init uv_loop_init(self), ok 0    // uv.h 1.53.0:291: initializes caller-allocated loop in place, returning 0 on success
+        drop uv_loop_close    // uv.h 1.53.0:292: releases internal loop resources
+    resource UvMutex wraps uv_mutex_t
+        init uv_mutex_init(self), ok 0    // uv.h 1.53.0:1863: initializes mutex in place, returning 0 on success
+        init uv_mutex_init_recursive(self), ok 0    // uv.h 1.53.0:1864: initializes recursive mutex in place, returning 0 on success
+        drop uv_mutex_destroy    // uv.h 1.53.0:1865: destroys mutex initialized by uv_mutex_init or uv_mutex_init_recursive
+    resource UvRwLock wraps uv_rwlock_t
+        init uv_rwlock_init(self), ok 0    // uv.h 1.53.0:1870: initializes rwlock in place, returning 0 on success
+        drop uv_rwlock_destroy    // uv.h 1.53.0:1871: destroys rwlock initialized by uv_rwlock_init
+    resource UvCond wraps uv_cond_t
+        init uv_cond_init(self), ok 0    // uv.h 1.53.0:1885: initializes condition variable in place, returning 0 on success
+        drop uv_cond_destroy    // uv.h 1.53.0:1886: destroys condition variable initialized by uv_cond_init
+    resource UvBarrier wraps uv_barrier_t
+        init uv_barrier_init(self), ok 0    // uv.h 1.53.0:1890: initializes barrier in place, returning 0 on success
+        drop uv_barrier_destroy    // uv.h 1.53.0:1891: destroys barrier initialized by uv_barrier_init
+    resource FsReq wraps uv_fs_t
+        init uv_fs_open(param 1), ok >= 0    // uv.h 1.53.0:1490: opens file synchronously when cb is NULL, returning fd >= 0
+        borrows param 0    // uv.h 1.53.0:1490: stores loop pointer in req->loop
+        init uv_fs_read(param 1), ok >= 0    // uv.h 1.53.0:1496: reads file synchronously when cb is NULL, returning bytes read >= 0
+        borrows param 0    // uv.h 1.53.0:1496: stores loop pointer in req->loop
+        init uv_fs_write(param 1), ok >= 0    // uv.h 1.53.0:1507: writes file synchronously when cb is NULL, returning bytes written >= 0
+        borrows param 0    // uv.h 1.53.0:1507: stores loop pointer in req->loop
+        init uv_fs_close(param 1), ok 0    // uv.h 1.53.0:1486: closes file synchronously when cb is NULL, returning 0 on success
+        borrows param 0    // uv.h 1.53.0:1486: stores loop pointer in req->loop
+        init uv_fs_stat(param 1), ok 0    // uv.h 1.53.0:1574: stats path synchronously when cb is NULL, returning 0 on success
+        borrows param 0    // uv.h 1.53.0:1574: stores loop pointer in req->loop
+        init uv_fs_unlink(param 1), ok 0    // uv.h 1.53.0:1503: unlinks path synchronously when cb is NULL, returning 0 on success
+        borrows param 0    // uv.h 1.53.0:1503: stores loop pointer in req->loop
+        drop uv_fs_req_cleanup    // uv.h 1.53.0:1485: frees internal memory allocated for uv_fs_t request
+    handle UvHandle wraps *mut uv_handle_t    // uv.h 1.53.0:479: abstract base handle passed to uv_close_cb and uv_alloc_cb
+    handle StreamHandle wraps *mut uv_stream_t extends UvHandle    // uv.h 1.53.0:529: uv_stream_t is a subclass of uv_handle_t
+    handle TimerHandle wraps *mut uv_timer_t extends UvHandle    // uv.h 1.53.0:983: uv_timer_t is a subclass of uv_handle_t
+    handle IdleHandle wraps *mut uv_idle_t extends UvHandle    // uv.h 1.53.0:961: uv_idle_t is a subclass of uv_handle_t
+    handle PrepareHandle wraps *mut uv_prepare_t extends UvHandle    // uv.h 1.53.0:941: uv_prepare_t is a subclass of uv_handle_t
+    handle CheckHandle wraps *mut uv_check_t extends UvHandle    // uv.h 1.53.0:951: uv_check_t is a subclass of uv_handle_t
+    handle WriteReqHandle wraps *mut uv_write_t    // uv.h 1.53.0:584: callback-scope handle passed to uv_write_cb
+    resource Tcp wraps uv_tcp_t extends StreamHandle
+        init uv_tcp_init(param 1), ok 0    // uv.h 1.53.0:613: initializes TCP handle attached to loop, returning 0 on success
+        borrows param 0    // uv.h 1.53.0:613: stores loop pointer in handle->loop
+        async_close uv_close check uv_is_closing    // uv.h 1.53.0:504,599: handles are closed asynchronously via uv_close
+    resource Timer wraps uv_timer_t extends TimerHandle
+        init uv_timer_init(param 1), ok 0    // uv.h 1.53.0:992: initializes timer handle attached to loop, returning 0 on success
+        borrows param 0    // uv.h 1.53.0:992: stores loop pointer in handle->loop
+        async_close uv_close check uv_is_closing    // uv.h 1.53.0:504,599: handles are closed asynchronously via uv_close
+    resource Idle wraps uv_idle_t extends IdleHandle
+        init uv_idle_init(param 1), ok 0    // uv.h 1.53.0:966: initializes idle handle attached to loop, returning 0 on success
+        borrows param 0    // uv.h 1.53.0:966: stores loop pointer in handle->loop
+        async_close uv_close check uv_is_closing    // uv.h 1.53.0:504,599: handles are closed asynchronously via uv_close
+    resource Prepare wraps uv_prepare_t extends PrepareHandle
+        init uv_prepare_init(param 1), ok 0    // uv.h 1.53.0:946: initializes prepare handle attached to loop, returning 0 on success
+        borrows param 0    // uv.h 1.53.0:946: stores loop pointer in handle->loop
+        async_close uv_close check uv_is_closing    // uv.h 1.53.0:504,599: handles are closed asynchronously via uv_close
+    resource Check wraps uv_check_t extends CheckHandle
+        init uv_check_init(param 1), ok 0    // uv.h 1.53.0:956: initializes check handle attached to loop, returning 0 on success
+        borrows param 0    // uv.h 1.53.0:956: stores loop pointer in handle->loop
+        async_close uv_close check uv_is_closing    // uv.h 1.53.0:504,599: handles are closed asynchronously via uv_close
+    resource Pipe wraps uv_pipe_t extends StreamHandle
+        init uv_pipe_init(param 1), ok 0    // uv.h 1.53.0:891: initializes pipe handle attached to loop, returning 0 on success
+        borrows param 0    // uv.h 1.53.0:891: stores loop pointer in handle->loop
+        async_close uv_close check uv_is_closing    // uv.h 1.53.0:504,599: handles are closed asynchronously via uv_close
+    resource Udp wraps uv_udp_t extends UvHandle
+        init uv_udp_init(param 1), ok 0    // uv.h 1.53.0:760: initializes UDP handle attached to loop, returning 0 on success
+        borrows param 0    // uv.h 1.53.0:760: stores loop pointer in handle->loop
+        async_close uv_close check uv_is_closing    // uv.h 1.53.0:504,599: handles are closed asynchronously via uv_close
+
+    // Loop operations.
+    fn uv_run
+        of Loop    // uv.h 1.53.0:310: runs the event loop in the given mode
+        rename run    // uv.h 1.53.0:310: clean Loop.run method
+        lend    // uv.h 1.53.0:310: borrows loop for the duration of uv_run
+    fn uv_stop
+        of Loop    // uv.h 1.53.0:311: requests the event loop to stop after the current iteration
+        rename stop    // uv.h 1.53.0:311: clean Loop.stop method
+        lend    // uv.h 1.53.0:311: borrows loop
+    fn uv_loop_alive
+        of Loop    // uv.h 1.53.0:306: returns non-zero if there are referenced active handles or requests
+        rename alive    // uv.h 1.53.0:306: clean Loop.alive method
+        lend    // uv.h 1.53.0:306: reads loop state without retaining
+    fn uv_update_time
+        of Loop    // uv.h 1.53.0:317: updates the loop's cached current time
+        rename update_time    // uv.h 1.53.0:317: clean Loop.update_time method
+        lend    // uv.h 1.53.0:317: borrows loop
+    fn uv_now
+        of Loop    // uv.h 1.53.0:318: returns current loop timestamp in milliseconds
+        rename now    // uv.h 1.53.0:318: clean Loop.now method
+        lend    // uv.h 1.53.0:318: reads loop timestamp
+    fn uv_backend_fd
+        of Loop    // uv.h 1.53.0:320: returns backend poll file descriptor
+        rename get_backend_fd    // uv.h 1.53.0:320: avoids clash with uv_loop_s.backend_fd field
+        lend    // uv.h 1.53.0:320: reads loop backend fd
+    fn uv_backend_timeout
+        of Loop    // uv.h 1.53.0:321: returns poll timeout in milliseconds
+        rename backend_timeout    // uv.h 1.53.0:321: clean Loop.backend_timeout method
+        lend    // uv.h 1.53.0:321: reads loop timeout
+    fn uv_loop_fork
+        of Loop    // uv.h 1.53.0:308: reinitializes kernel state needed after fork(2)
+        rename fork    // uv.h 1.53.0:308: clean Loop.fork method
+        lend    // uv.h 1.53.0:308: borrows loop
+    fn uv_metrics_idle_time
+        of Loop    // uv.h 1.53.0:1415: returns cumulative event-loop idle time in nanoseconds
+        rename metrics_idle_time    // uv.h 1.53.0:1415: clean Loop.metrics_idle_time method
+        lend    // uv.h 1.53.0:1415: borrows loop
+
+    // Base handle operations (inherited by StreamHandle, TimerHandle, Tcp, Timer, ...).
+    fn uv_close
+        of UvHandle    // uv.h 1.53.0:504: requests asynchronous handle close
+        rename close    // uv.h 1.53.0:504: clean handle.close(cb) method
+        callback param 1    // uv.h 1.53.0:504: close_cb invoked when handle is closed
+        nullable param 1    // uv.h 1.53.0:504: close_cb may be NULL
+        close_release via uv_handle_get_data, uv_handle_set_data    // uv.h 1.53.0:486,488,504: releases close-owned handle state after close_cb runs
+    fn uv_is_closing
+        of UvHandle    // uv.h 1.53.0:599: returns non-zero if handle is closing or closed
+        rename is_closing    // uv.h 1.53.0:599: clean handle.is_closing method
+        lend    // uv.h 1.53.0:599: reads handle flags
+    fn uv_is_active
+        of UvHandle    // uv.h 1.53.0:496: returns non-zero if handle is active
+        rename is_active    // uv.h 1.53.0:496: clean handle.is_active method
+        lend    // uv.h 1.53.0:496: reads handle flags
+    fn uv_ref
+        of UvHandle    // uv.h 1.53.0:313: references the given handle
+        rename ref_handle    // uv.h 1.53.0:313: avoids keyword clash with `ref`
+        lend    // uv.h 1.53.0:313: borrows handle
+    fn uv_unref
+        of UvHandle    // uv.h 1.53.0:314: unreferences the given handle
+        rename unref_handle    // uv.h 1.53.0:314: paired with ref_handle
+        lend    // uv.h 1.53.0:314: borrows handle
+    fn uv_has_ref
+        of UvHandle    // uv.h 1.53.0:315: returns non-zero if handle is referenced
+        rename has_ref    // uv.h 1.53.0:315: clean handle.has_ref method
+        lend    // uv.h 1.53.0:315: reads handle flags
+    fn uv_handle_get_type
+        of UvHandle    // uv.h 1.53.0:484: returns handle->type
+        rename get_type    // uv.h 1.53.0:484: clean handle.get_type method
+        lend    // uv.h 1.53.0:484: reads handle->type
+    fn uv_handle_get_loop
+        of UvHandle    // uv.h 1.53.0:487: returns handle->loop
+        rename get_loop    // uv.h 1.53.0:487: clean handle.get_loop method
+        lend    // uv.h 1.53.0:487: reads handle->loop
+        returns borrow Loop from param 0    // uv.h 1.53.0:487: borrowed pointer to the loop owning the handle
+    fn uv_send_buffer_size
+        of UvHandle    // uv.h 1.53.0:506: gets or sets OS socket send buffer size
+        rename send_buffer_size    // uv.h 1.53.0:506: clean handle.send_buffer_size method
+        lend    // uv.h 1.53.0:506: borrows handle
+        updates param 1    // uv.h 1.53.0:506: reads/writes *value without retaining pointer
+    fn uv_recv_buffer_size
+        of UvHandle    // uv.h 1.53.0:507: gets or sets OS socket receive buffer size
+        rename recv_buffer_size    // uv.h 1.53.0:507: clean handle.recv_buffer_size method
+        lend    // uv.h 1.53.0:507: borrows handle
+        updates param 1    // uv.h 1.53.0:507: reads/writes *value without retaining pointer
+
+    // Stream operations (inherited by Tcp and Pipe).
+    fn uv_listen
+        of StreamHandle    // uv.h 1.53.0:542: starts listening for incoming connections
+        rename listen    // uv.h 1.53.0:542: clean stream.listen method
+        lend    // uv.h 1.53.0:542: borrows stream
+        callback param 2    // uv.h 1.53.0:542: uv_connection_cb invoked on incoming connection
+    fn uv_read_stop
+        of StreamHandle    // uv.h 1.53.0:548: stops reading data from the stream
+        rename read_stop    // uv.h 1.53.0:548: clean stream.read_stop method
+        lend    // uv.h 1.53.0:548: borrows stream
+    fn uv_is_readable
+        of StreamHandle    // uv.h 1.53.0:594: returns 1 if stream is readable
+        rename is_readable    // uv.h 1.53.0:594: clean stream.is_readable method
+        lend    // uv.h 1.53.0:594: reads stream state
+    fn uv_is_writable
+        of StreamHandle    // uv.h 1.53.0:595: returns 1 if stream is writable
+        rename is_writable    // uv.h 1.53.0:595: clean stream.is_writable method
+        lend    // uv.h 1.53.0:595: reads stream state
+    fn uv_stream_get_write_queue_size
+        of StreamHandle    // uv.h 1.53.0:540: returns stream->write_queue_size
+        rename get_write_queue_size    // uv.h 1.53.0:540: avoids clash with uv_tcp_s/uv_pipe_s write_queue_size field
+        lend    // uv.h 1.53.0:540: reads stream->write_queue_size
+    fn uv_stream_set_blocking
+        of StreamHandle    // uv.h 1.53.0:597: enables or disables blocking mode for stream
+        rename set_blocking    // uv.h 1.53.0:597: clean stream.set_blocking method
+        lend    // uv.h 1.53.0:597: borrows stream
+    fn uv_try_write
+        of StreamHandle    // uv.h 1.53.0:561: attempts immediate synchronous write without queuing
+        rename try_write    // uv.h 1.53.0:561: clean stream.try_write method
+        lend    // uv.h 1.53.0:561: borrows stream and reads buffer synchronously
+        buffer param 1 len param 2 via uv_buf_init    // uv.h 1.53.0:511,561: constructs uv_buf_t from byte slice
+    fn uv_write
+        of StreamHandle(param 1)    // uv.h 1.53.0:550: queues asynchronous write on stream
+        rename write    // uv.h 1.53.0:550: clean stream.write(data, cb) method
+        async_req param 0 via uv_req_set_data, uv_req_get_data    // uv.h 1.53.0:491,492,550: owns uv_write_t and copied bytes until uv_write_cb runs
+        buffer param 2 len param 3 via uv_buf_init    // uv.h 1.53.0:511,550: constructs uv_buf_t from copied byte buffer
+        callback param 4    // uv.h 1.53.0:550: uv_write_cb invoked upon write completion
+        nullable param 4    // uv.h 1.53.0:550: write_cb may be NULL
+    fn uv_write_nwritten
+        of WriteReqHandle    // uv.h 1.53.0:582: returns bytes written by completed write request
+        rename nwritten    // uv.h 1.53.0:582: clean WriteReqHandle.nwritten method
+        lend    // uv.h 1.53.0:582: reads req->nwritten
+
+    // TCP operations.
+    fn uv_accept
+        of Tcp(param 1)    // uv.h 1.53.0:543: accepts incoming connection from server stream into initialized client Tcp handle
+        rename accept    // uv.h 1.53.0:543: client.accept(&server)
+        lend    // uv.h 1.53.0:543: borrows both server and client handles
+    fn uv_read_start
+        of Tcp    // uv.h 1.53.0:545: starts reading on TCP stream with alloc and read callbacks
+        rename read_start    // uv.h 1.53.0:545: consumes Tcp handle into loop read lifecycle
+        consumes param 0    // uv.h 1.53.0:545: ownership transfers to loop until uv_close finishes
+        read_pair alloc param 1 via uv_buf_init read param 2 via uv_handle_set_data, uv_handle_get_data    // uv.h 1.53.0:486,488,511,545: safe alloc + read callback buffer bridge
+    fn uv_tcp_bind
+        of Tcp    // uv.h 1.53.0:643: binds TCP handle to IPv4 address
+        rename bind    // uv.h 1.53.0:643: clean Tcp.bind method
+        lend    // uv.h 1.53.0:643: borrows handle and copies sockaddr
+        reads param 1 as sockaddr_in    // uv.h 1.53.0:643: struct sockaddr_in prefix-compatible with struct sockaddr
+    fn uv_tcp_getsockname
+        of Tcp    // uv.h 1.53.0:646: gets current bound IPv4 address of TCP handle
+        rename getsockname    // uv.h 1.53.0:646: clean Tcp.getsockname method
+        lend    // uv.h 1.53.0:646: borrows handle
+        fills param 1 as sockaddr_in len param 2    // uv.h 1.53.0:646: fills sockaddr_in with namelen = sizeof(sockaddr_in)
+    fn uv_tcp_getpeername
+        of Tcp    // uv.h 1.53.0:649: gets peer IPv4 address of connected TCP handle
+        rename getpeername    // uv.h 1.53.0:649: clean Tcp.getpeername method
+        lend    // uv.h 1.53.0:649: borrows handle
+        fills param 1 as sockaddr_in len param 2    // uv.h 1.53.0:649: fills sockaddr_in with namelen = sizeof(sockaddr_in)
+    fn uv_tcp_nodelay
+        of Tcp    // uv.h 1.53.0:616: enables or disables Nagle's algorithm
+        lend    // uv.h 1.53.0:616: borrows handle
+    fn uv_tcp_keepalive
+        of Tcp    // uv.h 1.53.0:617: enables or disables TCP keep-alive
+        lend    // uv.h 1.53.0:617: borrows handle
+    fn uv_tcp_keepalive_ex
+        of Tcp    // uv.h 1.53.0:620: enables or disables TCP keep-alive with extended timing parameters
+        lend    // uv.h 1.53.0:620: borrows handle
+    fn uv_tcp_simultaneous_accepts
+        of Tcp    // uv.h 1.53.0:625: enables or disables simultaneous asynchronous accepts
+        lend    // uv.h 1.53.0:625: borrows handle
+
+    // Timer, Idle, Prepare, Check operations.
+    fn uv_timer_start
+        of TimerHandle    // uv.h 1.53.0:993: starts timer with timeout and repeat interval in milliseconds
+        rename start    // uv.h 1.53.0:993: clean Timer/TimerHandle.start method
+        lend    // uv.h 1.53.0:993: borrows timer handle
+        callback param 1    // uv.h 1.53.0:993: uv_timer_cb invoked on timer expiration
+    fn uv_timer_stop
+        of TimerHandle    // uv.h 1.53.0:997: stops timer
+        rename stop    // uv.h 1.53.0:997: clean Timer/TimerHandle.stop method
+        lend    // uv.h 1.53.0:997: borrows timer handle
+    fn uv_timer_again
+        of TimerHandle    // uv.h 1.53.0:998: stops and restarts repeating timer
+        rename again    // uv.h 1.53.0:998: clean Timer/TimerHandle.again method
+        lend    // uv.h 1.53.0:998: borrows timer handle
+    fn uv_timer_set_repeat
+        of TimerHandle    // uv.h 1.53.0:999: sets timer repeat interval in milliseconds
+        rename set_repeat    // uv.h 1.53.0:999: clean Timer/TimerHandle.set_repeat method
+        lend    // uv.h 1.53.0:999: borrows timer handle
+    fn uv_timer_get_repeat
+        of TimerHandle    // uv.h 1.53.0:1000: returns timer repeat interval in milliseconds
+        rename get_repeat    // uv.h 1.53.0:1000: clean Timer/TimerHandle.get_repeat method
+        lend    // uv.h 1.53.0:1000: reads timer repeat
+    fn uv_timer_get_due_in
+        of TimerHandle    // uv.h 1.53.0:1001: returns time remaining until timer fires in milliseconds
+        rename get_due_in    // uv.h 1.53.0:1001: clean Timer/TimerHandle.get_due_in method
+        lend    // uv.h 1.53.0:1001: reads timer due time
+    fn uv_idle_start
+        of IdleHandle    // uv.h 1.53.0:967: starts idle handle with callback
+        rename start    // uv.h 1.53.0:967: clean Idle/IdleHandle.start method
+        lend    // uv.h 1.53.0:967: borrows idle handle
+        callback param 1    // uv.h 1.53.0:967: uv_idle_cb
+    fn uv_idle_stop
+        of IdleHandle    // uv.h 1.53.0:968: stops idle handle
+        rename stop    // uv.h 1.53.0:968: clean Idle/IdleHandle.stop method
+        lend    // uv.h 1.53.0:968: borrows idle handle
+    fn uv_prepare_start
+        of PrepareHandle    // uv.h 1.53.0:947: starts prepare handle with callback
+        rename start    // uv.h 1.53.0:947: clean Prepare/PrepareHandle.start method
+        lend    // uv.h 1.53.0:947: borrows prepare handle
+        callback param 1    // uv.h 1.53.0:947: uv_prepare_cb
+    fn uv_prepare_stop
+        of PrepareHandle    // uv.h 1.53.0:948: stops prepare handle
+        rename stop    // uv.h 1.53.0:948: clean Prepare/PrepareHandle.stop method
+        lend    // uv.h 1.53.0:948: borrows prepare handle
+    fn uv_check_start
+        of CheckHandle    // uv.h 1.53.0:957: starts check handle with callback
+        rename start    // uv.h 1.53.0:957: clean Check/CheckHandle.start method
+        lend    // uv.h 1.53.0:957: borrows check handle
+        callback param 1    // uv.h 1.53.0:957: uv_check_cb
+    fn uv_check_stop
+        of CheckHandle    // uv.h 1.53.0:958: stops check handle
+        rename stop    // uv.h 1.53.0:958: clean Check/CheckHandle.stop method
+        lend    // uv.h 1.53.0:958: borrows check handle
+
+    // Synchronous filesystem requests (cb fixed to NULL -> runs synchronously, cleaned by FsReq.Drop).
+    fn uv_fs_open
+        rename open    // uv.h 1.53.0:1490: FsReq.open constructor
+        param 5 fixed null    // uv.h 1.53.0:1490: NULL callback runs uv_fs_open synchronously
+    fn uv_fs_read
+        rename read    // uv.h 1.53.0:1496: FsReq.read constructor
+        buffer param 3 capacity param 4 via uv_buf_init    // uv.h 1.53.0:511,1496: constructs writable uv_buf_t from []mut u8
+        param 6 fixed null    // uv.h 1.53.0:1496: NULL callback runs uv_fs_read synchronously
+    fn uv_fs_write
+        rename write    // uv.h 1.53.0:1507: FsReq.write constructor
+        buffer param 3 len param 4 via uv_buf_init    // uv.h 1.53.0:511,1507: constructs read-only uv_buf_t from []u8
+        param 6 fixed null    // uv.h 1.53.0:1507: NULL callback runs uv_fs_write synchronously
+    fn uv_fs_close
+        rename close    // uv.h 1.53.0:1486: FsReq.close constructor
+        param 3 fixed null    // uv.h 1.53.0:1486: NULL callback runs uv_fs_close synchronously
+    fn uv_fs_stat
+        rename stat    // uv.h 1.53.0:1574: FsReq.stat constructor
+        param 3 fixed null    // uv.h 1.53.0:1574: NULL callback runs uv_fs_stat synchronously
+    fn uv_fs_unlink
+        rename unlink    // uv.h 1.53.0:1503: FsReq.unlink constructor
+        param 3 fixed null    // uv.h 1.53.0:1503: NULL callback runs uv_fs_unlink synchronously
+    fn uv_fs_get_type
+        of FsReq    // uv.h 1.53.0:1478: returns req->fs_type
+        rename get_type    // uv.h 1.53.0:1478: clean FsReq.get_type method
+        lend    // uv.h 1.53.0:1478: reads req->fs_type
+    fn uv_fs_get_result
+        of FsReq    // uv.h 1.53.0:1479: returns req->result
+        rename get_result    // uv.h 1.53.0:1479: clean FsReq.get_result method
+        lend    // uv.h 1.53.0:1479: reads req->result
+    fn uv_fs_get_system_error
+        of FsReq    // uv.h 1.53.0:1480: returns platform-specific system error code
+        rename get_system_error    // uv.h 1.53.0:1480: clean FsReq.get_system_error method
+        lend    // uv.h 1.53.0:1480: reads req
+    fn uv_fs_get_path
+        of FsReq    // uv.h 1.53.0:1482: returns path stored in req->path
+        rename get_path    // uv.h 1.53.0:1482: clean FsReq.get_path method
+        lend    // uv.h 1.53.0:1482: borrows req
+        returns borrow CStr from param 0    // uv.h 1.53.0:1482: valid until uv_fs_req_cleanup
+    fn uv_fs_get_statbuf
+        of FsReq    // uv.h 1.53.0:1483: returns pointer to req->statbuf
+        rename get_statbuf    // uv.h 1.53.0:1483: clean FsReq.get_statbuf method
+        lend    // uv.h 1.53.0:1483: borrows req
+        returns borrow uv_stat_t from param 0    // uv.h 1.53.0:1483: points into req->statbuf
+
+    // Synchronization primitives.
+    fn uv_mutex_lock
+        of UvMutex    // uv.h 1.53.0:1866: locks mutex
+        lend    // uv.h 1.53.0:1866: borrows mutex
+    fn uv_mutex_trylock
+        of UvMutex    // uv.h 1.53.0:1867: attempts to lock mutex without blocking
+        lend    // uv.h 1.53.0:1867: borrows mutex
+    fn uv_mutex_unlock
+        of UvMutex    // uv.h 1.53.0:1868: unlocks mutex
+        lend    // uv.h 1.53.0:1868: borrows mutex
+    fn uv_rwlock_rdlock
+        of UvRwLock    // uv.h 1.53.0:1872: acquires shared read lock
+        lend    // uv.h 1.53.0:1872: borrows rwlock
+    fn uv_rwlock_tryrdlock
+        of UvRwLock    // uv.h 1.53.0:1873: attempts shared read lock without blocking
+        lend    // uv.h 1.53.0:1873: borrows rwlock
+    fn uv_rwlock_rdunlock
+        of UvRwLock    // uv.h 1.53.0:1874: releases shared read lock
+        lend    // uv.h 1.53.0:1874: borrows rwlock
+    fn uv_rwlock_wrlock
+        of UvRwLock    // uv.h 1.53.0:1875: acquires exclusive write lock
+        lend    // uv.h 1.53.0:1875: borrows rwlock
+    fn uv_rwlock_trywrlock
+        of UvRwLock    // uv.h 1.53.0:1876: attempts exclusive write lock without blocking
+        lend    // uv.h 1.53.0:1876: borrows rwlock
+    fn uv_rwlock_wrunlock
+        of UvRwLock    // uv.h 1.53.0:1877: releases exclusive write lock
+        lend    // uv.h 1.53.0:1877: borrows rwlock
+    fn uv_cond_signal
+        of UvCond    // uv.h 1.53.0:1887: unblocks at least one waiting thread
+        lend    // uv.h 1.53.0:1887: borrows cond
+    fn uv_cond_broadcast
+        of UvCond    // uv.h 1.53.0:1888: unblocks all waiting threads
+        lend    // uv.h 1.53.0:1888: borrows cond
+    fn uv_cond_wait
+        of UvCond    // uv.h 1.53.0:1894: waits on condition variable holding mutex
+        lend    // uv.h 1.53.0:1894: borrows cond and mutex
+    fn uv_cond_timedwait
+        of UvCond    // uv.h 1.53.0:1895: waits on condition variable with nanosecond timeout
+        lend    // uv.h 1.53.0:1895: borrows cond and mutex
+    fn uv_barrier_wait
+        of UvBarrier    // uv.h 1.53.0:1892: blocks until count threads reach barrier
+        lend    // uv.h 1.53.0:1892: borrows barrier
+
+    // Network address, error strings, version, OS and system utilities.
+    fn uv_ip4_addr
+        lend    // uv.h 1.53.0:1796: parses IPv4 address string and port into sockaddr_in
+        fills param 2    // uv.h 1.53.0:1796: fills struct sockaddr_in
+    fn uv_ip6_addr
+        lend    // uv.h 1.53.0:1797: parses IPv6 address string and port into sockaddr_in6
+        fills param 2    // uv.h 1.53.0:1797: fills struct sockaddr_in6
+    fn uv_ip4_name
+        lend    // uv.h 1.53.0:1799: formats IPv4 sockaddr_in into dst buffer
+        reads param 0    // uv.h 1.53.0:1799: reads struct sockaddr_in
+        buffer param 1 capacity param 2    // uv.h 1.53.0:1799: writes NUL-terminated string up to size bytes
+    fn uv_ip6_name
+        lend    // uv.h 1.53.0:1800: formats IPv6 sockaddr_in6 into dst buffer
+        reads param 0    // uv.h 1.53.0:1800: reads struct sockaddr_in6
+        buffer param 1 capacity param 2    // uv.h 1.53.0:1800: writes NUL-terminated string up to size bytes
+    fn uv_version_string
+        lend    // uv.h 1.53.0:276: returns static version string
+        returns static CStr    // uv.h 1.53.0:276: pointer to static string literal
+    fn uv_strerror
+        lend    // uv.h 1.53.0:425: returns error description string for UV_E* code
+        returns static CStr    // uv.h 1.53.0:425: pointer to static error message table
+    fn uv_err_name
+        lend    // uv.h 1.53.0:428: returns error symbol name for UV_E* code
+        returns static CStr    // uv.h 1.53.0:428: pointer to static error name table
+    fn uv_handle_type_name
+        lend    // uv.h 1.53.0:485: returns handle type name string
+        returns static CStr    // uv.h 1.53.0:485: pointer to static string table
+    fn uv_req_type_name
+        lend    // uv.h 1.53.0:494: returns request type name string
+        returns static CStr    // uv.h 1.53.0:494: pointer to static string table
+    fn uv_strerror_r
+        lend    // uv.h 1.53.0:426: writes error description into caller buffer
+        buffer param 1 capacity param 2    // uv.h 1.53.0:426: writes up to buflen bytes
+    fn uv_err_name_r
+        lend    // uv.h 1.53.0:429: writes error symbol name into caller buffer
+        buffer param 1 capacity param 2    // uv.h 1.53.0:429: writes up to buflen bytes
+    fn uv_cwd
+        lend    // uv.h 1.53.0:1843: writes current working directory into buffer
+        buffer param 0 capacity param 1 inout    // uv.h 1.53.0:1843: inout capacity/length
+        ok 0    // uv.h 1.53.0:1843: returns 0 on success
+    fn uv_os_homedir
+        lend    // uv.h 1.53.0:1329: writes home directory into buffer
+        buffer param 0 capacity param 1 inout    // uv.h 1.53.0:1329: inout capacity/length
+        ok 0    // uv.h 1.53.0:1329: returns 0 on success
+    fn uv_os_tmpdir
+        lend    // uv.h 1.53.0:1330: writes temporary directory into buffer
+        buffer param 0 capacity param 1 inout    // uv.h 1.53.0:1330: inout capacity/length
+        ok 0    // uv.h 1.53.0:1330: returns 0 on success
+    fn uv_os_gethostname
+        lend    // uv.h 1.53.0:1402: writes system hostname into buffer
+        buffer param 0 capacity param 1 inout    // uv.h 1.53.0:1402: inout capacity/length
+        ok 0    // uv.h 1.53.0:1402: returns 0 on success
+    fn uv_exepath
+        lend    // uv.h 1.53.0:1841: writes executable path into buffer
+        buffer param 0 capacity param 1 inout    // uv.h 1.53.0:1841: inout capacity/length
+        ok 0    // uv.h 1.53.0:1841: returns 0 on success
+    fn uv_os_getenv
+        lend    // uv.h 1.53.0:1387: reads environment variable into buffer
+        buffer param 1 capacity param 2 inout    // uv.h 1.53.0:1387: inout capacity/length
+        ok 0    // uv.h 1.53.0:1387: returns 0 on success
+    fn uv_os_setenv
+        lend    // uv.h 1.53.0:1388: sets environment variable without retaining strings
+    fn uv_os_unsetenv
+        lend    // uv.h 1.53.0:1389: unsets environment variable without retaining name
+    fn uv_chdir
+        lend    // uv.h 1.53.0:1845: changes current working directory without retaining dir
+    fn uv_resident_set_memory
+        lend    // uv.h 1.53.0:1302: writes RSS in bytes
+        fills param 0    // uv.h 1.53.0:1302: fills size_t
+    fn uv_uptime
+        lend    // uv.h 1.53.0:1303: writes system uptime in seconds
+        fills param 0    // uv.h 1.53.0:1303: fills double
+    fn uv_os_uname
+        lend    // uv.h 1.53.0:1404: writes OS identification record
+        fills param 0    // uv.h 1.53.0:1404: fills uv_utsname_t
+    fn uv_getrusage
+        lend    // uv.h 1.53.0:1326: writes process resource usage record
+        fills param 0    // uv.h 1.53.0:1326: fills uv_rusage_t
+    fn uv_clock_gettime
+        lend    // uv.h 1.53.0:1852: reads high-resolution clock into uv_timespec64_t
+        fills param 1    // uv.h 1.53.0:1852: fills uv_timespec64_t
+    fn uv_gettimeofday
+        lend    // uv.h 1.53.0:1906: reads wall-clock time into uv_timeval64_t
+        fills param 0    // uv.h 1.53.0:1906: fills uv_timeval64_t
+    fn uv_os_getpriority
+        lend    // uv.h 1.53.0:1356: reads scheduling priority of process
+        fills param 1    // uv.h 1.53.0:1356: fills int

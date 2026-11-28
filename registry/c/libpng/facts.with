@@ -1,0 +1,257 @@
+// libpng 1.6.59 (conan-center-index recipes/libpng). Every clause cites
+// include/png.h installed by the package.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - png_set_longjmp_fn, png_longjmp: C setjmp/longjmp non-local jump buffers
+//   (use setjmp-free error handling via png_set_error_fn instead).
+// - png_create_read_struct_2, png_create_write_struct_2, png_set_mem_fn,
+//   png_get_mem_ptr, png_malloc, png_calloc, png_malloc_warn, png_free,
+//   png_malloc_default, png_free_default: custom raw allocator hooks and
+//   untyped `void *` allocations.
+// - png_set_read_fn, png_set_write_fn, png_get_io_ptr, png_set_progressive_read_fn,
+//   png_get_progressive_ptr, png_process_data*, png_progressive_combine_row,
+//   png_set_read_user_transform_fn, png_set_write_user_transform_fn,
+//   png_set_user_transform_info, png_get_user_transform_ptr,
+//   png_set_read_user_chunk_fn, png_get_user_chunk_ptr: raw pointer I/O and
+//   transform callback hooks whose signatures pass untyped raw byte pointers.
+// - png_read_row, png_write_row, png_read_rows, png_write_rows, png_get_rows,
+//   png_set_rows, png_read_png, png_write_png: row/image functions with caller-managed
+//   row pointers or implicit rowbytes without info_ptr (use png_read_image /
+//   png_write_image with PngInfo instead).
+// - png_image_* simplified API: retains raw image/colormap pointers across
+//   multi-step opaque control state.
+// - Ancillary chunk getters/setters returning borrowed internal struct pointers
+//   through `T **` out-parameters (png_get_PLTE, png_get_tRNS, png_get_text,
+//   png_get_iCCP, png_get_eXIf*, png_get_sPLT, png_get_unknown_chunks, etc.).
+c facts libpng:
+    handle PngHandle wraps *mut png_struct_def    // png.h 1.6.59:788: callback-scope png_structp passed to error/warning callbacks
+
+    resource PngRead wraps *mut png_struct_def
+        from png_create_read_struct    // png.h 1.6.59:943: allocates PNG read struct
+        drop png_destroy_read_struct    // png.h 1.6.59:1480: destroys PNG read struct via &png_ptr
+    resource PngWrite wraps *mut png_struct_def
+        from png_create_write_struct    // png.h 1.6.59:949: allocates PNG write struct
+        drop png_destroy_write_struct    // png.h 1.6.59:1485: destroys PNG write struct via &png_ptr
+    resource PngInfo wraps *mut png_info_def
+        from png_create_info_struct    // png.h 1.6.59:1033: allocates PNG info struct associated with png_ptr
+        drop png_destroy_info_struct(param 1)    // png.h 1.6.59:1476: frees info struct using parent png_ptr and &info_ptr
+
+    // ── Constructors & destructors ──
+    fn png_create_read_struct
+        text param 0    // png.h 1.6.59:944: NUL-terminated PNG_LIBPNG_VER_STRING
+        param 1 fixed null    // png.h 1.6.59:945: configure custom error userdata via png_set_error_fn
+        param 2 fixed null    // png.h 1.6.59:945: configure custom error callback via png_set_error_fn
+        param 3 fixed null    // png.h 1.6.59:945: configure custom warning callback via png_set_error_fn
+    fn png_destroy_read_struct
+        param 1 fixed null    // png.h 1.6.59:1482: info_ptr is managed by PngInfo Drop
+        param 2 fixed null    // png.h 1.6.59:1482: end_info_ptr is managed by PngInfo Drop
+    fn png_create_write_struct
+        text param 0    // png.h 1.6.59:950: NUL-terminated PNG_LIBPNG_VER_STRING
+        param 1 fixed null    // png.h 1.6.59:951: configure custom error userdata via png_set_error_fn
+        param 2 fixed null    // png.h 1.6.59:951: configure custom error callback via png_set_error_fn
+        param 3 fixed null    // png.h 1.6.59:951: configure custom warning callback via png_set_error_fn
+    fn png_destroy_write_struct
+        param 1 fixed null    // png.h 1.6.59:1486: info_ptr is managed by PngInfo Drop
+
+    // ── Shared read/write operations (disambiguated by `of` + `rename`) ──
+    fn png_create_info_struct
+        of PngRead    // png.h 1.6.59:1033: creates info struct for PngRead
+        rename create_read_info    // png.h 1.6.59:1033: PngRead.create_read_info()
+        lend    // png.h 1.6.59:1034: borrows read png_ptr
+    fn png_create_info_struct
+        of PngWrite    // png.h 1.6.59:1033: creates info struct for PngWrite
+        rename create_write_info    // png.h 1.6.59:1033: PngWrite.create_write_info()
+        lend    // png.h 1.6.59:1034: borrows write png_ptr
+    fn png_init_io
+        of PngRead    // png.h 1.6.59:1628: binds stdio FILE* to PngRead
+        rename init_read_io    // png.h 1.6.59:1628: PngRead.init_read_io(&file)
+        retains param 1 by param 0    // png.h 1.6.59:1629: stores fp in png_ptr->io_ptr for lifetime of reader
+    fn png_init_io
+        of PngWrite    // png.h 1.6.59:1628: binds stdio FILE* to PngWrite
+        rename init_write_io    // png.h 1.6.59:1628: PngWrite.init_write_io(&file)
+        retains param 1 by param 0    // png.h 1.6.59:1629: stores fp in png_ptr->io_ptr for lifetime of writer
+    fn png_set_error_fn
+        of PngRead    // png.h 1.6.59:1640: installs setjmp-free error/warning callbacks on PngRead
+        rename set_read_error_fn    // png.h 1.6.59:1640: PngRead.set_read_error_fn(...)
+        retains param 1 by param 0    // png.h 1.6.59:1642: stores error_ptr in png_ptr->error_ptr
+        retains param 2 by param 0    // png.h 1.6.59:1642: stores error_fn in png_ptr
+        retains param 3 by param 0    // png.h 1.6.59:1642: stores warning_fn in png_ptr
+        nullable param 2    // png.h 1.6.59:1636: NULL keeps default error handler
+        nullable param 3    // png.h 1.6.59:1636: NULL keeps default warning handler
+        user_data from png_get_error_ptr as &U    // png.h 1.6.59:1645: png_get_error_ptr returns registered error_ptr
+    fn png_set_error_fn
+        of PngWrite    // png.h 1.6.59:1640: installs setjmp-free error/warning callbacks on PngWrite
+        rename set_write_error_fn    // png.h 1.6.59:1640: PngWrite.set_write_error_fn(...)
+        retains param 1 by param 0    // png.h 1.6.59:1642: stores error_ptr in png_ptr->error_ptr
+        retains param 2 by param 0    // png.h 1.6.59:1642: stores error_fn in png_ptr
+        retains param 3 by param 0    // png.h 1.6.59:1642: stores warning_fn in png_ptr
+        nullable param 2    // png.h 1.6.59:1636: NULL keeps default error handler
+        nullable param 3    // png.h 1.6.59:1636: NULL keeps default warning handler
+        user_data from png_get_error_ptr as &U    // png.h 1.6.59:1645: png_get_error_ptr returns registered error_ptr
+    fn png_get_rowbytes
+        of PngRead    // png.h 1.6.59:1900: returns bytes per row for PngRead
+        rename read_rowbytes    // png.h 1.6.59:1900: PngRead.read_rowbytes(&info)
+        lend    // png.h 1.6.59:1900: borrows reader and info
+    fn png_get_rowbytes
+        of PngWrite    // png.h 1.6.59:1900: returns bytes per row for PngWrite
+        rename write_rowbytes    // png.h 1.6.59:1900: PngWrite.write_rowbytes(&info)
+        lend    // png.h 1.6.59:1900: borrows writer and info
+
+    // ── Read pipeline & transforms ──
+    fn png_set_sig_bytes
+        of PngRead    // png.h 1.6.59:926: informs libpng of already-read signature bytes
+        lend    // png.h 1.6.59:926: borrows reader
+    fn png_read_info
+        of PngRead    // png.h 1.6.59:1053: reads PNG header chunks before IDAT
+        lend    // png.h 1.6.59:1053: borrows reader and info
+    fn png_read_update_info
+        of PngRead    // png.h 1.6.59:1427: applies requested transforms to info
+        lend    // png.h 1.6.59:1427: borrows reader and info
+    fn png_start_read_image
+        of PngRead    // png.h 1.6.59:1423: updates palette with requested transformations
+        lend    // png.h 1.6.59:1423: borrows reader
+    fn png_read_image
+        of PngRead    // png.h 1.6.59:1445: reads entire decoded image into RGBA/pixel rows
+        lend    // png.h 1.6.59:1445: borrows reader without retaining row pointers
+        buffer param 1 capacity rows height png_get_image_height(param 0, PngInfo) rowbytes png_get_rowbytes(param 0, PngInfo)    // png.h 1.6.59:1445: writes height rows of rowbytes bytes through row-pointer array
+    fn png_read_end
+        of PngRead    // png.h 1.6.59:1471: reads trailing chunks after IDAT
+        lend    // png.h 1.6.59:1471: borrows reader and info
+    fn png_get_IHDR
+        of PngRead    // png.h 1.6.59:2169: reads IHDR image dimensions and format
+        lend    // png.h 1.6.59:2169: borrows reader and info
+        fills param 2    // png.h 1.6.59:2171: writes width
+        fills param 3    // png.h 1.6.59:2171: writes height
+        fills param 4    // png.h 1.6.59:2172: writes bit_depth
+        fills param 5    // png.h 1.6.59:2172: writes color_type
+        fills param 6    // png.h 1.6.59:2173: writes interlace_method
+        fills param 7    // png.h 1.6.59:2173: writes compression_method
+        fills param 8    // png.h 1.6.59:2173: writes filter_method
+    fn png_get_image_width
+        of PngRead    // png.h 1.6.59:1956: returns image width in pixels
+        lend    // png.h 1.6.59:1956: borrows reader and info
+    fn png_get_image_height
+        of PngRead    // png.h 1.6.59:1960: returns image height in pixels
+        lend    // png.h 1.6.59:1960: borrows reader and info
+    fn png_get_bit_depth
+        of PngRead    // png.h 1.6.59:1964: returns bit depth per channel
+        lend    // png.h 1.6.59:1964: borrows reader and info
+    fn png_get_color_type
+        of PngRead    // png.h 1.6.59:1968: returns PNG color type
+        lend    // png.h 1.6.59:1968: borrows reader and info
+    fn png_get_channels
+        of PngRead    // png.h 1.6.59:1952: returns number of channels per pixel
+        lend    // png.h 1.6.59:1952: borrows reader and info
+    fn png_get_valid
+        of PngRead    // png.h 1.6.59:1895: returns bitmask of valid ancillary chunks
+        lend    // png.h 1.6.59:1895: borrows reader and info
+    fn png_set_expand
+        of PngRead    // png.h 1.6.59:1084: expands paletted/low-bit/tRNS images
+        lend    // png.h 1.6.59:1084: borrows reader
+    fn png_set_expand_gray_1_2_4_to_8
+        of PngRead    // png.h 1.6.59:1086: expands 1/2/4-bit grayscale to 8-bit
+        lend    // png.h 1.6.59:1086: borrows reader
+    fn png_set_palette_to_rgb
+        of PngRead    // png.h 1.6.59:1088: expands paletted images to RGB
+        lend    // png.h 1.6.59:1088: borrows reader
+    fn png_set_tRNS_to_alpha
+        of PngRead    // png.h 1.6.59:1090: expands tRNS chunk to full alpha channel
+        lend    // png.h 1.6.59:1090: borrows reader
+    fn png_set_expand_16
+        of PngRead    // png.h 1.6.59:1098: expands 8-bit samples to 16-bit
+        lend    // png.h 1.6.59:1098: borrows reader
+    fn png_set_bgr
+        of PngRead    // png.h 1.6.59:1104: swaps RGB/RGBA to BGR/BGRA
+        lend    // png.h 1.6.59:1104: borrows reader
+    fn png_set_gray_to_rgb
+        of PngRead    // png.h 1.6.59:1110: expands grayscale to RGB
+        lend    // png.h 1.6.59:1110: borrows reader
+    fn png_set_strip_alpha
+        of PngRead    // png.h 1.6.59:1272: strips alpha channel
+        lend    // png.h 1.6.59:1272: borrows reader
+    fn png_set_swap_alpha
+        of PngRead    // png.h 1.6.59:1278: swaps RGBA to ARGB
+        lend    // png.h 1.6.59:1278: borrows reader
+    fn png_set_invert_alpha
+        of PngRead    // png.h 1.6.59:1284: inverts alpha channel
+        lend    // png.h 1.6.59:1284: borrows reader
+    fn png_set_filler
+        of PngRead    // png.h 1.6.59:1290: inserts filler byte into RGB/gray pixels
+        lend    // png.h 1.6.59:1290: borrows reader
+    fn png_set_add_alpha
+        of PngRead    // png.h 1.6.59:1296: adds alpha channel to RGB/gray pixels
+        lend    // png.h 1.6.59:1296: borrows reader
+    fn png_set_swap
+        of PngRead    // png.h 1.6.59:1302: byte-swaps 16-bit samples
+        lend    // png.h 1.6.59:1302: borrows reader
+    fn png_set_packing
+        of PngRead    // png.h 1.6.59:1308: unpacks sub-8-bit pixels to 1 byte each
+        lend    // png.h 1.6.59:1308: borrows reader
+    fn png_set_strip_16
+        of PngRead    // png.h 1.6.59:1374: strips 16-bit channels to 8-bit
+        lend    // png.h 1.6.59:1374: borrows reader
+    fn png_set_scale_16
+        of PngRead    // png.h 1.6.59:1367: scales 16-bit channels accurately to 8-bit
+        lend    // png.h 1.6.59:1367: borrows reader
+    fn png_set_interlace_handling
+        of PngRead    // png.h 1.6.59:1333: enables interlaced pass handling and returns pass count
+        lend    // png.h 1.6.59:1333: borrows reader
+    fn png_set_crc_action
+        of PngRead    // png.h 1.6.59:1489: configures CRC error policy
+        lend    // png.h 1.6.59:1489: borrows reader
+    fn png_set_benign_errors
+        of PngRead    // png.h 1.6.59:1890: controls benign error handling
+        lend    // png.h 1.6.59:1890: borrows reader
+    fn png_set_user_limits
+        of PngRead    // png.h 1.6.59:2650: sets maximum allowed image dimensions
+        lend    // png.h 1.6.59:2650: borrows reader
+
+    // ── Write pipeline ──
+    fn png_set_IHDR
+        of PngWrite    // png.h 1.6.59:2175: sets IHDR image dimensions and format for writing
+        lend    // png.h 1.6.59:2175: borrows writer and info
+    fn png_write_info_before_PLTE
+        of PngWrite    // png.h 1.6.59:1046: writes header chunks before PLTE
+        lend    // png.h 1.6.59:1046: borrows writer and info
+    fn png_write_info
+        of PngWrite    // png.h 1.6.59:1048: writes PNG signature and header chunks
+        lend    // png.h 1.6.59:1048: borrows writer and info
+    fn png_write_image
+        of PngWrite    // png.h 1.6.59:1462: writes entire pixel image through row-pointer array
+        lend    // png.h 1.6.59:1462: borrows writer without retaining row pointers
+        buffer param 1 len rows height png_get_image_height(param 0, PngInfo) rowbytes png_get_rowbytes(param 0, PngInfo)    // png.h 1.6.59:1462: reads height rows of rowbytes bytes through row-pointer array
+    fn png_write_end
+        of PngWrite    // png.h 1.6.59:1466: writes IEND and trailing chunks
+        lend    // png.h 1.6.59:1466: borrows writer and info
+    fn png_write_sig
+        of PngWrite    // png.h 1.6.59:1010: writes 8-byte PNG signature
+        lend    // png.h 1.6.59:1010: borrows writer
+    fn png_write_flush
+        of PngWrite    // png.h 1.6.59:1418: flushes buffered PNG output
+        lend    // png.h 1.6.59:1418: borrows writer
+    fn png_set_compression_level
+        of PngWrite    // png.h 1.6.59:1576: sets zlib compression level (0-9)
+        lend    // png.h 1.6.59:1576: borrows writer
+    fn png_set_filter
+        of PngWrite    // png.h 1.6.59:1520: sets scanline filter policy
+        lend    // png.h 1.6.59:1520: borrows writer
+    fn png_set_flush
+        of PngWrite    // png.h 1.6.59:1415: configures automatic output flushing every nrows
+        lend    // png.h 1.6.59:1415: borrows writer
+
+    // ── Byte-order & signature helpers ──
+    fn png_sig_cmp
+        param 1 fixed 0    // png.h 1.6.59:935: compare from start of slice
+        buffer param 0 len param 2    // png.h 1.6.59:934: compares sig[0..num_to_check) against 8-byte PNG signature
+    fn png_get_uint_32
+        buffer param 0 len 4    // png.h 1.6.59:2772: reads big-endian uint32 from 4-byte slice
+    fn png_get_int_32
+        buffer param 0 len 4    // png.h 1.6.59:2774: reads big-endian int32 from 4-byte slice
+    fn png_get_uint_16
+        buffer param 0 len 2    // png.h 1.6.59:2773: reads big-endian uint16 from 2-byte slice
+    fn png_save_uint_32
+        buffer param 0 capacity 4    // png.h 1.6.59:2784: writes big-endian uint32 into 4-byte slice
+    fn png_save_int_32
+        buffer param 0 capacity 4    // png.h 1.6.59:2785: writes big-endian int32 into 4-byte slice
+    fn png_save_uint_16
+        buffer param 0 capacity 2    // png.h 1.6.59:2786: writes big-endian uint16 into 2-byte slice

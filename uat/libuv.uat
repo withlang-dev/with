@@ -1,0 +1,11 @@
+scenario: c.libuv runs TCP echo server, timer, uv_fs reads, and deterministic uv_close ordering without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: with get c.libuv
+write src/main.with from libuv_main.with
+run: with run
+expect exit: 0
+expect stdout contains: libuv ok

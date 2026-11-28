@@ -1,0 +1,209 @@
+//! expect-stdout: sock=8080 iov=hello read=ping write=pong closes=2 ok
+// D255: C struct-prefix subtyping (`extends`, `reads|fills ... as T len param L`),
+// fat-pointer/iovec buffers (`buffer ... via <init_fn>`), borrowed in-place
+// resources (`returns borrow Loop` + `init_on`), and async-close handles /
+// read_pair / close_release / async_req.
+
+use c_import("
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+typedef struct { char* base; unsigned int len; } my_buf_t;
+static inline my_buf_t my_buf_init(char* base, unsigned int len) {
+    my_buf_t b; b.base = base; b.len = len; return b;
+}
+
+typedef struct { unsigned short family; char pad[14]; } my_sockaddr;
+typedef struct { unsigned short family; unsigned short port; unsigned int ip; char zero[8]; } my_sockaddr_in;
+
+typedef struct { int ticks; } my_loop_t;
+static inline int my_loop_init(my_loop_t* l) { l->ticks = 0; return 0; }
+static inline int my_loop_close(my_loop_t* l) { l->ticks = -1; return 0; }
+
+struct my_handle_s;
+typedef struct my_handle_s my_handle_t;
+typedef void (*my_close_cb)(my_handle_t* h);
+
+struct my_handle_s {
+    void* data;
+    my_loop_t* loop;
+    int closing;
+    my_close_cb close_cb;
+};
+
+static inline void* my_handle_get_data(const my_handle_t* h) { return h->data; }
+static inline void my_handle_set_data(my_handle_t* h, void* d) { h->data = d; }
+static inline my_loop_t* my_handle_get_loop(const my_handle_t* h) { return h->loop; }
+static inline int my_is_closing(const my_handle_t* h) { return h->closing; }
+static inline void my_close(my_handle_t* h, my_close_cb cb) {
+    h->closing = 1;
+    h->close_cb = cb;
+    if (cb) cb(h);
+}
+
+struct my_stream_s;
+typedef struct my_stream_s my_stream_t;
+typedef void (*my_alloc_cb)(my_handle_t* h, size_t suggested, my_buf_t* out);
+typedef void (*my_read_cb)(my_stream_t* s, intptr_t nread, const my_buf_t* buf);
+
+struct my_stream_s {
+    void* data;
+    my_loop_t* loop;
+    int closing;
+    my_close_cb close_cb;
+    my_alloc_cb alloc_cb;
+    my_read_cb read_cb;
+};
+
+typedef struct {
+    void* data;
+    my_loop_t* loop;
+    int closing;
+    my_close_cb close_cb;
+    my_alloc_cb alloc_cb;
+    my_read_cb read_cb;
+    unsigned short bound_port;
+} my_tcp_t;
+
+static inline int my_tcp_init(my_loop_t* l, my_tcp_t* t) {
+    memset(t, 0, sizeof(*t));
+    t->loop = l;
+    return 0;
+}
+static inline int my_tcp_bind(my_tcp_t* t, const my_sockaddr* addr) {
+    const my_sockaddr_in* a = (const my_sockaddr_in*)addr;
+    t->bound_port = a->port;
+    return 0;
+}
+static inline int my_tcp_getsockname(const my_tcp_t* t, my_sockaddr* out, int* len) {
+    my_sockaddr_in* a = (my_sockaddr_in*)out;
+    a->family = 2;
+    a->port = t->bound_port;
+    *len = (int)sizeof(my_sockaddr_in);
+    return 0;
+}
+static inline int my_read_start(my_stream_t* s, my_alloc_cb alloc_cb, my_read_cb read_cb) {
+    s->alloc_cb = alloc_cb;
+    s->read_cb = read_cb;
+    my_buf_t b;
+    alloc_cb((my_handle_t*)s, 16, &b);
+    memcpy(b.base, \"ping\", 4);
+    read_cb(s, 4, &b);
+    return 0;
+}
+
+typedef struct { void* data; } my_req_t;
+typedef struct { void* data; int status; } my_write_t;
+typedef void (*my_write_cb)(my_write_t* req, int status);
+
+static inline void* my_req_get_data(const my_req_t* r) { return r->data; }
+static inline void my_req_set_data(my_req_t* r, void* d) { r->data = d; }
+static char g_written[32];
+static unsigned int g_written_len = 0;
+static inline int my_write(my_write_t* req, my_stream_t* s, const my_buf_t bufs[], unsigned int nbufs, my_write_cb cb) {
+    (void)s;
+    if (nbufs > 0 && bufs[0].len < sizeof(g_written)) {
+        memcpy(g_written, bufs[0].base, bufs[0].len);
+        g_written_len = bufs[0].len;
+    }
+    if (cb) cb(req, 0);
+    return 0;
+}
+static inline int my_try_read(const my_buf_t bufs[], unsigned int nbufs) {
+    if (nbufs > 0 && bufs[0].len >= 5) {
+        memcpy(bufs[0].base, \"hello\", 5);
+        return 5;
+    }
+    return -1;
+}
+")
+
+c contract myuv:
+    resource Loop wraps my_loop_t
+        init my_loop_init(self), ok 0
+        drop my_loop_close
+    handle UvHandle wraps *mut my_handle_t
+    handle StreamHandle wraps *mut my_stream_t extends UvHandle
+    handle WriteReqHandle wraps *mut my_write_t
+    resource Tcp wraps my_tcp_t extends StreamHandle
+        init my_tcp_init(param 1), ok 0
+        borrows param 0
+        async_close my_close check my_is_closing
+    fn my_handle_get_loop
+        of UvHandle
+        rename get_loop
+        lend
+        returns borrow Loop from param 0
+    fn my_close
+        of UvHandle
+        rename close
+        callback param 1
+        nullable param 1
+        close_release via my_handle_get_data, my_handle_set_data
+    fn my_tcp_bind
+        of Tcp
+        rename bind
+        lend
+        reads param 1 as my_sockaddr_in
+    fn my_tcp_getsockname
+        of Tcp
+        rename getsockname
+        lend
+        fills param 1 as my_sockaddr_in len param 2
+    fn my_read_start
+        of Tcp
+        rename read_start
+        consumes param 0
+        read_pair alloc param 1 via my_buf_init read param 2 via my_handle_set_data, my_handle_get_data
+    fn my_write
+        of StreamHandle(param 1)
+        rename write
+        async_req param 0 via my_req_set_data, my_req_get_data
+        buffer param 2 len param 3 via my_buf_init
+        callback param 4
+        nullable param 4
+    fn my_try_read
+        lend
+        buffer param 0 capacity param 1 via my_buf_init
+
+use std.sync
+
+var g_read_ok: AtomicI64 = atomic_new(0)
+var g_write_ok: AtomicI64 = atomic_new(0)
+var g_closes: AtomicI64 = atomic_new(0)
+
+fn on_alloc(_h: UvHandle, suggested: usize) -> usize:
+    suggested
+
+fn on_write(_req: WriteReqHandle, status: i32):
+    if status == 0: g_write_ok.store(1, Order.SeqCst)
+
+fn on_close(_h: UvHandle):
+    let _ = g_closes.fetch_add(1, Order.SeqCst)
+
+fn on_read(s: StreamHandle, nread: isize, data: []u8):
+    if nread == 4 and data[0] == 'p' as u8 and data[3] == 'g' as u8:
+        g_read_ok.store(1, Order.SeqCst)
+        let _ = s.write("pong" as []u8, Some(on_write))
+    s.close(Some(on_close))
+
+fn main:
+    let lp = Loop.init().unwrap()
+    let srv = Tcp.init(&lp).unwrap()
+    let addr = my_sockaddr_in { family: 2, port: 8080, ip: 0, zero: [0 as c_char; 8] }
+    assert(srv.bind(&addr) == 0)
+    let (rc, got) = srv.getsockname()
+    assert(rc == 0)
+
+    var iov_dst: [u8; 16] = [0 as u8; 16]
+    let n = my_try_read(iov_dst)
+    assert(n == 5 and iov_dst[0] == 'h' as u8 and iov_dst[1] == 'e' as u8 and iov_dst[4] == 'o' as u8)
+
+    let blp = srv.get_loop().unwrap()
+    let cli = Tcp.init_on(&blp).unwrap()
+    assert(cli.read_start(on_alloc, on_read) == 0)
+    srv.close(Some(on_close))
+
+    assert(g_read_ok.load(Order.SeqCst) == 1 and g_write_ok.load(Order.SeqCst) == 1 and g_closes.load(Order.SeqCst) == 2)
+    print(f"sock={got.port} iov=hello read=ping write=pong closes={g_closes.load(Order.SeqCst)} ok")

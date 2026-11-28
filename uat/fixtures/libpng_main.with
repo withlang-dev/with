@@ -1,0 +1,75 @@
+// Zero-unsafe UAT for c.libpng (#3153): write a 4x4 RGBA PNG image using
+// png_create_write_struct + png_set_error_fn + png_write_image, then read it
+// back into RGBA rows using png_create_read_struct + setjmp-free error
+// handling via png_set_error_fn + png_read_image, verifying every pixel.
+use contracts.libpng
+use c_import("<stdio.h>")
+use c_import("png.h")
+
+type PngErrCtx { tag: i32 }
+
+fn on_png_error(_ctx: PngHandle, _msg: *const c_char, state: &PngErrCtx):
+    panic(f"libpng error callback invoked (tag={state.tag})")
+
+fn on_png_warn(_ctx: PngHandle, _msg: *const c_char, _state: &PngErrCtx):
+    let _ = 0
+
+fn write_sample_png(path: &str, src: []u8, w: u32, h: u32):
+    let fp = CFile.fopen(path, "wb").unwrap()
+    let writer = PngWrite.create_write_struct(PNG_LIBPNG_VER_STRING).unwrap()
+    writer.set_write_error_fn(PngErrCtx { tag: 1 }, Some(on_png_error), Some(on_png_warn))
+    writer.init_write_io(&fp)
+    let info = writer.create_write_info().unwrap()
+    writer.set_IHDR(&info, w, h, 8, PNG_COLOR_TYPE_RGBA as i32, PNG_INTERLACE_NONE as i32, PNG_COMPRESSION_TYPE_DEFAULT as i32, PNG_FILTER_TYPE_DEFAULT as i32)
+    writer.write_info(&info)
+    writer.write_image(src, &info)
+    writer.write_end(&info)
+
+fn read_sample_png(path: &str, dst: []mut u8) -> (u32, u32, usize):
+    let fp = CFile.fopen(path, "rb").unwrap()
+    let reader = PngRead.create_read_struct(PNG_LIBPNG_VER_STRING).unwrap()
+    reader.set_read_error_fn(PngErrCtx { tag: 2 }, Some(on_png_error), Some(on_png_warn))
+    reader.init_read_io(&fp)
+    let info = reader.create_read_info().unwrap()
+    reader.read_info(&info)
+    let (ihdr_ok, w, h, bit_depth, color_type, _interlace, _comp, _filter) = reader.get_IHDR(&info)
+    if ihdr_ok == 0 or w != 4 or h != 4 or bit_depth != 8:
+        panic(f"unexpected PNG IHDR: ok={ihdr_ok} {w}x{h} bd={bit_depth} ct={color_type}")
+    if color_type == PNG_COLOR_TYPE_PALETTE as i32:
+        reader.set_palette_to_rgb()
+    if color_type == PNG_COLOR_TYPE_RGB as i32 or color_type == PNG_COLOR_TYPE_GRAY as i32:
+        reader.set_filler(0xFF, PNG_FILLER_AFTER as i32)
+    reader.read_update_info(&info)
+    let rb = reader.read_rowbytes(&info)
+    reader.read_image(dst, &info)
+    reader.read_end(&info)
+    (w, h, rb)
+
+fn main:
+    let ver = png_access_version_number()
+    if ver < 10600:
+        panic(f"unexpected libpng version: {ver}")
+
+    // Build a 4x4 RGBA test pattern (64 bytes).
+    var src: [u8; 64] = [0 as u8; 64]
+    for y in 0..4:
+        for x in 0..4:
+            let idx = (y * 4 + x) * 4
+            src[idx] = (x * 60 + 15) as u8
+            src[idx + 1] = (y * 60 + 20) as u8
+            src[idx + 2] = ((x + y) * 35) as u8
+            src[idx + 3] = 255 as u8
+
+    write_sample_png("sample.png", src[..], 4, 4)
+
+    var dst: [u8; 64] = [0 as u8; 64]
+    let (w, h, rb) = read_sample_png("sample.png", dst)
+    if w != 4 or h != 4 or rb != 16:
+        panic(f"unexpected read geometry: {w}x{h} rb={rb}")
+
+    for i in 0..64:
+        if dst[i] != src[i]:
+            panic(f"RGBA pixel mismatch at byte {i}: got {dst[i]} expected {src[i]}")
+
+    print(f"libpng {ver}: {w}x{h} rgba rowbytes={rb}")
+    print("libpng ok")
