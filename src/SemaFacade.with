@@ -2196,17 +2196,20 @@ impl Sema:
             let p = self.facade_resolve_param(self.ast.get_extra(ops), fn_sym, sig)
             if p < 0:
                 return c
-            let l = self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
-            if l < 0:
+            let mode = self.ast.get_extra(ops + 2)
+            let is_fixed_size = mode == 5 or mode == 6
+            let is_derived_cap = mode == 7 or mode == 8
+            let l = if is_fixed_size: -1 else: self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
+            if not is_fixed_size and l < 0:
                 return c
             // D198: a parameter a value-record clause describes is no buffer.
             for described in c.value_records:
-                if described == p or described == l:
+                if described == p or (not is_fixed_size and not is_derived_cap and described == l):
                     self.emit_error_with_help(f"fn '{fname}': a pointer paired with a count is a buffer (§16.2b.8), not a value record; the `reads`/`fills`/`updates` clause on it does not apply (§16.2b.5)", clause, "delete the `reads`/`fills`/`updates` clause and keep 'buffer param P len param L'")
                     return c
-            let mode = self.ast.get_extra(ops + 2)
-            let is_capacity = mode != 0
+            let is_capacity = mode == 1 or mode == 2 or mode == 4 or mode == 6 or mode == 7 or mode == 8
             let is_inout = mode == 1
+            let is_ptr_len = mode == 1 or mode == 3 or mode == 4
             let elements = self.ast.get_extra(ops + 3)
             let ptype = self.resolve_alias(self.sig_param_type(sig, p) as TypeId)
             if self.get_type_kind(ptype) != TypeKind.TY_PTR or (elements == 0 and not self.facade_type_is_byte(self.get_type_d0(ptype))):
@@ -2226,37 +2229,40 @@ impl Sema:
                     return c
             if is_capacity and self.get_type_d1(ptype) == 0:
                 let shown = self.facade_param_display(fn_sym, sig, p)
-                let cap_spell = if is_inout: "capacity … inout" else: "capacity"
+                let cap_spell = if is_inout: "capacity … inout" else if mode == 4: "capacity … updates" else: "capacity"
                 self.emit_error_with_help(f"fn '{fname}': 'buffer param {p} {cap_spell}' names {shown}, a const pointer; C cannot write into it — a buffer C fills is 'T *', and an input buffer is paired with 'len' (§16.2b.8)", clause, f"an input buffer is 'buffer param {p} len param N', with N the integer parameter that carries its length")
                 return c
-            if p == l:
-                let shown = self.facade_param_display(fn_sym, sig, p)
-                self.emit_error_with_help(f"fn '{fname}': 'buffer param {p}' pairs {shown} with itself; a pairing names the pointer and the distinct integer that carries its length (§16.2b.8)", clause, f"'buffer param {p} len param N', with N the integer parameter that carries the length")
-                return c
-            let ltype = self.resolve_alias(self.sig_param_type(sig, l) as TypeId)
-            if not is_inout:
-                if self.get_type_kind(self.numeric_operand_type(ltype as i32)) != TypeKind.TY_INT:
-                    let shown = self.facade_param_display(fn_sym, sig, l)
-                    let label = if is_capacity: "capacity" else: "len"
-                    self.emit_error_with_help(f"fn '{fname}': '{label} param {l}' names {shown}, which is not an integer; the count parameter carries the byte count C reads (§16.2b.8)", clause, f"name the integer parameter after '{label}'; when C reads the capacity through a pointer and writes the length back, write 'capacity param {l} inout'")
+            if not is_fixed_size:
+                if p == l:
+                    let shown = self.facade_param_display(fn_sym, sig, p)
+                    self.emit_error_with_help(f"fn '{fname}': 'buffer param {p}' pairs {shown} with itself; a pairing names the pointer and the distinct integer that carries its length (§16.2b.8)", clause, f"'buffer param {p} len param N', with N the integer parameter that carries the length")
                     return c
-            else if self.get_type_kind(ltype) != TypeKind.TY_PTR or self.get_type_d1(ltype) == 0 or self.get_type_kind(self.numeric_operand_type(self.get_type_d0(ltype))) != TypeKind.TY_INT:
-                let shown = self.facade_param_display(fn_sym, sig, l)
-                self.emit_error_with_help(f"fn '{fname}': 'capacity param {l} inout' names {shown}, which is not a pointer to an integer; C reads the capacity through it and writes the produced length back (§16.2b.8)", clause, f"when the count is passed by value, write 'capacity param {l}' or 'len param {l}'")
-                return c
+                let ltype = self.resolve_alias(self.sig_param_type(sig, l) as TypeId)
+                if not is_ptr_len:
+                    if self.get_type_kind(self.numeric_operand_type(ltype as i32)) != TypeKind.TY_INT:
+                        let shown = self.facade_param_display(fn_sym, sig, l)
+                        let label = if is_capacity: "capacity" else: "len"
+                        self.emit_error_with_help(f"fn '{fname}': '{label} param {l}' names {shown}, which is not an integer; the count parameter carries the byte count C reads (§16.2b.8)", clause, f"name the integer parameter after '{label}'; when C reads the capacity through a pointer and writes the length back, write 'capacity param {l} inout'")
+                        return c
+                else if self.get_type_kind(ltype) != TypeKind.TY_PTR or self.get_type_d1(ltype) == 0 or self.get_type_kind(self.numeric_operand_type(self.get_type_d0(ltype))) != TypeKind.TY_INT:
+                    let shown = self.facade_param_display(fn_sym, sig, l)
+                    let spell = if is_inout: f"capacity param {l} inout" else if mode == 4: f"capacity param {l} updates" else: f"len param {l} updates"
+                    self.emit_error_with_help(f"fn '{fname}': '{spell}' names {shown}, which is not a pointer to an integer; C reads the count through it and writes the updated count back (§16.2b.8)", clause, f"when the count is passed by value, write 'capacity param {l}' or 'len param {l}'")
+                    return c
+            let l_claimed = if is_fixed_size or is_derived_cap: -1 else: l
             for k in 0..c.buffer_ptr.len():
-                let taken = if c.buffer_ptr[k] == p or c.buffer_len[k] == p: p else if c.buffer_ptr[k] == l or c.buffer_len[k] == l: l else: -1
+                let taken = if c.buffer_ptr[k] == p or c.buffer_len[k] == p: p else if l_claimed >= 0 and (c.buffer_ptr[k] == l_claimed or c.buffer_len[k] == l_claimed): l_claimed else: -1
                 if taken >= 0:
                     let shown = self.facade_param_display(fn_sym, sig, taken)
                     self.emit_error_with_help(f"fn '{fname}': {shown} is already part of a buffer pairing; a parameter is paired once (§16.2b.8)", clause, "delete one of the two buffer clauses that name it")
                     return c
             for k in 0..c.fixed_params.len():
-                if c.fixed_params[k] == p or c.fixed_params[k] == l:
+                if c.fixed_params[k] == p or (l_claimed >= 0 and c.fixed_params[k] == l_claimed):
                     let shown = self.facade_param_display(fn_sym, sig, c.fixed_params[k])
                     self.emit_error_with_help(f"fn '{fname}': {shown} is bound by 'fixed' and cannot also be a buffer or its length (§16.2b.8, §16.2b.11)", clause, "delete the 'fixed' clause: the buffer argument supplies the pointer and its length")
                     return c
             c.buffer_ptr.push(p)
-            c.buffer_len.push(l)
+            c.buffer_len.push(l_claimed)
             c.buffer_inout.push(mode)
             c.buffer_elements.push(elements)
             return c

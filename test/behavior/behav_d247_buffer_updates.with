@@ -1,0 +1,36 @@
+//! expect-stdout: stream: hint=0 out=4 in=4 bytes=65 66 67 68
+//! expect-stdout: partial: rc=3 consumed=3
+//! expect-stdout: info: rc=0 tag=77 consumed=2
+//! expect-stdout: ok
+
+// D247 (§16.2b.8): `buffer param P len|capacity param L updates` presents
+// counted buffers whose length pointers C reads and updates in place,
+// returning bounds-checked `usize` counts alongside C's return value and any
+// `fills` outputs.
+
+use c_import("#include <stddef.h>\ntypedef struct { int tag; } Header;\nstatic inline size_t xform(void *dst, size_t *dst_len, const void *src, size_t *src_len) { size_t n = *src_len < *dst_len ? *src_len : *dst_len; const unsigned char *s = (const unsigned char *)src; unsigned char *d = (unsigned char *)dst; for (size_t i = 0; i < n; i++) d[i] = (unsigned char)(s[i] - 32); *dst_len = n; *src_len = n; return *src_len < 4 ? 1 : 0; }\nstatic inline int compress_fit(const char *src, char *dst, int *src_len, int dst_cap) { int n = *src_len < dst_cap ? *src_len : dst_cap; for (int i = 0; i < n; i++) dst[i] = src[i]; *src_len = n; return n; }\nstatic inline size_t parse_hdr(Header *out, const void *src, size_t *src_len) { out->tag = 77; *src_len = *src_len >= 2 ? 2 : *src_len; return 0; }\n")
+
+c contract buf_updates:
+    fn xform
+        buffer param 0 capacity param 1 updates
+        buffer param 2 len param 3 updates
+    fn compress_fit
+        buffer param 0 len param 2 updates
+        buffer param 1 capacity param 3
+    fn parse_hdr
+        fills param 0
+        buffer param 1 len param 2 updates
+
+fn main:
+    var out: [u8; 8] = [0 as u8; 8]
+    let input: [u8; 4] = [97, 98, 99, 100]
+    let (hint, out_n, in_n) = xform(out, input[..])
+    print(f"stream: hint={hint} out={out_n} in={in_n} bytes={out[0]} {out[1]} {out[2]} {out[3]}")
+
+    var small: [u8; 3] = [0 as u8; 3]
+    let (rc, consumed) = compress_fit(input[..], small)
+    print(f"partial: rc={rc} consumed={consumed}")
+
+    let (irc, hdr, hcons) = parse_hdr(input[..])
+    print(f"info: rc={irc} tag={hdr.tag} consumed={hcons}")
+    print("ok")

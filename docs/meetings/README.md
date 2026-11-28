@@ -12,6 +12,8 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D248 — Fixed-size and offset-derived buffer contracts (`buffer param P len|capacity <N>` and `capacity param L +/- <N>`) (delegated; #3142, #3148)](2026-11-27-D248-fixed-and-derived-buffers.md)
+- [D247 — `buffer param P len|capacity param L updates` for streaming in-out buffer counts (delegated; #3137)](2026-11-27-D247-buffer-updates.md)
 - [D246 — Borrow-only child resources (`resource R wraps *mut T` with `returns borrow R from param N`) (delegated; #3114, #3143)](2026-11-27-D246-borrow-only-child-resource.md)
 - [D245 — `ok >= C` status predicate for non-negative-count C APIs (delegated; #3152)](2026-11-27-D245-ok-nonneg-status.md)
 - [D244 — `reads`, `fills`, and `updates` on flat C scalars (delegated; #3139, #3148, #3149, #3152)](2026-11-27-D244-scalar-reads-fills-updates.md)

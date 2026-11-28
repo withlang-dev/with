@@ -495,7 +495,7 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
         if current_fn.len() == 0: return Err(facts_error(path, line_no, "a fact belongs to a `resource` or an `fn` item"))
         let cwords = clause.fields()
         let is_of_clause = (cwords.len() == 2 and cwords[0] == "of") or (cwords.len() == 3 and cwords[0] == "of" and cwords[1].ends_with("(param") and cwords[2].ends_with(")") and cwords[1].len() > 6 and cwords[2].len() > 1)
-        let is_buffer_param = cwords.len() >= 6 and cwords[0] == "buffer" and cwords[1] == "param" and (cwords[3] == "len" or cwords[3] == "capacity") and cwords[4] == "param"
+        let is_buffer_param = cwords.len() >= 5 and cwords[0] == "buffer" and cwords[1] == "param" and (cwords[3] == "len" or cwords[3] == "capacity")
         let is_discarded = cwords.len() == 3 and cwords[0] == "param" and cwords[2] == "discarded"
         let is_fixed = cwords.len() >= 4 and cwords[0] == "param" and cwords[2] == "fixed"
         let is_ok = cwords.len() >= 2 and cwords[0] == "ok"
@@ -595,7 +595,7 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
             // functions ISO C and POSIX specify that way.
             let n = clause.slice(12, clause.len()).trim()
             if n.len() == 0 or n.contains(" "): return Err(facts_error(path, line_no, "`reads param N` takes a parameter ref"))
-            if not is_digit(n[0]): fn_carry = true
+            fn_carry = true
             fn_clauses.push(clause.to_owned())
             fn_cites.push(cite.to_owned())
             fn_kinds.push("reads:" ++ n)
