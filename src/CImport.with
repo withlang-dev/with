@@ -4158,11 +4158,12 @@ fn ci_macro_probe_decl_result(probe_session: i64, decl: i32, name: &str) -> str:
     // type position.
     let ty = ci_unsafe_fn_ptr_type(with_cimport_var_type_translated(probe_session, decl))
     if ty.len() == 0 or ci_starts_with(ty, "__UNSUPPORTED"): return ""
-    // A string-valued object macro evaluated through clang (e.g. OpenSSL's
-    // `#define OPENSSL_FILE __FILE__`) probes as `[c_char; N]`, but direct
-    // string-literal macros emit as `str` so macro wrappers can pass them to
-    // `const char *` parameters without an array-to-pointer mismatch.
-    if ci_array_text_elem(ty) == "c_char":
+    // In c_import mode, a string-valued object macro evaluated through clang
+    // (e.g. OpenSSL's `#define OPENSSL_FILE __FILE__`) probes as `[c_char; N]`,
+    // but direct string-literal macros emit as `str` so macro wrappers can pass
+    // them to `const char *` parameters. Migrate mode keeps `[c_char; N]` so
+    // translated C code can still index the macro as an array (#1104).
+    if not ci_translate_in_migrate_mode() and ci_array_text_elem(ty) == "c_char":
         let str_init = ci_trim(ci_try_eval_var_init_for_type(probe_session, decl, "str"))
         if ci_is_string_literal(str_init) and not ci_str_contains(str_init, name):
             return "let " ++ ci_escape_reserved(name) ++ " = " ++ str_init
@@ -4881,7 +4882,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                 // `#define OPENSSL_FILE __FILE__`) report semantic type `[c_char; N]`
                 // but must emit as `str` like direct string literals (line 4743) so
                 // macro wrappers can pass them to `const char *` parameters.
-                if ci_is_string_literal(ci_trim(macro_expr_result)) and ci_array_text_elem(cast_expr_ty) == "c_char":
+                if not ci_translate_in_migrate_mode() and ci_is_string_literal(ci_trim(macro_expr_result)) and ci_array_text_elem(cast_expr_ty) == "c_char":
                     let str_line = "let " ++ safe_name ++ " = " ++ ci_trim(macro_expr_result)
                     if not ci_macro_shared_let_add(unit_vars, safe_name, str_line):
                         output = output ++ str_line ++ "\n"

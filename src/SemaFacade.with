@@ -2092,7 +2092,7 @@ impl Sema:
             // another non-resource type stays as C declares it.
             if self.resolve_alias(tid as TypeId) != self.ty_cstr:
                 let tn = self.type_name(tid)
-                self.emit_error_with_help(f"fn '{fname}': 'returns static {tn}' — only 'returns static CStr' or a borrow-only '*const T' resource is ruled (§16.2b.7, D256)", clause, "delete the clause, declare a borrow-only '*const T' resource, or write 'returns borrow <Record> from domain <name>'")
+                self.emit_error_with_help(f"fn '{fname}': 'returns static {tn}' — only 'returns static CStr' is ruled (§16.2b.7); a static pointer of another type stays as C declares it", clause, "delete the clause: the function keeps the pointer C declares; a view of a record is 'returns borrow <Record> from domain <name>'")
                 return c
             if not self.facade_type_is_c_string_ptr(self.sig_return_type(sig)):
                 let rt = self.type_name(self.sig_return_type(sig))

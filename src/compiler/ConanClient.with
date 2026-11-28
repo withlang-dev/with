@@ -2615,9 +2615,11 @@ fn conan_write_header_only_binary_contract(name: &str, version: &str, dep_dir: &
     let q = "\x22"
     var entries = ""
     var idx = 0
-    // Collect header candidates; for large multi-header binary SDKs (>16 sub-headers,
-    // such as OpenSSL's 140+ `openssl/*.h`), narrow to the headers cited in
-    // `facts.with` when any match, avoiding parsing 140 redundant translation units.
+    // Collect header candidates; for very large multi-header binary SDKs (>64
+    // sub-headers, such as OpenSSL's 140+ `openssl/*.h`), narrow to the headers
+    // cited in `facts.with` when any match, avoiding parsing 140 redundant
+    // translation units without dropping umbrella headers on medium SDKs like
+    // HarfBuzz (40 headers where sub-headers require `<hb.h>`).
     var header_rels = []
     for pass in 0..2:
         if pass == 1 and header_rels.len() > 0: break
@@ -2628,7 +2630,7 @@ fn conan_write_header_only_binary_contract(name: &str, version: &str, dep_dir: &
                 if pass == 0 and rel.contains("/"): continue
                 if pass == 1 and rel.split("/").len() != 2: continue
                 if not header_rels.contains(rel): header_rels.push(rel.to_owned())
-    if header_rels.len() > 16:
+    if header_rels.len() > 64:
         let facts_src = runtime_read_file(reg.path)
         let cited_rels = []
         for rel in header_rels:
