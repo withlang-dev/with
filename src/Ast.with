@@ -261,7 +261,7 @@ pub const TDK_FLAG_RESOURCE: i32 = 32768
 // D51 §16.2b stage 1: NK_FACADE_CLAUSE.d0 and the operands each kind writes
 // to extra (a 0 operand is "absent"; refs are NK_FACADE_PARAM_REF nodes).
 pub const FACADE_CLAUSE_FROM: i32 = 1              // [producer_sym, out_param_ref|0]
-pub const FACADE_CLAUSE_INIT: i32 = 2              // [fn_sym]
+pub const FACADE_CLAUSE_INIT: i32 = 2              // [fn_sym, param_ref|0, ok_sym...]  (D249: `init f(self)` or `init f(param N)`, optional `, ok K...`)
 pub const FACADE_CLAUSE_PREINIT: i32 = 3           // [fn_sym]
 pub const FACADE_CLAUSE_DROP: i32 = 4              // [fn_sym, param_ref|0]  (`drop f(param N)`: N receives the resource, the first when 0, D209)
 pub const FACADE_CLAUSE_DESTROYS: i32 = 5          // [fn_sym|0, param_ref|0]   (a resource names one; an fn item is one)
@@ -354,8 +354,8 @@ pub const FACADE_PARAM_REF_TYPE: i32 = 2
 // read it here, the renderer reads the leading operands as it reads any
 // clause. Only the kinds a profile rule can state have a row.
 fn facade_clause_operand_count(kind: i32) -> i32:
-    if kind == FACADE_CLAUSE_FROM or kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS: return 2
-    if kind == FACADE_CLAUSE_INIT or kind == FACADE_CLAUSE_PREINIT: return 1
+    if kind == FACADE_CLAUSE_FROM or kind == FACADE_CLAUSE_INIT or kind == FACADE_CLAUSE_DROP or kind == FACADE_CLAUSE_DESTROYS: return 2
+    if kind == FACADE_CLAUSE_PREINIT: return 1
     if kind == FACADE_CLAUSE_LEND: return 0
     -1
 

@@ -422,15 +422,23 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
                 facts_push_unique(facts.value_res_fns, fshort)
                 facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"
                 continue
-            // §31.8.1 (Eric, 2026-11-21, #3173 D): an in-place resource is
-            // stated as a contract states it: `init F(self)`, with its own
-            // success status when it has one (`init F(self), ok K`), and a
-            // resource-level `ok K` for the initializers that state none.
+            // §31.8.1 (Eric, 2026-11-21, #3173 D; D249): an in-place resource
+            // is stated as a contract states it: `init F(self)` or
+            // `init F(param N)`, with its own success status when it has one
+            // (`init F(...), ok K`), and a resource-level `ok K` for the
+            // initializers that state none.
             if in_value and words.len() >= 2 and words[0] == "init":
-                let named = if words[1].ends_with(","): words[1].slice(0, words[1].len() - 1) else: words[1]
-                if not named.ends_with("(self)") or named.len() <= 6: return Err(facts_error(path, line_no, "an in-place initializer is `init F(self)`, or `init F(self), ok K` with its own success status"))
-                if words.len() > 2 and (not words[1].ends_with(",") or words[2] != "ok" or words.len() < 4): return Err(facts_error(path, line_no, "after `init F(self),` state the initializer's own success status: `ok K`"))
-                let ishort = named.slice(0, named.len() - 6)
+                var ishort = ""
+                if words[1].ends_with("(param") and words.len() >= 3 and (words[2].ends_with(")") or words[2].ends_with("),")):
+                    if words[1].len() <= 6: return Err(facts_error(path, line_no, "an in-place initializer is `init F(self)` or `init F(param N)`, with optional `, ok K`"))
+                    ishort = words[1].slice(0, words[1].len() - 6)
+                    if words.len() > 3 and (not words[2].ends_with("),") or words[3] != "ok" or words.len() < 5):
+                        return Err(facts_error(path, line_no, "after `init F(param N),` state the initializer's own success status: `ok K`"))
+                else:
+                    let named = if words[1].ends_with(","): words[1].slice(0, words[1].len() - 1) else: words[1]
+                    if not named.ends_with("(self)") or named.len() <= 6: return Err(facts_error(path, line_no, "an in-place initializer is `init F(self)` or `init F(param N)`, with optional `, ok K`"))
+                    if words.len() > 2 and (not words[1].ends_with(",") or words[2] != "ok" or words.len() < 4): return Err(facts_error(path, line_no, "after `init F(self),` state the initializer's own success status: `ok K`"))
+                    ishort = named.slice(0, named.len() - 6)
                 facts_push_unique(facts.value_fns, ishort)
                 facts_push_unique(facts.value_res_fns, ishort)
                 facts.value_text = facts.value_text ++ "        " ++ clause ++ "    // registry: " ++ cite ++ "\n"

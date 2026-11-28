@@ -277,14 +277,44 @@ impl PairsBody:
                 continue
             if body.rval_kinds[rv] == RvalueKind.RK_REF:
                 self.note_ref(dest, self.key_of(body.rval_d1[rv]))
+            else if body.rval_kinds[rv] == RvalueKind.RK_SLICE:
+                // D250: a slice of an array or buffer borrows that base place.
+                let src = self.key_of(body.rval_d0[rv])
+                if src >= 0:
+                    self.note_ref(dest, if self.ref_origin[src] >= 0: self.ref_origin[src] else: src)
             else if body.rval_kinds[rv] == RvalueKind.RK_USE:
-                // A copied reference names what it copies.
+                // A copied reference or moved slice/ref temp names what it borrows.
                 let op = body.rval_d0[rv]
                 let src_place = pairs_operand_place(body, op)
-                if src_place >= 0 and not pairs_operand_is_move(body, op):
+                if src_place >= 0:
                     let src = self.key_of(src_place)
-                    if src >= 0 and self.ref_origin[src] != -2:
+                    if src >= 0 and (self.ref_origin[src] >= 0 or (not pairs_operand_is_move(body, op) and self.ref_origin[src] != -2)):
                         self.note_ref(dest, self.ref_origin[src])
+        // D250: a call returning a slice (e.g. `s.as_bytes()`, `list.as_slice()`)
+        // borrows its first argument's owning place; propagate through any
+        // subsequent `RK_USE` copies/moves of that slice temporary.
+        for bb in 0..body.block_count():
+            if body.term_kind(bb) != TermKind.TK_CALL: continue
+            let dest_place = body.term_data2(bb)
+            let dest = self.key_of(dest_place)
+            if dest < 0 or dest_place < 0 or dest_place >= body.place_sema_types.len(): continue
+            let dty = sema.resolve_alias(body.place_sema_types[dest_place] as TypeId)
+            if sema.get_type_kind(dty) != TypeKind.TY_SLICE: continue
+            let call_id = body.term_data1(bb)
+            if call_id < 0 or call_id >= body.call_arg_starts.len() or body.call_arg_counts[call_id] < 1: continue
+            let arg0 = pairs_operand_place(body, body.call_arg_operands[body.call_arg_starts[call_id]])
+            let src = self.key_of(arg0)
+            if src >= 0:
+                self.note_ref(dest, if self.ref_origin[src] >= 0: self.ref_origin[src] else: src)
+        for stmt in 0..body.stmt_count():
+            if body.stmt_kind(stmt) != StmtKind.Assign: continue
+            let dest = self.key_of(body.stmt_data0(stmt))
+            let rv = body.stmt_data1(stmt)
+            if dest < 0 or rv < 0 or rv >= body.rval_kinds.len() or body.rval_kinds[rv] != RvalueKind.RK_USE: continue
+            let src_place = pairs_operand_place(body, body.rval_d0[rv])
+            let src = self.key_of(src_place)
+            if src >= 0 and self.ref_origin[src] >= 0:
+                self.note_ref(dest, self.ref_origin[src])
         for bb in 0..body.block_count():
             if body.term_kind(bb) != TermKind.TK_CALL:
                 continue
@@ -315,6 +345,15 @@ impl PairsBody:
                         let base_local = self.keys.base_local[origin]
                         if base_local >= 0 and base_local < body.local_type_ids.len() and sema.facade_resource_index_for_type(body.local_type_ids[base_local]) >= 0:
                             self.origin_is_resource[origin] = 1
+                if action == FOREIGN_PAIR_RETAIN and sema.facade_pair_ops[opi].retained_param2 >= 0:
+                    let origin2 = self.userdata_origin(body, call_id, sema.facade_pair_ops[opi].retained_param2)
+                    if origin2 >= 0:
+                        self.origin_key[origin2] = 1
+                        self.origin_bb[origin2] = bb
+                        if origin2 < self.keys.base_local.len():
+                            let base_local2 = self.keys.base_local[origin2]
+                            if base_local2 >= 0 and base_local2 < body.local_type_ids.len() and sema.facade_resource_index_for_type(body.local_type_ids[base_local2]) >= 0:
+                                self.origin_is_resource[origin2] = 1
         // A setter's status or Result bound to a local (`let r = h.set(…)`),
         // moved/copied into a temporary (`?`), or its enum discriminant read
         // (`RK_DISCRIMINANT`): each stands for the call's status in a branch.
@@ -490,9 +529,9 @@ impl PairsBody:
     // call that receives it (borrowed or moved) without `preserves` is
     // refused. `skip_arg` exempts the retaining setter's own retained
     // argument so a second handle may share the same resource.
-    mut fn check_retained_resource_args(sema: &Sema, body: &MirBody, bb: i32, start: i32, count: i32, sig: i32, skip_arg: i32):
+    mut fn check_retained_resource_args(sema: &Sema, body: &MirBody, bb: i32, start: i32, count: i32, sig: i32, skip_arg: i32, skip_arg2: i32):
         for ai in 0..count:
-            if ai == skip_arg: continue
+            if ai == skip_arg or ai == skip_arg2: continue
             let operand = body.call_arg_operands[(start + ai)]
             let key = self.key_of(pairs_operand_place(body, operand))
             if key < 0: continue
@@ -520,7 +559,8 @@ impl PairsBody:
             if subject < 0 or subject >= count:
                 return
             let skip_arg = if action == FOREIGN_PAIR_RETAIN: sema.facade_pair_ops[opi].retained_param else: -1
-            self.check_retained_resource_args(sema, body, bb, start, count, sig, skip_arg)
+            let skip_arg2 = if action == FOREIGN_PAIR_RETAIN: sema.facade_pair_ops[opi].retained_param2 else: -1
+            self.check_retained_resource_args(sema, body, bb, start, count, sig, skip_arg, skip_arg2)
             let recv = self.key_of(pairs_operand_place(body, body.call_arg_operands[(start + subject)]))
             if recv < 0:
                 return
@@ -528,12 +568,15 @@ impl PairsBody:
             let releases = sema.facade_pair_ops[opi].releases
             let guard = if ok >= 0: dest else: -1
             if action == FOREIGN_PAIR_RETAIN:
-                // D194: the setter's storage argument is held under its slot
-                // whatever the status (a failed setter may have stored it);
-                // the slot's previous storage is released on the success
+                // D194 / D250: the setter's storage argument(s) are held under
+                // their slot(s) whatever the status (a failed setter may have
+                // stored them); previous storage is released on the success
                 // edge only.
                 let origin = self.userdata_origin(body, call_id, sema.facade_pair_ops[opi].retained_param)
                 self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_retain_block(sema.facade_pair_ops[opi].slot, origin, guard, releases, invokes)), pairs_site(PairsSiteKind.Invoke, bb, -1, recv, opi))
+                if sema.facade_pair_ops[opi].retained_param2 >= 0:
+                    let origin2 = self.userdata_origin(body, call_id, sema.facade_pair_ops[opi].retained_param2)
+                    self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_retain_block(sema.facade_pair_ops[opi].slot + 1, origin2, guard, 0, invokes)), pairs_site(PairsSiteKind.Invoke, bb, -1, recv, opi))
             else if action == FOREIGN_PAIR_CALLBACK or action == FOREIGN_PAIR_USERDATA:
                 let origin = if action == FOREIGN_PAIR_USERDATA: self.userdata_origin(body, call_id, sema.facade_pair_ops[opi].retained_param) else: -1
                 var cb_block = pairs_releasing(pairs_block(action, u_tid, origin, guard, true, invokes), releases, guard)
@@ -547,15 +590,19 @@ impl PairsBody:
         // until a reset); a resource moved into it is checked and gone; a
         // retained origin moved into it dies here; a retained resource passed
         // to an operation not marked `preserves` is refused.
-        self.check_retained_resource_args(sema, body, bb, start, count, sig, -1)
+        self.check_retained_resource_args(sema, body, bb, start, count, sig, -1, -1)
         for ai in 0..count:
             let operand = body.call_arg_operands[(start + ai)]
             let key = self.key_of(pairs_operand_place(body, operand))
             if key < 0:
                 continue
+            let ri = if self.is_resource(key): self.key_resource[key] else if self.is_ref(key) and self.ref_origin[key] >= 0: self.key_resource[self.ref_origin[key]] else: -1
+            let has_cb_pair = ri >= 0 and sema.facade_resource_has_callback_pair(ri)
             if self.is_resource(key) and pairs_operand_is_move(body, operand):
+                if not has_cb_pair:
+                    self.push(pairs_step(FOREIGN_STEP_ESCAPE, key, -1, pairs_keep()), pairs_site(PairsSiteKind.Escape, bb, -1, key, -1))
                 self.push(pairs_step(FOREIGN_STEP_APPLY, key, -1, pairs_block(FOREIGN_PAIR_DESTROY, 0, -1, -1, false, true)), pairs_site(PairsSiteKind.Helper, bb, -1, key, -1))
-            else if self.is_resource(key) or self.is_ref(key):
+            else if (self.is_resource(key) or self.is_ref(key)) and has_cb_pair:
                 self.push(pairs_step(FOREIGN_STEP_APPLY, key, -1, pairs_block(FOREIGN_PAIR_UNKNOWN, 0, -1, -1, false, true)), pairs_site(PairsSiteKind.Helper, bb, -1, key, -1))
             if self.is_origin(key) and self.origin_is_resource[key] == 0 and pairs_operand_is_move(body, operand):
                 self.push(pairs_step(FOREIGN_STEP_EXPIRE, key, -1, pairs_keep()), pairs_site(PairsSiteKind.Moved, bb, -1, key, -1))

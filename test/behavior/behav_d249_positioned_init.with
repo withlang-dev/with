@@ -1,0 +1,31 @@
+//! expect-stdout: parsed=2 tag=7 len=5
+//! expect-stdout: scalar=1 len=3
+//! expect-stdout: ok
+
+// D249 (§16.2b.4, §16.2b.8): positioned in-place `init F(param N), ok K`
+// and bridged `buffer` parameters on in-place initializers.
+
+use c_import("#include <stddef.h>\ntypedef struct { int count; } reader_t;\ntypedef struct { int kind; int len; } token_t;\nstatic inline int reader_init(reader_t *r) { r->count = 0; return 1; }\nstatic inline void reader_delete(reader_t *r) { r->count = -1; }\nstatic inline int reader_next(reader_t *r, token_t *tok) { r->count += 1; tok->kind = r->count == 1 ? 7 : 0; tok->len = 5; return 1; }\nstatic inline int token_scalar_init(token_t *tok, const unsigned char *val, int len) { tok->kind = 1; tok->len = len; return val != NULL && len >= 0 ? 1 : 0; }\nstatic inline void token_delete(token_t *tok) { tok->kind = -1; }\n")
+
+c contract d249_pos:
+    resource Reader wraps reader_t
+        init reader_init(self), ok 1
+        drop reader_delete
+    resource Token wraps token_t
+        init reader_next(param 1), ok 1
+        init token_scalar_init(self), ok 1
+        independent
+        drop token_delete
+    fn token_scalar_init
+        buffer param 1 len param 2
+
+fn main:
+    let r = Reader.init().unwrap()
+    let t1 = Token.reader_next(&r).unwrap()
+    let t2 = Token.reader_next(&r).unwrap()
+    let parsed = if t2.kind == 0: 2 else: 1
+    print(f"parsed={parsed} tag={t1.kind} len={t1.len}")
+    let bytes: [u8; 3] = [97, 98, 99]
+    let ts = Token.scalar_init(bytes[..]).unwrap()
+    print(f"scalar={ts.kind} len={ts.len}")
+    print("ok")

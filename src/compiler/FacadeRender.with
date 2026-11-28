@@ -970,13 +970,17 @@ fn facade_render_imported_name_ops(pool: &AstPool, intern: &InternPool, ci: &Lis
             let result = if repr.starts_with("*"): "" else: " -> " ++ made
             out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ bridge.params ++ ")" ++ result ++ ":\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(bridge.params) ++ ")\n"
         else if kind == FACADE_CLAUSE_INIT and not facade_render_has_clause(pool, resource, FACADE_CLAUSE_PREINIT):
-            // D215: an in-place producer by its C name takes the modeled
-            // argument list; the storage slot is what the contract removes.
+            // D215 / D249: an in-place producer by its C name takes the modeled
+            // argument list; the storage slot (`self` or `param N`) is what the
+            // contract removes.
             let init_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
             if init_fn == 0: continue
             let cname = intern.resolve(pool.get_data0(init_fn as NodeId))
-            let (iparams, _) = facade_render_params(pool, intern, init_fn, 1)
-            out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ iparams ++ "):\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(iparams) ++ ")\n"
+            let at = if pool.get_data2(clause as NodeId) > 1 and pool.get_extra(ops + 1) != 0: facade_render_param_ref(pool, intern, init_fn, pool.get_extra(ops + 1)) else: 0
+            if at < 0: continue
+            let ibridge = facade_render_bridge(pool, intern, init_fn, 0, at, "")
+            if not ibridge.ok: continue
+            out = out ++ "fn " ++ facade_render_bridge_name(cname) ++ "(" ++ ibridge.params ++ "):\n    " ++ name ++ "." ++ facade_render_present(pool, intern, ci, resource, cname) ++ "(" ++ facade_render_forward_names(ibridge.params) ++ ")\n"
         else if kind == FACADE_CLAUSE_DROP:
             let dropper = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
             // D215 (§16.2b.11): a function whose resource parameter is
@@ -1574,6 +1578,7 @@ fn facade_item_is_variadic(pool: &AstPool, item: i32) -> bool:
 
 fn facade_render_lend_item(pool: &AstPool, intern: &InternPool, ci: &List[i32], item: i32) -> FacadeLendItem:
     let li = FacadeLendItem { decl: 0, of_sym: 0, of_param: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, present_cases: 0, record_view: false, text_free: 0, text_bytes: false, detaches: 0 }
+    let retain_clauses = []
     let cstart = pool.get_data1(item as NodeId)
     for k in 0..pool.get_data2(item as NodeId):
         let clause = pool.get_extra(cstart + k)
@@ -1616,6 +1621,10 @@ fn facade_render_lend_item(pool: &AstPool, intern: &InternPool, ci: &List[i32], 
         // method transfers ownership of a non-receiver resource parameter into
         // the receiver (cJSON_AddItemToObject, yaml_emitter_emit).
         else if kind == FACADE_CLAUSE_CONSUMES and pool.get_extra(ops + 1) == 0: li.bridged = true
+        // D250: `retains param N by param 0` on a buffer or value-record
+        // parameter keeps the operation a lend method; MIR enforces the
+        // retention lifetime via FOREIGN_PAIR_RETAIN.
+        else if kind == FACADE_CLAUSE_RETAINS: retain_clauses.push(clause)
         // `callback_thread any` beside a variadic contract speaks of a case's
         // callback (§16.2b.10): Sema checks the userdata at the pair's setter.
         else if kind == FACADE_CLAUSE_CALLBACK_THREAD and facade_item_is_variadic(pool, item): {}
@@ -1627,6 +1636,17 @@ fn facade_render_lend_item(pool: &AstPool, intern: &InternPool, ci: &List[i32], 
         li.lends = false
         return li
     li.decl = facade_render_find_fn(pool, intern, ci, pool.get_data0(item as NodeId))
+    if li.decl != 0 and retain_clauses.len() > 0:
+        for rc in retain_clauses:
+            let rops = pool.get_data1(rc as NodeId)
+            let ra = facade_render_param_ref(pool, intern, li.decl, pool.get_extra(rops))
+            let rby = facade_render_param_ref(pool, intern, li.decl, pool.get_extra(rops + 1))
+            let is_paired = ra >= 0 and (facade_render_buffer_of(pool, intern, li.decl, ra).0 == ra or facade_render_value_record_kind(pool, intern, li.decl, ra).len() > 0)
+            if rby != 0 or not is_paired:
+                li.lends = false
+                li.decl = 0
+                return li
+        li.bridged = true
     li
 
 // D243: the parameter index that receives the host resource (0 unless `of R(param N)`).
@@ -1904,7 +1924,7 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     var status_k = -1
     for status_init in init_fns:
         status_k += 1
-        if status_init == 0 or (ok_syms.len() == 0 and pool.get_data2(init_clauses[status_k] as NodeId) < 2): continue
+        if status_init == 0 or (ok_syms.len() == 0 and pool.get_data2(init_clauses[status_k] as NodeId) < 3): continue
         let ret = facade_render_return(pool, intern, status_init)
         if ret.len() > 0:
             init_has_ok = true
@@ -2030,7 +2050,10 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
         // The initializer's own `ok` when it states one; the resource's
         // otherwise.
         let init_oks = facade_render_init_oks(pool, init_clauses[k], ok_syms)
-        let ctor = facade_render_init(pool, intern, name, repr_text, each_init, iname, preinit_fn, init_oks, pinned, facade_render_dep_values(pool, intern, deps, facade_dep_init(k), each_init) ++ keep_init, shared, shared_message)
+        let iops = pool.get_data1(init_clauses[k] as NodeId)
+        let init_at = if pool.get_data2(init_clauses[k] as NodeId) > 1 and pool.get_extra(iops + 1) != 0: facade_render_param_ref(pool, intern, each_init, pool.get_extra(iops + 1)) else: 0
+        if init_at < 0: return ("", facade_render_no_error_use())
+        let ctor = facade_render_init(pool, intern, name, repr_text, each_init, init_at, iname, preinit_fn, init_oks, pinned, facade_render_dep_values(pool, intern, deps, facade_dep_init(k), each_init) ++ keep_init, shared, shared_message)
         if ctor.len() == 0:
             return ("", facade_render_no_error_use())
         out = out ++ ctor
@@ -2071,7 +2094,7 @@ fn facade_dep_init_index(owner: i32) -> i32: if owner == FACADE_DEP_INIT: 0 else
 fn facade_render_init_oks(pool: &AstPool, clause: i32, resource_oks: &List[i32]):
     let out = []
     let ops = pool.get_data1(clause as NodeId)
-    for k in 1..pool.get_data2(clause as NodeId): out.push(pool.get_extra(ops + k))
+    for k in 2..pool.get_data2(clause as NodeId): out.push(pool.get_extra(ops + k))
     if out.len() == 0:
         for status in resource_oks: out.push(status)
     out
@@ -2103,6 +2126,7 @@ fn facade_render_item_deps(pool: &AstPool, intern: &InternPool, ci: &List[i32], 
     var last_producer: i32 = -2
     var independent = false
     let inits = []
+    let init_pos_refs = []
     var preinit_fn: i32 = 0
     for k in 0..pool.get_data2(item as NodeId):
         let clause = pool.get_extra(extra_start + 1 + k)
@@ -2120,9 +2144,10 @@ fn facade_render_item_deps(pool: &AstPool, intern: &InternPool, ci: &List[i32], 
         else if kind == FACADE_CLAUSE_INIT:
             last_producer = facade_dep_init(inits.len())
             inits.push(facade_render_find_fn(pool, intern, ci, pool.get_extra(ops)))
+            init_pos_refs.push(if pool.get_data2(clause as NodeId) > 1: pool.get_extra(ops + 1) else: 0)
         else if kind == FACADE_CLAUSE_PREINIT:
             preinit_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
-    facade_render_deps(pool, intern, item, producers, out_refs, inits, preinit_fn, borrow_refs, borrow_owners, independent)
+    facade_render_deps(pool, intern, item, producers, out_refs, inits, init_pos_refs, preinit_fn, borrow_refs, borrow_owners, independent)
 
 // D85 (§16.2b.6): the field of resource `item` that holds its parent named
 // `parent` — the one view a parent borrow is read from. "" unless exactly
@@ -2180,7 +2205,7 @@ fn facade_render_status_const_type(pool: &AstPool, intern: &InternPool, sym: i32
             if ty.len() > 0: return ty
     "c_int"
 
-fn facade_render_deps(pool: &AstPool, intern: &InternPool, item: i32, producers: &List[i32], out_refs: &List[i32], inits: &List[i32], preinit_fn: i32, borrow_refs: &List[i32], borrow_owners: &List[i32], independent: bool) -> FacadeDeps:
+fn facade_render_deps(pool: &AstPool, intern: &InternPool, item: i32, producers: &List[i32], out_refs: &List[i32], inits: &List[i32], init_pos_refs: &List[i32], preinit_fn: i32, borrow_refs: &List[i32], borrow_owners: &List[i32], independent: bool) -> FacadeDeps:
     let deps = FacadeDeps { ok: true, owners: [], params: [], resources: [], slots: [], slot_res: [], slot_optional: [] }
     // Every owner: each `from`, then the `init`.
     let owners: List[i32] = []
@@ -2200,8 +2225,9 @@ fn facade_render_deps(pool: &AstPool, intern: &InternPool, item: i32, producers:
         if each_init == 0: continue
         owners.push(facade_dep_init(init_k))
         decls.push(each_init)
-        firsts.push(1)
-        skips.push(-1)
+        firsts.push(0)
+        let init_at = if init_pos_refs[init_k] != 0: facade_render_param_ref(pool, intern, each_init, init_pos_refs[init_k]) else: 0
+        skips.push(init_at)
         // A resource the in-place resource depends on is received by its
         // `init`; preinit only constructs storage (Sema names a preinit that
         // receives one).
@@ -2444,7 +2470,7 @@ fn facade_render_received_arg(pool: &AstPool, intern: &InternPool, res: i32, pte
 // `iname` (§16.2b.11, facade_render_present: `Counter.init` for
 // `counter_init` on `Counter`, `Stream.inflateInit` where no prefix matches,
 // or its `rename`).
-fn facade_render_init(pool: &AstPool, intern: &InternPool, name: &str, repr_text: &str, init_fn: i32, iname: &str, preinit_fn: i32, ok_syms: &List[i32], pinned: bool, deps: &str, shared: &str, shared_message: bool) -> str:
+fn facade_render_init(pool: &AstPool, intern: &InternPool, name: &str, repr_text: &str, init_fn: i32, at: i32, iname: &str, preinit_fn: i32, ok_syms: &List[i32], pinned: bool, deps: &str, shared: &str, shared_message: bool) -> str:
     // The storage and status locals are spelled apart from every parameter
     // the constructor takes (preinit's, then init's).
     var taken = facade_render_param_names(pool, intern, init_fn)
@@ -2452,11 +2478,17 @@ fn facade_render_init(pool: &AstPool, intern: &InternPool, name: &str, repr_text
         taken = taken ++ ", " ++ facade_render_param_names(pool, intern, preinit_fn)
     let repr = facade_render_fresh("repr", taken)
     let status = facade_render_fresh("status", taken)
-    let storage_arg = facade_render_repr_arg(pool, intern, init_fn, repr_text, repr, pinned)
+    let storage_arg = facade_render_repr_arg_at(pool, intern, init_fn, at, repr_text, repr, pinned)
     if storage_arg.len() == 0 or storage_arg == repr:
         return ""
-    let (iparams, iargs) = facade_render_params(pool, intern, init_fn, 1)
-    var params = iparams
+    // D249: pass storage at `at` through the full parameter bridge so
+    // positioned initializers (`init f(param N)`) and buffer/nullable/text
+    // parameters emit their prologue cleanly.
+    let ibridge = facade_render_bridge(pool, intern, init_fn, 0, at, storage_arg)
+    if not ibridge.ok:
+        return ""
+    var params = ibridge.params
+    let pro = facade_render_indent(ibridge.prologue, "    ")
     // §16.2b.3: in-place storage begins as `Representation.zeroed()`.
     var storage = repr_text ++ ".zeroed()"
     if preinit_fn != 0:
@@ -2466,20 +2498,19 @@ fn facade_render_init(pool: &AstPool, intern: &InternPool, name: &str, repr_text
         storage = facade_render_call(pool, intern, preinit_fn, pargs)
     if pinned: storage = "Box.new(" ++ storage ++ ")"
     let ret = facade_render_return(pool, intern, init_fn)
-    let call_args = if iargs.len() > 0: storage_arg ++ ", " ++ iargs else: storage_arg
-    let call = facade_render_call(pool, intern, init_fn, call_args)
+    let call = facade_render_call(pool, intern, init_fn, ibridge.args)
     let out = "fn " ++ name ++ "." ++ iname ++ "(" ++ params ++ ")"
     let made = name ++ " { " ++ deps ++ "repr: " ++ repr ++ ", live: true }"
     if ret.len() == 0:
         if ok_syms.len() > 0:
             return ""
-        return out ++ " -> " ++ name ++ ":\n    var " ++ repr ++ " = " ++ storage ++ "\n    " ++ call ++ "\n    " ++ made ++ "\n"
+        return out ++ " -> " ++ name ++ ":\n    var " ++ repr ++ " = " ++ storage ++ "\n" ++ pro ++ "    " ++ call ++ "\n    " ++ made ++ "\n"
     let status_type = ret.slice(4, ret.len())
     if ok_syms.len() == 0:
-        return out ++ " -> (" ++ status_type ++ ", " ++ name ++ "):\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", " ++ made ++ ")\n"
+        return out ++ " -> (" ++ status_type ++ ", " ++ name ++ "):\n    var " ++ repr ++ " = " ++ storage ++ "\n" ++ pro ++ "    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", " ++ made ++ ")\n"
     let err = if shared.len() > 0: shared else: facade_render_error_name(name)
     let failed_args = if shared_message: status ++ ", \"\"" else: status
-    out ++ " -> Result[" ++ facade_render_ok_type(intern, ok_syms, status_type, name) ++ ", " ++ err ++ "]:\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    if " ++ facade_render_not_ok(intern, ok_syms, status) ++ ": return Err(" ++ err ++ ".Failed(" ++ failed_args ++ "))\n    Ok(" ++ facade_render_ok_value(intern, ok_syms, status, made) ++ ")\n"
+    out ++ " -> Result[" ++ facade_render_ok_type(intern, ok_syms, status_type, name) ++ ", " ++ err ++ "]:\n    var " ++ repr ++ " = " ++ storage ++ "\n" ++ pro ++ "    let " ++ status ++ " = " ++ call ++ "\n    if " ++ facade_render_not_ok(intern, ok_syms, status) ++ ": return Err(" ++ err ++ ".Failed(" ++ failed_args ++ "))\n    Ok(" ++ facade_render_ok_value(intern, ok_syms, status, made) ++ ")\n"
 
 // D245 (§16.2b.4): one status failure test — `status < C` for `ok >= C`,
 // `status != C` for `ok C`.

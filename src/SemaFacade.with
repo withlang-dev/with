@@ -693,7 +693,8 @@ impl Sema:
         if isig < 0:
             return false
         let repr = self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId)
-        if self.facade_same_type(self.sig_param_type(isig, 0), repr as i32):
+        let at = self.facade_resources[ri].init_params[k]
+        if self.facade_same_type(self.sig_param_type(isig, at), repr as i32):
             self.emit_error_with_help(f"resource '{rname}': 'init {iname}' takes the representation by value, so it would initialize a copy; an in-place initializer takes a pointer to the storage (§16.2b.4)", node, "name the initializer that takes a pointer to the record; a function that returns the record by value is 'from <fn>'")
             return false
         // A void initializer beside others that return a status takes no
@@ -709,7 +710,7 @@ impl Sema:
             let rt = self.type_name(self.sig_return_type(isig))
             self.emit_error_with_help(f"resource '{rname}': 'ok {cn}' compares an integer status, but 'init {iname}' returns {rt} (§16.2b.4)", node, "delete 'ok': it compares the integer an initializer returns")
             return false
-        if self.facade_op_raw_beyond(init_fn, 0, false):
+        if self.facade_op_raw_beyond(init_fn, at, false):
             self.emit_error_with_help(f"resource '{rname}': 'init {iname}' is still a raw call after the facade covers the storage (a variadic, a raw return, or a raw pointer parameter the facade does not describe); describe it with an fn item (§16.2b.5)", node, f"add 'fn {iname}' with a clause for each pointer parameter ('text param N', 'buffer param P len param L', 'param N fixed null')")
             return false
         // A pinned resource's representation lives in its cell (D54): every
@@ -1193,7 +1194,7 @@ impl Sema:
         let repr_tid = self.resolve_type_expr(repr_node) as i32
         if repr_tid == 0:
             return
-        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: [], out_params: [], init: 0, inits: [], init_ok: [], preinit: 0, drop: 0, destroyers: [], ok_consts: [], ok_node: 0, borrows: [], borrows_owner: [], borrows_nodes: [], last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0, message: 0, message_node: 0, handle: 0 }
+        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: [], out_params: [], init: 0, inits: [], init_params: [], init_ok: [], preinit: 0, drop: 0, destroyers: [], ok_consts: [], ok_node: 0, borrows: [], borrows_owner: [], borrows_nodes: [], last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0, message: 0, message_node: 0, handle: 0 }
         for ci in 0..clause_count:
             let clause = self.ast.get_extra(extra_start + 1 + ci)
             r = self.collect_resource_clause(rname, r, clause)
@@ -1315,10 +1316,11 @@ impl Sema:
             let sig = self.facade_fn_sig(f, clause)
             if sig < 0:
                 return r
-            // D209 (§31): `drop f(param N)` / `destroys f(param N)` names
-            // the parameter that receives the resource; the first otherwise.
+            // D209 / D249 (§31): `init f(param N)` / `drop f(param N)` /
+            // `destroys f(param N)` names the parameter that receives the
+            // resource; the first otherwise.
             var at = 0
-            if kind != FACADE_CLAUSE_INIT and self.ast.get_data2(clause) > 1 and self.ast.get_extra(ops + 1) != 0:
+            if self.ast.get_data2(clause) > 1 and self.ast.get_extra(ops + 1) != 0:
                 at = self.facade_resolve_param(self.ast.get_extra(ops + 1), f, sig)
                 if at < 0: return r
                 if not self.facade_accepts_repr_at(sig, at, r.repr_tid):
@@ -1326,7 +1328,7 @@ impl Sema:
                     let shown = self.facade_param_display(f, sig, at)
                     self.emit_error_with_help(f"resource '{rname}': '{fnm}' does not take the representation in {shown} (§31, §16.2b.13)", clause, f"after '{fnm}' name the parameter that receives what '{rname}' wraps: '(param N)'")
                     return r
-                if at != 0: self.facade_destroyer_at.insert(f, at)
+                if at != 0 and kind != FACADE_CLAUSE_INIT: self.facade_destroyer_at.insert(f, at)
             if at == 0 and not self.facade_accepts_repr(sig, r.repr_tid):
                 let fnm = self.pool_resolve(f)
                 self.emit_error_with_help(f"resource '{rname}': '{fnm}' does not take the representation as its first parameter (§16.2b.13)", clause, f"an operation of '{rname}' takes what it wraps first; describe '{fnm}' with an fn item when the resource is a later parameter (no destroyer form exists for that: #3177)")
@@ -1342,15 +1344,16 @@ impl Sema:
                 if r.init == 0: r.init = f
                 r.last_producer = facade_dep_init(r.inits.len())
                 r.inits.push(f)
-                // `init f(self), ok K`: its own success statuses, verified
-                // as the resource's are.
-                for k in 1..self.ast.get_data2(clause):
+                r.init_params.push(at)
+                // `init f(self), ok K` / `init f(param N), ok K`: its own
+                // success statuses, verified as the resource's are.
+                for k in 2..self.ast.get_data2(clause):
                     let c = self.ast.get_extra(ops + k)
                     if not self.facade_status_constant_ok(c):
                         let cn = self.pool_resolve(c)
                         self.emit_error_with_help(f"resource '{rname}': '{cn}' is not an imported compile-time constant (§16.2b.4, §16.2b.13)", clause, "after 'ok' write the status constant as the header names it: 'ok SQLITE_OK'")
                         return r
-                r.init_ok.push(self.ast.get_data2(clause) - 1)
+                r.init_ok.push(self.ast.get_data2(clause) - 2)
             else if kind == FACADE_CLAUSE_DROP: r.drop = f
             else: r.destroyers.push(f)
             return r
@@ -1511,6 +1514,21 @@ impl Sema:
         // there is no default to lean on.
         for cb in c.bare_callbacks:
             if c.retains.contains(cb) and c.callback_thread_said == 0: self.emit_error_with_help(f"fn '{fname}': 'callback param {cb}' is retained, and the contract does not say which thread calls it (§16.2b.9)", item, "add 'callback_thread any' when the library may call it from any thread, or 'callback_thread registering' when it calls it only on the thread that registered it")
+        // D250 (§16.2b.9): validate every `retains param A by param B` after
+        // all clauses of the fn item have been collected (so clause order with
+        // `buffer` / `updates` / `reads` / `fills` does not matter).
+        for (rk, a) in c.retains.enumerate():
+            let b = c.retains_by[rk]
+            let userdata = self.facade_param_is_userdata(fn_sym, sig, a)
+            let callable = self.facade_param_is_callable(sig, a)
+            let cstr = self.ci_type_is_const_c_string_input(self.sig_param_type(sig, a))
+            let paired = c.buffer_ptr.contains(a) or c.value_records.contains(a)
+            if not userdata and not callable and not cstr and not paired:
+                let shown = self.facade_param_display(fn_sym, sig, a)
+                self.emit_error_with_help(f"fn '{fname}': retains {shown}; retention is modeled for a callback, its 'void *' userdata, and a C string, or a paired buffer/value parameter — nothing else is kept by a resource (§16.2b.9)", item, "delete the 'retains' clause and leave the function raw: no clause describes a kept pointer of another type (#3120)")
+            else if paired and b != 0:
+                let shown = self.facade_param_display(fn_sym, sig, b)
+                self.emit_error_with_help(f"fn '{fname}': 'retains … by' names {shown}, but a retained buffer or value parameter is kept by the resource the operation is a method of, its first parameter (§16.2b.9)", item, "write 'retains param N by param 0': the keeper is the resource the operation is a method of")
         self.foreign_contract_index.insert(fn_sym, self.foreign_contracts.len() as i32)
         self.foreign_contracts.push(c)
 
@@ -1788,15 +1806,11 @@ impl Sema:
                 let why = if self.facade_param_receives(fn_sym, b).len() == 0: "receives no modeled resource" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
                 self.emit_error_with_help(f"fn '{fname}': 'retains … by' names {shown}, which {why}; a retained value is kept by a resource and released when that resource is destroyed (§16.2b.5, §16.2b.9)", clause, "after 'by' name the parameter that receives the resource keeping the value, usually the first: 'retains param N by param 0'")
                 return c
-            // What can be retained: a callback (a code pointer, nothing to
-            // keep), its `void *` userdata (kept by the resource, ruling
-            // §45), or a C string (the #602 raw-call rule, §16.3c).
+            // What can be retained: a callback, its `void *` userdata, a C
+            // string, or (D250) a paired buffer or value-record parameter
+            // (checked at the end of collect_fn_item so clause order is free).
             let userdata = self.facade_param_is_userdata(fn_sym, sig, a)
             let callable = self.facade_param_is_callable(sig, a)
-            if not userdata and not callable and self.ci_type_is_const_c_string_input(self.sig_param_type(sig, a)) == false:
-                let shown = self.facade_param_display(fn_sym, sig, a)
-                self.emit_error_with_help(f"fn '{fname}': retains {shown}; retention is modeled for a callback, its 'void *' userdata, and a C string — nothing else is kept by a resource (§16.2b.9)", clause, "delete the 'retains' clause and leave the function raw: no clause describes a kept pointer of another type (#3120)")
-                return c
             if (userdata or callable) and b != 0:
                 let shown = self.facade_param_display(fn_sym, sig, b)
                 self.emit_error_with_help(f"fn '{fname}': 'retains … by' names {shown}, but a retained callback or userdata is kept by the resource the operation is a method of, its first parameter; retention by another parameter is not modeled (§16.2b.9)", clause, "write 'retains param N by param 0': the keeper is the resource the operation is a method of")
@@ -4149,6 +4163,30 @@ impl Sema:
             if self.foreign_contracts[ci].nullable_params[k] == pi: return true
         false
 
+    // D250: whether parameter `pi` is a paired buffer or value-record parameter
+    // that the contract also marks `retains param pi by param 0`.
+    fn facade_contract_retains_paired(ci: isize, pi: i32) -> bool:
+        let c = &self.foreign_contracts[ci]
+        c.retains.contains(pi) and (c.buffer_ptr.contains(pi) or c.value_records.contains(pi))
+
+    // D250: whether the contract has any `retains` parameter that is NOT a
+    // paired buffer/value-record parameter (i.e. a callback, userdata, or CStr).
+    fn facade_contract_has_unpaired_retains(ci: isize) -> bool:
+        let c = &self.foreign_contracts[ci]
+        for a in c.retains:
+            if not c.buffer_ptr.contains(a) and not c.value_records.contains(a): return true
+        false
+
+    // D250: the C parameter indices of paired buffer/value-record parameters
+    // retained by param 0 on contract `ci`.
+    fn facade_contract_paired_retains(ci: isize) -> List[i32]:
+        let out = []
+        let c = &self.foreign_contracts[ci]
+        for (k, a) in c.retains.enumerate():
+            if c.retains_by[k] == 0 and (c.buffer_ptr.contains(a) or c.value_records.contains(a)):
+                out.push(a)
+        out
+
     // Whether a callback, retention or consumption clause models `pi`.
     fn facade_contract_models_param(ci: i32, pi: i32) -> bool:
         let c = &self.foreign_contracts[ci]
@@ -4231,6 +4269,16 @@ impl Sema:
                 if self.facade_same_fn(r.destroyers[k], fn_sym): return true
         false
 
+    // D249: `drop`, `destroys`, and `preinit` cannot pair buffers; `init` now
+    // renders through the full parameter bridge and may pair buffers.
+    fn facade_fn_is_destroyer_or_preinit(fn_sym: i32) -> bool:
+        for r in self.facade_resources:
+            if self.facade_same_fn(r.preinit, fn_sym) or self.facade_same_fn(r.drop, fn_sym):
+                return true
+            for d in r.destroyers:
+                if self.facade_same_fn(d, fn_sym): return true
+        false
+
     // The name a free operation is presented under: its `rename`, or the C
     // name. Under the C name the rendering is `__with_facade_<name>`
     // (facade_render_bridge_name) and a call to the C name is redirected to
@@ -4299,21 +4347,18 @@ impl Sema:
         let inout = self.facade_contract_inout(ci)
         let ok_const = self.foreign_contracts[ci].ok_const
         let resource_op = self.facade_fn_is_resource_op(fn_sym)
-        let contract_item = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].bare_callbacks.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_consumes.len() > 0 or self.foreign_contracts[ci].callback_thread_said != 0
+        let contract_item = self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.facade_contract_has_unpaired_retains(ci) or self.foreign_contracts[ci].bare_callbacks.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_consumes.len() > 0 or self.foreign_contracts[ci].callback_thread_said != 0
         let callback_item = self.facade_contract_is_callback_item(ci)
-        // D122 (§16.2b.8): a producer's buffer-plus-length input
-        // (xmlReadMemory's buffer and size) is paired like a lend's; the
-        // constructor renders it through the same bridge
-        // (FacadeRender.with facade_render_bridge with the out slot). An
-        // initializer, drop or destroyer takes only what the resource
-        // passes it.
-        let own_lifecycle = resource_op and self.facade_fn_is_destroyer_or_init(fn_sym)
+        // D122 / D249 (§16.2b.8): a producer's or initializer's buffer-plus-length
+        // input is paired like a lend's; a drop, destroyer, or preinit takes only
+        // what the resource passes it.
+        let own_lifecycle = resource_op and self.facade_fn_is_destroyer_or_preinit(fn_sym)
         if has_pairs and (own_lifecycle or (contract_item and not callback_item)):
             let what = if own_lifecycle: "a resource's own lifecycle operation (its initializer, drop or destroyer)" else: "a callback, retention or consumption contract"
             self.emit_error_with_help(f"fn '{fname}': a buffer pairing describes a lend, a free operation or a producer, and '{fname}' is {what}; a slice in that rendering is not modeled (§16.2b.8)", node, "delete the buffer clause; the function keeps its raw pointer and length parameters")
             return
         for pi in 0..self.sig_get_param_count(sig):
-            if self.facade_contract_pairs(ci, pi) and self.facade_contract_models_param(ci, pi):
+            if self.facade_contract_pairs(ci, pi) and self.facade_contract_models_param(ci, pi) and not self.facade_contract_retains_paired(ci, pi):
                 let shown = self.facade_param_display(fn_sym, sig, pi)
                 self.emit_error_with_help(f"fn '{fname}': {shown} is both a buffer or fixed parameter and a callback, userdata, retention or consumption parameter; each parameter has one presented contract (§16.2b.8, §16.2b.9)", node, "keep one of the two clauses that name this parameter")
                 return
@@ -4435,8 +4480,8 @@ impl Sema:
     fn facade_owner_fn(ri: isize, owner: i32) -> i32: if facade_dep_is_init(owner): self.facade_resources[ri].inits[facade_dep_init_index(owner)] else: self.facade_resources[ri].producers[owner]
 
     // The parameter an owner never receives a parent through: the out slot,
-    // or the storage `init` initializes.
-    fn facade_owner_skip(ri: isize, owner: i32) -> i32: if facade_dep_is_init(owner): 0 else: self.facade_resources[ri].out_params[owner]
+    // or the storage `init` initializes (`self` or `param N`, D249).
+    fn facade_owner_skip(ri: isize, owner: i32) -> i32: if facade_dep_is_init(owner): self.facade_resources[ri].init_params[facade_dep_init_index(owner)] else: self.facade_resources[ri].out_params[owner]
 
     // #3121 (§16.2b.4): when `fn_sym` is a direct-return pointer producer of
     // resource `ri` whose fn item states `consumes param N` (without
@@ -5800,7 +5845,7 @@ impl Sema:
 
     mut fn verify_facade_buffer_params():
         for ci in 0..self.foreign_contracts.len():
-            if self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.foreign_contracts[ci].retains.len() > 0 or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_said != 0 or self.foreign_contracts[ci].callback_consumes.len() > 0:
+            if self.foreign_contracts[ci].destroys != 0 or self.foreign_contracts[ci].consumes.len() > 0 or self.facade_contract_has_unpaired_retains(ci as i32) or self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_said != 0 or self.foreign_contracts[ci].callback_consumes.len() > 0:
                 continue
             let fn_sym = self.foreign_contracts[ci].fn_sym
             let decl = self.foreign_contracts[ci].decl
@@ -5931,10 +5976,10 @@ impl Sema:
             for k in 0..self.foreign_contracts[ci].nullable_params.len():
                 let pi = self.foreign_contracts[ci].nullable_params[k]
                 if self.facade_param_is_fn_pointer(sig, pi): continue
-                // D121 step 6 (§16.2b.8): a nullable C string presents as
-                // `Option[&str]`, NULL for None (libxml2's optional
-                // encoding).
-                if self.facade_param_is_c_string(sig, pi): continue
+                // D121 step 6 (§16.2b.8): a nullable C string (or `text param`)
+                // presents as `Option[&str]`, NULL for None (libxml2's optional
+                // encoding, libyaml's optional anchor/tag).
+                if self.facade_param_is_c_string(sig, pi) or self.facade_param_is_text(fn_sym, pi): continue
                 // D198 (§16.2b.5): `nullable param N` composes with `reads` and
                 // presents `Option[&T]`.
                 if self.facade_contract_reads(ci as i32, pi): continue
@@ -6459,8 +6504,16 @@ impl Sema:
                 let ri = self.foreign_contracts[ci].variadic_slots[si].resource
                 if ri >= 0:
                     self.facade_pair_resources.insert(self.facade_resources[ri].name, ri)
+            // D250: non-variadic methods retaining a paired buffer or
+            // value-record parameter (`retains param N by param 0`).
+            if self.foreign_contracts[ci].variadic_node == 0 and self.facade_contract_paired_retains(ci).len() > 0:
+                let hosts = self.facade_method_host(self.foreign_contracts[ci].fn_sym)
+                if hosts.len() == 1:
+                    let ri = hosts[0]
+                    self.facade_pair_resources.insert(self.facade_resources[ri].name, ri)
         if self.facade_pair_resources.len() == 0:
             return
+        let next_retain_slot: HashMap[i32, i32] = HashMap.new()
         for ci in 0..self.foreign_contracts.len() as i32:
             let fn_sym = self.foreign_contracts[ci].fn_sym
             let hosts = self.facade_method_host(fn_sym)
@@ -6506,6 +6559,16 @@ impl Sema:
             if not self.sig_text_index.contains(mtext):
                 continue
             let sig: i32 = self.sig_text_index.get(mtext).unwrap()
+            let paired_retains = self.facade_contract_paired_retains(ci)
+            if paired_retains.len() > 0:
+                // D250: a non-variadic method retaining one or two paired
+                // buffer/value-record parameters (`retains param N by param 0`).
+                let slot = next_retain_slot.get(ri).copied() ?? 32
+                let rp1 = self.facade_presented_param_index(ci, paired_retains[0])
+                let rp2 = if paired_retains.len() >= 2: self.facade_presented_param_index(ci, paired_retains[1]) else: -1
+                next_retain_slot.insert(ri, slot + (if rp2 >= 0: 2 else: 1))
+                self.facade_add_retain_pair_op(sig, ci, ri, slot, rp1, rp2, self.facade_contract_ok_value(ci), invokes)
+                continue
             // A `callbacks none` operation keeps the pair as it is; any other
             // is callback-capable (§16.2b.9: conservatively reentrant).
             var action = if invokes != 0: FOREIGN_PAIR_INVOKE else: FOREIGN_PAIR_KEEP
@@ -6514,6 +6577,19 @@ impl Sema:
             self.facade_add_pair_op(sig, ci, ri, action, -1, 0, -1, invokes)
         self.facade_index_preserved_params()
         self.facade_index_retention_releases()
+
+    // D250: whether resource `ri` has a variadic callback/userdata pair (so
+    // unmodeled helper calls mark its pair unknown). Retention-only resources
+    // have no callback pair to invalidate.
+    fn facade_resource_has_callback_pair(ri: i32) -> bool:
+        for c in self.foreign_contracts:
+            for slot in c.variadic_slots:
+                if slot.resource != ri: continue
+                let k = slot.case_index
+                if k >= 0 and k < c.variadic_case_kinds.len():
+                    let kind = c.variadic_case_kinds[k]
+                    if kind == .Callback or kind == .Userdata: return true
+        false
 
     // §16.2b.5 (#3120): record which parameters each presented facade
     // signature marks `preserves`, so MIR allows read-only operations on a
@@ -6575,16 +6651,19 @@ impl Sema:
         -1
 
     mut fn facade_add_pair_op(sig: i32, ci: i32, ri: i32, action: i32, slot: i32, userdata_tid: i32, guard_ok: i64, invokes: i32):
+        let retained_param = if action == FOREIGN_PAIR_USERDATA or action == FOREIGN_PAIR_RETAIN: self.sig_get_param_count(sig) - 1 else: -1
+        self.facade_add_pair_op_with_retained(sig, ci, ri, action, slot, userdata_tid, guard_ok, invokes, retained_param, -1)
+
+    // D250: register a non-variadic method that retains one or two explicit
+    // presented parameters (a buffer slice and/or an `updates`/`reads` ref).
+    mut fn facade_add_retain_pair_op(sig: i32, ci: i32, ri: i32, slot: i32, retained_param: i32, retained_param2: i32, guard_ok: i64, invokes: i32):
+        self.facade_add_pair_op_with_retained(sig, ci, ri, FOREIGN_PAIR_RETAIN, slot, 0, guard_ok, invokes, retained_param, retained_param2)
+
+    mut fn facade_add_pair_op_with_retained(sig: i32, ci: i32, ri: i32, action: i32, slot: i32, userdata_tid: i32, guard_ok: i64, invokes: i32, retained_param: i32, retained_param2: i32):
         if sig < 0 or self.facade_pair_op_by_sig.contains(sig):
             return
         self.facade_pair_op_by_sig.insert(sig, self.facade_pair_ops.len() as i32)
-        // Every pair operation is a method of its resource: the receiver is
-        // the resource it acts on. A userdata setter retains the referent
-        // of its last parameter, the `&U` (facade_note_pair_op_sig).
-        // … as does a retained pointer setter (D194): the storage its last
-        // parameter borrows.
-        let retained_param = if action == FOREIGN_PAIR_USERDATA or action == FOREIGN_PAIR_RETAIN: self.sig_get_param_count(sig) - 1 else: -1
-        self.facade_pair_ops.push(FacadePairOp { contract: ci, resource: ri, action, slot, userdata_tid, guard_ok, invokes, subject_param: 0, retained_param, releases: 0 })
+        self.facade_pair_ops.push(FacadePairOp { contract: ci, resource: ri, action, slot, userdata_tid, guard_ok, invokes, subject_param: 0, retained_param, retained_param2, releases: 0 })
 
     // The success status a contract's `ok CONST` states, or -1.
     fn facade_contract_ok_value(ci: isize):
