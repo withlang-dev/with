@@ -1618,14 +1618,8 @@ fn facade_render_receiver_method(pool: &AstPool, intern: &InternPool, ci: &List[
     let cname = intern.resolve(pool.get_data0(producer as NodeId))
     let mname = facade_render_present(pool, intern, ci, parent, cname)
     let (params, _) = facade_render_params_but(pool, intern, producer, 1, slot, "")
-    let meta = pool.find_fn_meta(producer as NodeId)
-    let start = pool.fn_meta_param_start(meta)
-    var args = "self"
-    for pi in 1..pool.fn_meta_param_count(meta):
-        // A fixed argument (D64) is the constructor's literal, not a
-        // parameter the receiver method forwards.
-        if pi != slot and facade_render_fixed_literal(pool, intern, producer, pi).len() == 0:
-            args = args ++ ", " ++ facade_render_param_name(pool, intern, start, pi)
+    let fwd = facade_render_forward_names(params)
+    let args = if fwd.len() > 0: "self, " ++ fwd else: "self"
     let child_name = intern.resolve(pool.get_data0(child as NodeId))
     "impl " ++ pname ++ ":\n    fn " ++ mname ++ "(" ++ params ++ ") -> " ++ result ++ ": " ++ child_name ++ "." ++ ctor ++ "(" ++ args ++ ")\n"
 
