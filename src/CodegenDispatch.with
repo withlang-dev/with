@@ -5468,7 +5468,10 @@ impl Codegen:
                 continue
             var field_sema_ty: i32 = 0
             if owner_sema_ty > 0:
-                field_sema_ty = self.mir_project_field_sema_type(owner_sema_ty, field_sym)
+                if fi < self.sema.type_reflection_field_count(owner_sema_ty):
+                    field_sema_ty = self.sema.type_reflection_field_type_frozen(owner_sema_ty, fi)
+                if field_sema_ty <= 0:
+                    field_sema_ty = self.mir_project_field_sema_type(owner_sema_ty, field_sym)
             if field_sema_ty > 0 and self.sema.type_needs_drop_frozen(field_sema_ty) == 0:
                 fi = fi - 1
                 continue
@@ -6092,7 +6095,9 @@ impl Codegen:
             sema_phase_bug(f"BUG: no copy glue for Copy type {self.sema.type_name(resolved)} (D111)")
         let field_start: i32 = self.struct_field_starts[struct_idx]
         for fi in 0..self.struct_field_counts[struct_idx]:
-            let field_sema = self.mir_project_field_sema_type(resolved, self.struct_field_names[field_start + fi])
+            var field_sema = if fi < self.sema.type_reflection_field_count(resolved): self.sema.type_reflection_field_type_frozen(resolved, fi) else: 0
+            if field_sema <= 0:
+                field_sema = self.mir_project_field_sema_type(resolved, self.struct_field_names[field_start + fi])
             if field_sema <= 0 or self.sema.type_needs_drop_frozen(field_sema) == 0:
                 continue
             let field_index = self.get_llvm_field_index(ty, fi)
@@ -10755,13 +10760,18 @@ impl Codegen:
             if me_key_ty == 0:
                 me_key_ty = wl_type_of(me_key_raw)
             let me_key = self.mir_intrinsic_value_as(body, args_id, 1, me_key_raw, me_key_ty)
-            let me_fields: List[i64] = []
-            me_fields.push(ptr_ty)
-            me_fields.push(me_key_ty)
-            let me_struct_ty = wl_struct_type(self.context, list_data_i64(me_fields), 2, 0)
+            var me_struct_ty = self.mir_dest_llvm_type(body, dest_place)
+            var me_f0_val = wl_build_ptr_to_int(self.builder, me_map_ptr, i64_ty)
+            if me_struct_ty == 0 or wl_get_type_kind(me_struct_ty) != wl_struct_type_kind() or wl_count_struct_elem_types(me_struct_ty) < 2:
+                let me_fields: List[i64] = []
+                me_fields.push(i64_ty)
+                me_fields.push(me_key_ty)
+                me_struct_ty = wl_struct_type(self.context, list_data_i64(me_fields), 2, 0)
+            else if wl_get_type_kind(wl_struct_get_type_at(me_struct_ty, 0)) == wl_pointer_type_kind():
+                me_f0_val = me_map_ptr
             let me_alloca = self.create_entry_alloca(me_struct_ty)
             let me_f0 = wl_build_struct_gep(self.builder, me_struct_ty, me_alloca, 0)
-            wl_build_store(self.builder, me_map_ptr, me_f0)
+            wl_build_store(self.builder, me_f0_val, me_f0)
             let me_f1 = wl_build_struct_gep(self.builder, me_struct_ty, me_alloca, 1)
             wl_build_store(self.builder, me_key, me_f1)
             result = wl_build_load(self.builder, me_struct_ty, me_alloca)
