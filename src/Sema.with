@@ -1249,6 +1249,13 @@ type Sema {
     // MIR builds the Some around the lowered value. Keyed by expression node,
     // the Option type.
     value_to_option_nodes: HashMap[i32, i32, Minted],
+    // D34-A (D257, #920): expressions finalized at an owned demand via `Finalize[T]`.
+    // Keyed by expression node: target type, finalize method symbol, concrete sig,
+    // and (for generic builders) monomorphized symbol.
+    finalize_demand_nodes: HashMap[i32, i32, Minted],
+    finalize_demand_fn_syms: HashMap[i32, i32, Minted],
+    finalize_demand_sigs: HashMap[i32, i32, Minted],
+    finalize_demand_monos: HashMap[i32, i32, Minted],
     // D142 (§13.5): pipeline nodes whose left side is a sequence, iterated
     // by the `for` rule; the value is the iterator type MIR's inserted
     // `.iter()` call builds (for_iter_* keyed by the pipeline node).
@@ -4053,6 +4060,10 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         comptime_callable_chain: [:],
         comptime_callable_visiting: [],
         value_to_option_nodes: [:],
+        finalize_demand_nodes: [:],
+        finalize_demand_fn_syms: [:],
+        finalize_demand_sigs: [:],
+        finalize_demand_monos: [:],
         pipeline_implicit_iter: [:],
         implicit_iter_args: [:],
         iter_ctor_call_nodes: [:],
@@ -6680,6 +6691,7 @@ impl Sema:
         self.lang_trait_syms.insert(self.syms.scoped_send_trait, 1)
         self.lang_trait_syms.insert(self.pool_intern("Scoped"), 1)
         self.lang_trait_syms.insert(self.pool_intern("ScopedMut"), 1)
+        self.lang_trait_syms.insert(self.pool_intern("Finalize"), 1)
         self.lang_trait_syms.insert(self.pool_intern("Error"), 1)
 
 fn sema_is_name_char(ch: i32) -> bool:
@@ -8191,8 +8203,7 @@ impl Sema:
             if not (if self.in_negated_literal_context != 0: self.int_literal_fits_type_negated(node, width_ty) else: self.int_literal_fits_type(node, width_ty)):
                 let spelled = self.ast.int_literal_digits(node as NodeId)
                 let digits = if spelled.len() > 0: spelled else: f"{self.ast.int_lit_value(node as NodeId)}"
-                self.emit_error_with_help(f"`{digits}` is not a `c_char` literal:
- an integer literal from 0 to 127 is a `c_char` on every target (§16.1)", node, "write the value at an integer type and convert it: `… as c_char`")
+                self.emit_error_with_help(f"`{digits}` is not a `c_char` literal: an integer literal from 0 to 127 is a `c_char` on every target (§16.1)", node, "write the value at an integer type and convert it: `… as c_char`")
         else if self.in_bitwise_literal_context != 0:
             if not self.int_literal_bit_pattern_fits_type(node, width_ty):
                 self.emit_error("integer literal bit pattern does not fit expected type", node)

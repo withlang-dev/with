@@ -1,0 +1,82 @@
+//! expect-stdout: tail:hello world
+//! expect-stdout: ret:early
+//! expect-stdout: let:bound
+//! expect-stdout: arg:passed
+//! expect-stdout: field:boxed
+//! expect-stdout: generic:id-ok
+//! expect-stdout: custom:Doc(42,alpha)
+//! expect-stdout: drop-doc:alpha
+//! expect-stdout: gbuilder:99
+
+// D34-A (D257, #920): demand-site builder finalization via `Finalize[T]`.
+use std.string.StringBuilder
+use std.traits.Finalize
+
+fn make_tail() -> str:
+    var b = StringBuilder.new()
+    b.push_str("hello ")
+    b.push_str("world")
+    b
+
+fn make_early(flag: bool) -> str:
+    var b = StringBuilder.new()
+    b.push_str("early")
+    if flag:
+        return b
+    "fallback"
+
+fn take_owned(s: str) -> str:
+    f"arg:{s}"
+
+type BoxedStr { text: str }
+
+fn id[T](x: T) -> T: x
+
+type Doc { n: i32, tag: str }
+impl Drop for Doc:
+    move fn drop():
+        print(f"drop-doc:{self.tag}")
+
+type DocBuilder { n: i32, tag: str }
+impl Finalize[Doc] for DocBuilder:
+    move fn finalize() -> Doc:
+        Doc { n: self.n, tag: self.tag }
+
+type Wrap[T] { val: T }
+type WrapBuilder[T] { val: T }
+impl[T] Finalize[Wrap[T]] for WrapBuilder[T]:
+    move fn finalize() -> Wrap[T]:
+        Wrap { val: self.val }
+
+fn main:
+    print(f"tail:{make_tail()}")
+    print(f"ret:{make_early(true)}")
+
+    var b1 = StringBuilder.new()
+    b1.push_str("bound")
+    let s1: str = b1
+    print(f"let:{s1}")
+
+    var b2 = StringBuilder.new()
+    b2.push_str("passed")
+    print(take_owned(b2))
+
+    var b3 = StringBuilder.new()
+    b3.push_str("boxed")
+    let boxed = BoxedStr { text: b3 }
+    print(f"field:{boxed.text}")
+
+    var b4 = StringBuilder.new()
+    b4.push_str("id-ok")
+    let s4: str = id(b4)
+    print(f"generic:{s4}")
+
+    {
+        let db = DocBuilder { n: 42, tag: "alpha".to_owned() }
+        let d: Doc = db
+        print(f"custom:Doc({d.n},{d.tag})")
+    }
+
+    let wb = WrapBuilder { val: 99i32 }
+    let w: Wrap[i32] = wb
+    print(f"gbuilder:{w.val}")

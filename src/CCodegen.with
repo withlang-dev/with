@@ -119,8 +119,6 @@ enum CcBuiltin: i32:
     ABS
     FMA
     LIST_SLOT
-    VECSLOT_GET
-    VECSLOT_SET
     FMT_BUF_NEW
     FMT_BUF_WRITE_STR
     FMT_BUF_WRITE_FMT
@@ -2587,16 +2585,6 @@ impl CCodegen:
     // field the backend synthesizes for a modeled container (List's ptr/len).
     fn generic_inst_field_tid(tid: i32, field_sym: i32) -> i32:
         if self.generic_inst_is_declared_struct(tid): self.generic_struct_field_tid(tid, field_sym) else: self.list_synthetic_field_tid(tid, field_sym)
-
-    fn listslot_element_tid(tid: i32) -> i32:
-        let resolved = self.sema.resolve_alias(tid)
-        if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
-            return 0
-        if self.generic_inst_base_name(resolved as i32) != "ListSlot":
-            return 0
-        if self.sema.get_generic_inst_arg_count(resolved as i32) <= 0:
-            return 0
-        self.sema.get_generic_inst_arg(resolved as i32, 0)
 
     fn hashmap_value_tid(tid: i32) -> i32:
         let resolved = self.sema.resolve_alias(tid)
@@ -5799,7 +5787,6 @@ impl CCodegen:
                 1
             else:
                 0
-        let recv_is_listslot = first_owner == "ListSlot"
 
         if method == "new":
             let concrete_new_sym = self.canonical_body_sym(callee_sym)
@@ -5936,14 +5923,7 @@ impl CCodegen:
                 return CcBuiltin.OPT_EXPECT
             return CcBuiltin.NONE
 
-        if method == "set":
-            if recv_is_listslot:
-                return CcBuiltin.VECSLOT_SET
-            return CcBuiltin.NONE
-
         if method == "get":
-            if recv_is_listslot:
-                return CcBuiltin.VECSLOT_GET
             if recv_kind_is_map:
                 return CcBuiltin.MAP_GET
             if recv_kind_is_list:
@@ -6021,20 +6001,6 @@ impl CCodegen:
             return self.list_element_tid(self.recv_value_tid(body, args_id))
         if kind == CcBuiltin.LIST_CLEAR:
             return self.sema.ty_void as i32
-        if kind == CcBuiltin.VECSLOT_SET:
-            return self.sema.ty_void as i32
-        if kind == CcBuiltin.VECSLOT_GET:
-            let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == false:
-                return hinted
-            let slot_tid = self.operand_tid(body, self.call_arg_operand(body, args_id, 0))
-            let elem_tid = self.listslot_element_tid(slot_tid)
-            if elem_tid != 0:
-                return elem_tid
-            let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) == false:
-                return dst
-            return self.sema.ty_i64 as i32
         if kind == CcBuiltin.LIST_POP:
             let hinted = self.call_dest_expected_tid(body, dest_place)
             if hinted != 0 and self.is_void_tid(hinted) == false:
@@ -6943,17 +6909,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.FMT_BUF_FINISH: return CcBuiltin.FMT_BUF_FINISH
     if intrinsic == MirIntrinsic.LIST_SLOT: return CcBuiltin.LIST_SLOT
     if intrinsic == MirIntrinsic.LIST_GET_DISJOINT: return CcBuiltin.LIST_GET_DISJOINT
-    if intrinsic == MirIntrinsic.VECSLOT_GET: return CcBuiltin.VECSLOT_GET
-    if intrinsic == MirIntrinsic.VECSLOT_SET: return CcBuiltin.VECSLOT_SET
     if intrinsic == MirIntrinsic.SLOTMAP_NEW: return CcBuiltin.SLOTMAP
-    if intrinsic == MirIntrinsic.SLOTMAP_SLOT: return CcBuiltin.SLOTMAP
-    if intrinsic == MirIntrinsic.SLOTMAP_GET_DISJOINT: return CcBuiltin.SLOTMAP
-    if intrinsic == MirIntrinsic.SLOTMAPSLOT_GET: return CcBuiltin.SLOTMAP
-    if intrinsic == MirIntrinsic.SLOTMAPSLOT_SET: return CcBuiltin.SLOTMAP
-    if intrinsic == MirIntrinsic.VECRANGE_LEN: return CcBuiltin.VECRANGE
-    if intrinsic == MirIntrinsic.VECRANGE_LEN32: return CcBuiltin.VECRANGE
-    if intrinsic == MirIntrinsic.VECRANGE_LEN64: return CcBuiltin.VECRANGE
-    if intrinsic == MirIntrinsic.VECRANGE_ULEN32: return CcBuiltin.VECRANGE
     if intrinsic == MirIntrinsic.SPLIT_AT or intrinsic == MirIntrinsic.SPLIT_AT_MUT:
         return CcBuiltin.VECRANGE
     if intrinsic == MirIntrinsic.MULTI_INDEX: return CcBuiltin.MULTI_INDEX
@@ -7025,52 +6981,6 @@ impl CCodegen:
         if kind == CcBuiltin.VECRANGE:
             self.fail("C backend is LLVM-only for ListRange intrinsics by design (#301); compile this program with the LLVM backend")
             return "    abort();"
-
-        if kind == CcBuiltin.VECSLOT_GET:
-            if argc < 1:
-                self.fail("ListSlot.get expects one argument")
-                return "    abort();"
-            let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            var elem_tid = ret_tid
-            if elem_tid == 0 or self.is_void_tid(elem_tid):
-                elem_tid = self.listslot_element_tid(self.operand_tid(body, self.call_arg_operand(body, args_id, 0)))
-            if elem_tid == 0 or self.is_void_tid(elem_tid):
-                elem_tid = self.sema.ty_i64 as i32
-            let elem_ty = self.c_type(elem_tid, 0)
-            var out = ""
-            if has_ret != 0:
-                let dst = self.place_text(body, dest_place)
-                out = out ++ "    " ++ dst ++ " = ((" ++ elem_ty ++ "*)(intptr_t)((" ++ recv ++ ").data_ptr))[(" ++ recv ++ ").index];\n"
-                // D111: the element read out is one more holder.
-                let read_tid = self.place_sema_tid(body, dest_place)
-                let hold = self.copy_call_text(dst, read_tid)
-                if hold.len() > 0:
-                    out = out ++ "    " ++ hold ++ "\n"
-            else:
-                out = out ++ "    (void)((" ++ elem_ty ++ "*)(intptr_t)((" ++ recv ++ ").data_ptr))[(" ++ recv ++ ").index];\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.VECSLOT_SET:
-            if argc < 2:
-                self.fail("ListSlot.set expects two arguments")
-                return "    abort();"
-            let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            let val_operand = self.call_arg_operand(body, args_id, 1)
-            let val = self.operand_text(body, val_operand)
-            var elem_tid = self.operand_tid(body, val_operand)
-            if elem_tid == 0 or self.is_void_tid(elem_tid):
-                elem_tid = self.listslot_element_tid(self.operand_tid(body, self.call_arg_operand(body, args_id, 0)))
-            if elem_tid == 0 or self.is_void_tid(elem_tid):
-                elem_tid = self.sema.ty_i64 as i32
-            let elem_ty = self.c_type(elem_tid, 0)
-            let slot = "((" ++ elem_ty ++ "*)(intptr_t)((" ++ recv ++ ").data_ptr))[(" ++ recv ++ ").index]"
-            // The replaced element's owner drops before the store.
-            let old_drop = self.drop_call_text(slot, elem_tid, true)
-            var out = if old_drop.len() > 0: "    " ++ old_drop ++ "\n" else: ""
-            out = out ++ "    " ++ slot ++ " = " ++ val ++ ";\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
 
         if kind == CcBuiltin.LIST_PUSH:
             if argc < 2:

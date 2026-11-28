@@ -1362,7 +1362,8 @@ impl Sema:
                 else:
                     // D141: an arm the `None` join converted to the Option
                     // keeps its own type; the record is the conversion.
-                    let arm_converted = arm_node > 0 and (self.value_to_option_nodes.contains(arm_node) or self.value_to_option_nodes.contains(self.join_arm_value_node(arm_node)))
+                    let arm_leaf = self.join_arm_value_node(arm_node)
+                    let arm_converted = arm_node > 0 and (self.value_to_option_nodes.contains(arm_node) or self.value_to_option_nodes.contains(arm_leaf) or self.finalize_demand_nodes.contains(arm_node) or self.finalize_demand_nodes.contains(arm_leaf))
                     if not arm_converted and self.contextual_join_value_accepts(final_type, arm_ty) == false:
                         self.emit_contextual_join_mismatch(join_name, final_type, arm_ty, report_node, arm_node)
                         return 0
@@ -5831,7 +5832,8 @@ impl Sema:
     mut fn note_option_tail_demand(body: i32, body_expected_ret: TypeId, body_ty: TypeId):
         if body_expected_ret == 0 or body_ty == 0 or body_ty == self.ty_void or body_ty == self.ty_never: return
         let tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
-        self.value_to_option_at_demand(tail, body_expected_ret, body_ty)
+        let after_opt = self.value_to_option_at_demand(tail, body_expected_ret, body_ty)
+        self.finalize_at_demand(tail, body_expected_ret, after_opt)
 
     mut fn check_body_result(body: i32, source_body: i32, body_ty: TypeId, body_expected_ret: TypeId, ret_type: i32, has_ret_annotation: bool, is_entry: bool) -> bool:
         if has_ret_annotation and ret_type != 0 and ret_type != self.ty_void as i32:
@@ -5877,9 +5879,8 @@ impl Sema:
             // §4.9 / D111: the tail may be a Copy view of the Ok payload.
             let tail_copies = self.can_contextually_copy_ref(self.tail_ok_payload(body_expected_ret as i32, body_ty as i32), body_ty as i32)
             let tail_demand = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
-            // §4.9a (D103): the return type is a demand on the tail; a `T`
-            // tail under an `Option[T]` return is `Some(tail)`.
-            let tail_to_option = self.value_to_option_at_demand(tail_demand, body_expected_ret, body_ty) != body_ty
+            // §4.9a (D103) / D34-A (#920): the return type is a demand on the tail.
+            let tail_to_option = self.value_to_option_at_demand(tail_demand, body_expected_ret, body_ty) != body_ty or self.finalize_at_demand(tail_demand, body_expected_ret, body_ty) != body_ty
             if not tail_to_option and self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == false and body_materializes_copy == 0 and not tail_copies and not self.note_int_local_arg_demand(tail_demand, body_expected_ret as i32, body_ty as i32):
                 if has_ret_annotation:
                     self.body_result_mismatch_pending = body
@@ -5929,8 +5930,8 @@ impl Sema:
                                 let tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
                                 ok_wrapped = self.record_contextual_copy_adjustment(tail, ok_type, body_ty as i32) != 0
                     let tail_leaf = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
-                    // §4.9a (D103): a `T` tail under an `Option[T]` return.
-                    let tail_to_option = not ok_wrapped and self.value_to_option_at_demand(tail_leaf, body_expected_ret, body_ty) != body_ty
+                    // §4.9a (D103) / D34-A (#920): Option wrapping or builder finalization on the tail.
+                    let tail_to_option = not ok_wrapped and (self.value_to_option_at_demand(tail_leaf, body_expected_ret, body_ty) != body_ty or self.finalize_at_demand(tail_leaf, body_expected_ret, body_ty) != body_ty)
                     if ok_wrapped:
                         self.implicit_ok_tail_sigs.insert(sig_idx, 1)
                     else if not tail_to_option and not self.note_int_local_arg_demand(tail_leaf, body_expected_ret as i32, body_ty as i32):
@@ -10157,29 +10158,8 @@ impl Sema:
         if type_name == "FixedString" or type_name.starts_with("FixedString__"):
             if method_name == "new": return MirIntrinsic.FIXED_STRING_NEW
             return MirIntrinsic.NONE
-        if type_name == "ListSlot":
-            if method_name == "get": return MirIntrinsic.VECSLOT_GET
-            if method_name == "set": return MirIntrinsic.VECSLOT_SET
-            return MirIntrinsic.NONE
         if type_name == "SlotMap":
             if method_name == "new": return MirIntrinsic.SLOTMAP_NEW
-            if method_name == "slot": return MirIntrinsic.SLOTMAP_SLOT
-            if method_name == "get_disjoint": return MirIntrinsic.SLOTMAP_GET_DISJOINT
-            return MirIntrinsic.NONE
-        if type_name == "SlotMapSlot":
-            if method_name == "get": return MirIntrinsic.SLOTMAPSLOT_GET
-            if method_name == "set": return MirIntrinsic.SLOTMAPSLOT_SET
-            return MirIntrinsic.NONE
-        if type_name == "ListRange":
-            if method_name == "get": return MirIntrinsic.VECRANGE_GET
-            if method_name == "set": return MirIntrinsic.VECRANGE_SET
-            if method_name == "split_at": return MirIntrinsic.SPLIT_AT
-            if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
-            let listrange_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VECRANGE_LEN, method_name)
-            if listrange_len_intrinsic != MirIntrinsic.NONE: return listrange_len_intrinsic
-            return MirIntrinsic.NONE
-        if type_name == "ListIterPlace":
-            if method_name == "next": return MirIntrinsic.VECITERPLACE_NEXT
             return MirIntrinsic.NONE
         if type_name == "HashMap":
             if method_name == "new": return MirIntrinsic.MAP_NEW
@@ -11395,9 +11375,9 @@ impl Sema:
             let value = self.ast.get_data0(node)
             if value == 0:
                 return 1
-            // §4.9a (D103): a value the return demand converted keeps its own
+            // §4.9a (D103) / D34-A (#920): a value the return demand converted keeps its own
             // type on the node; the record is the conversion.
-            if self.value_to_option_nodes.contains(value):
+            if self.value_to_option_nodes.contains(value) or self.finalize_demand_nodes.contains(value):
                 return 1
             let actual = self.recorded_expr_type_or_zero(value)
             if actual != 0 and actual != self.ty_void and actual != self.ty_never:
@@ -11438,9 +11418,9 @@ impl Sema:
         // if/match carrier too would stack a second contextual-Copy adjustment
         // on the same demand and MIR would dereference twice.
         if value_path != 0:
-            // §4.9a (D103): a leaf the return demand already converted to
-            // its Option keeps its own type; the record is the conversion.
-            if self.value_to_option_nodes.contains(node):
+            // §4.9a (D103) / D34-A (#920): a leaf the return demand already converted
+            // keeps its own type; the record is the conversion.
+            if self.value_to_option_nodes.contains(node) or self.finalize_demand_nodes.contains(node):
                 return 1
             let actual = self.recorded_expr_type_or_zero(node)
             if actual != 0 and actual != self.ty_void and actual != self.ty_never:
@@ -21028,6 +21008,8 @@ impl Sema:
                 if self.value_to_option_nodes.contains(value):
                     if self.recorded_expr_type_or_zero(value) == 0:
                         self.typed_expr_types.insert(value, self.option_demand_payload(val_type) as i32)
+                else if self.finalize_demand_nodes.contains(value):
+                    ()
                 else:
                     self.typed_expr_types.insert(value, val_type as i32)
             self.check_returned_field_move(value, self.current_return_type as i32)
@@ -28970,10 +28952,7 @@ impl Sema:
             if set_slot != MirIntrinsic.NONE and set_slot != MirIntrinsic.MAP_VALUE_AT and set_slot != MirIntrinsic.MAP_TAKE_AT:
                 return true
         if owner_sym == self.syms.slotmap:
-            if field == self.syms.new or field == self.syms.slot or field == self.syms.get_disjoint:
-                return true
-        if owner_sym == self.syms.slotmapslot:
-            if field == self.syms.get or self.pool_resolve(field) == "set":
+            if field == self.syms.new:
                 return true
         if owner_sym == self.syms.option:
             let option_method_name = self.pool_resolve(field)
@@ -28989,12 +28968,7 @@ impl Sema:
                 return true
             if fixed_method_name == "len_i32" or fixed_method_name == "len_i64" or fixed_method_name == "capacity" or fixed_method_name == "is_empty" or fixed_method_name == "clear" or fixed_method_name == "push_byte" or fixed_method_name == "push_str" or fixed_method_name == "as_view" or fixed_method_name == "equals":
                 return true
-        if owner_sym == self.syms.listslot or owner_sym == self.syms.listrange:
-            if field == self.syms.get or self.pool_resolve(field) == "set" or self.is_collection_len_method(field):
-                return true
         if owner_sym == self.syms.listiterplace:
-            if field == self.syms.next:
-                return true
             if field == self.syms.fold or field == self.syms.reduce or field == self.syms.sum or field == self.syms.count or field == self.syms.partition or field == self.syms.collect:
                 return true
         false
@@ -31695,6 +31669,7 @@ impl Sema:
                 self.suppress_errors -= 1
                 out = expected
         out = self.value_to_option_at_demand(node, expected, out)
+        out = self.finalize_at_demand(node, expected, out)
         // D93: every demand on a literal's binding counts, the ones its
         // default (a List, D113) already meets too, so two that disagree are
         // an error at the second.
@@ -31780,6 +31755,82 @@ impl Sema:
         // wraps after); only the record says the demand wrapped it.
         self.value_to_option_nodes.insert(node, expected as i32)
         expected
+
+    // D34-A (D257, #920): where an owned type `expected` is demanded and
+    // `actual` is an owned builder implementing `Finalize[expected]`, consume
+    // the builder via `Finalize.finalize()` at the demand site. Law 2 Phase 2:
+    // only between two concrete known types, never binding an unknown, never
+    // chaining with another conversion, never firing on a borrowed demand or
+    // borrowed builder.
+    mut fn finalize_at_demand(node: i32, expected: TypeId, actual: TypeId) -> TypeId:
+        if node <= 0 or expected == 0 or actual == 0 or self.operator_operand_nodes.contains(node):
+            return actual
+        if self.value_to_option_nodes.contains(node):
+            return actual
+        if self.finalize_demand_nodes.contains(node):
+            return self.finalize_demand_nodes.get(node).unwrap() as TypeId
+        if expected == self.ty_void or actual == self.ty_void or actual == self.ty_never:
+            return actual
+        if self.types_compatible(expected, actual):
+            return actual
+        let exp_r = self.resolve_alias(expected)
+        let act_r = self.resolve_alias(actual)
+        if self.type_has_unresolved_parts(exp_r as i32) != 0 or self.type_has_unresolved_parts(act_r as i32) != 0:
+            return actual
+        let exp_k = self.get_type_kind(exp_r)
+        let act_k = self.get_type_kind(act_r)
+        if exp_k == TypeKind.TY_REF or exp_k == TypeKind.TY_PTR:
+            return actual
+        if act_k != TypeKind.TY_STRUCT and act_k != TypeKind.TY_ENUM and act_k != TypeKind.TY_GENERIC_INST:
+            return actual
+        let finalize_trait = self.pool_lookup_symbol("Finalize")
+        let finalize_method = self.pool_lookup_symbol("finalize")
+        if finalize_trait == 0 or finalize_method == 0:
+            return actual
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL:
+                continue
+            if self.ast.get_data2(decl) != finalize_trait:
+                continue
+            let target_match = self.impl_target_match(decl, act_r as i32)
+            if target_match.ok == 0:
+                continue
+            let tta_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
+            if tta_idx < 0:
+                continue
+            let arg_start: i32 = self.ast.state.impl_trait_type_args[(tta_idx + 1)]
+            let arg_count = self.ast.state.impl_trait_type_args[(tta_idx + 2)]
+            if arg_count <= 0:
+                continue
+            let built_ty = self.resolve_impl_trait_arg_for_source(decl, act_r as i32, self.ast.get_extra(arg_start), target_match.subst_names, target_match.subst_types)
+            if built_ty == 0 or not self.types_identical(self.resolve_alias(built_ty as TypeId) as i32, exp_r as i32):
+                continue
+            let owner_sym = self.method_owner_symbol_for_type(act_r as i32)
+            if owner_sym == 0:
+                continue
+            var fn_sym = self.lookup_method_fn(owner_sym, finalize_method)
+            var sig_idx = self.lookup_method_sig(owner_sym, finalize_method)
+            var mono_sym: i32 = 0
+            if sig_idx < 0:
+                fn_sym = self.lookup_generic_method_fn(owner_sym, finalize_method)
+                if fn_sym == 0:
+                    continue
+                sig_idx = self.concrete_owner_method_sig(owner_sym, act_r as i32, fn_sym)
+                if sig_idx < 0:
+                    continue
+                mono_sym = self.sig_names[sig_idx]
+            else if fn_sym == 0:
+                fn_sym = self.sig_names[sig_idx]
+            self.finalize_demand_nodes.insert(node, expected as i32)
+            self.finalize_demand_fn_syms.insert(node, fn_sym)
+            self.finalize_demand_sigs.insert(node, sig_idx)
+            if mono_sym != 0:
+                self.finalize_demand_monos.insert(node, mono_sym)
+            if self.is_copy(actual) == 0:
+                self.mark_moved_if_consumed(node)
+            return expected
+        actual
 
     // Use only after the surrounding construct has independently fixed an
     // owned destination type. The checked expression keeps its exact type;
@@ -35366,6 +35417,25 @@ impl Sema:
         if bb_tp != 0:
             self.put_generic_subst(bb_tp, concrete_owner, node)
 
+        // Enforce trait bounds on the impl block (`impl[T: Copy] SlotMapSlot[T]`),
+        // the method's own type parameters, and any `where` clause, matching
+        // check_generic_call.
+        let method_bounds_errors_before = self.diags.count_by_severity(DiagSeverity.Error)
+        if self.method_impl_nodes.contains(method_fn_sym):
+            let method_impl_nd = self.method_impl_nodes.get(method_fn_sym).unwrap()
+            let impl_tp_meta = self.ast.find_impl_type_params(method_impl_nd)
+            if impl_tp_meta >= 0:
+                self.check_generic_trait_bounds(self.ast.state.impl_type_params[(impl_tp_meta + 1)], self.ast.state.impl_type_params[(impl_tp_meta + 2)], node)
+        if fn_tp_count > 0:
+            self.check_generic_trait_bounds(fn_tp_start, fn_tp_count, node)
+        let method_where_idx = self.ast.find_where_meta(fn_node)
+        if method_where_idx >= 0:
+            self.check_generic_trait_bounds(self.ast.state.where_meta[(method_where_idx + 1)], self.ast.state.where_meta[(method_where_idx + 2)], node)
+        if self.diags.count_by_severity(DiagSeverity.Error) != method_bounds_errors_before:
+            self.generic_subst_param_syms = saved_generic_method_subst_syms
+            self.generic_subst_type_ids = saved_generic_method_subst_tys
+            return 0
+
         let param_offset = (not (is_static != 0)) as i32
         // arg_count < 0: a compiler-synthesized call whose receiver alone
         // decides the specialization (D69's `for` over a generic Gen impl);
@@ -36924,22 +36994,6 @@ impl Sema:
         if owner_sym == self.syms.slotmap:
             if field == self.syms.new:
                 return recv_type
-            if tk == TypeKind.TY_GENERIC_INST:
-                let elem_ty = self.get_generic_inst_arg(resolved as i32, 0)
-                if field == self.syms.slot:
-                    return self.ensure_slotmapslot_type_for(elem_ty)
-                if field == self.syms.get_disjoint:
-                    let slot_ty = self.ensure_slotmapslot_type_for(elem_ty)
-                    let elems: List[i32] = []
-                    elems.push(slot_ty)
-                    elems.push(slot_ty)
-                    return self.ensure_tuple_type(elems, 2) as i32
-        if owner_sym == self.syms.slotmapslot:
-            if tk == TypeKind.TY_GENERIC_INST:
-                if field == self.syms.get:
-                    return self.get_generic_inst_arg(resolved as i32, 0)
-                if method_name == "set":
-                    return self.ty_void as i32
         if owner_sym == self.syms.option:
             if field == self.syms.is_some or field == self.syms.is_none:
                 return self.ty_bool as i32
@@ -37187,14 +37241,8 @@ impl Sema:
                     update_params.push(update_value_ty)
                     return self.ensure_fn_type(update_params, 1, update_value_ty as TypeId) as i32
         // #669: storing methods (mirror method_arg_stores_value) must publish the
-        // stored element type, or a contextual enum arg (`slot.set(Some(x))`)
+        // stored element type, or a contextual enum arg (`entry.set(Some(x))`)
         // never learns its enum and codegen has no aggregate destination.
-        if owner_sym == self.syms.listslot or owner_sym == self.syms.slotmapslot:
-            if method_name == "set" and arg_index == 0:
-                return self.get_generic_inst_arg(resolved as i32, 0)
-        if owner_sym == self.syms.listrange:
-            if method_name == "set" and arg_index == 1:
-                return self.get_generic_inst_arg(resolved as i32, 0)
         if owner_sym == self.syms.hashmapentry:
             if (method_name == "set" or method_name == "or_insert") and arg_index == 0:
                 return self.get_generic_inst_arg(resolved as i32, 1)
@@ -38016,9 +38064,6 @@ impl Sema:
         if type_name_sym == self.syms.list:
             if field == self.syms.iter or field == self.syms.keys or field == self.syms.iter_place or field == self.syms.iter_ref or field == self.syms.range_method or field == self.syms.split_at or field == self.syms.split_at_mut:
                 return true
-        if type_name_sym == self.syms.listrange:
-            if field == self.syms.split_at or field == self.syms.split_at_mut:
-                return true
         false
 
     // Builtin methods have no declared signature node, so their receiver mode
@@ -38036,14 +38081,6 @@ impl Sema:
             // `fn`'s, a slot let a read-only method or a `&T` parameter
             // overwrite an element a caller held a view of.
             if field == self.syms.slot or field == self.syms.iter_place or field == self.syms.get_disjoint:
-                return ReceiverMode.Mut
-        if type_name_sym == self.syms.listrange:
-            if field == self.syms.split_at_mut:
-                return ReceiverMode.Mut
-        // The same rule for a SlotMap's slots (§6): `sm.slot(h)` through a
-        // `&SlotMap` parameter wrote the element.
-        if type_name_sym == self.syms.slotmap:
-            if field == self.syms.slot or field == self.syms.get_disjoint:
                 return ReceiverMode.Mut
         if type_name_sym == self.syms.hashmap:
             if field == self.syms.insert or field == self.syms.remove or field == self.syms.clear:
@@ -39574,7 +39611,7 @@ impl Sema:
                     if a0_ty != 0:
                         let index_ty = self.ty_i64 as i32
                         self.check_builtin_method_call_arg(mc_call_name, 0, index_ty, a0_ty, self.ast.get_extra(extra_start))
-            else if (type_name_sym == self.syms.list or type_name_sym == self.syms.listrange) and (field == self.syms.split_at or field == self.syms.split_at_mut):
+            else if type_name_sym == self.syms.list and (field == self.syms.split_at or field == self.syms.split_at_mut):
                 if arg_count != 1:
                     self.emit_error(mc_method_name_raw ++ "() expects exactly one index argument", node)
                 else:
@@ -39632,26 +39669,6 @@ impl Sema:
                 // D110: insert(value: T) stores it; contains/remove(value: &T) observe.
                 if arg_count >= 1:
                     self.check_builtin_key_arg(mc_call_name, recv_type, node, 0, arg_types[0], self.ast.get_extra(extra_start))
-            else if type_name_sym == self.syms.slotmap:
-                let sm_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                let sm_handle_ty = self.ensure_handle_type_for(sm_elem_ty)
-                if field == self.syms.slot:
-                    if arg_count >= 1:
-                        let h_ty = arg_types[0]
-                        if sm_handle_ty != 0 and h_ty != 0:
-                            self.check_builtin_method_call_arg(mc_call_name, 0, sm_handle_ty, h_ty, self.ast.get_extra(extra_start))
-                else if field == self.syms.get_disjoint:
-                    for sm_hi in 0..2:
-                        if arg_count > sm_hi:
-                            let h_ty3 = arg_types[sm_hi]
-                            if sm_handle_ty != 0 and h_ty3 != 0:
-                                self.check_builtin_method_call_arg(mc_call_name, sm_hi, sm_handle_ty, h_ty3, self.ast.get_extra(extra_start + sm_hi))
-            else if type_name_sym == self.syms.slotmapslot:
-                if mc_method_name_raw == "set" and arg_count >= 1:
-                    let slot_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let set_arg_ty = arg_types[0]
-                    if slot_elem_ty != 0 and set_arg_ty != 0:
-                        self.check_builtin_method_call_arg(mc_call_name, 0, slot_elem_ty, set_arg_ty, self.ast.get_extra(extra_start))
             // Return types for builtin generic methods
             let generic_len_ret = self.collection_len_method_return_type(mc_method_name_raw)
             if type_name_sym == self.syms.fixed_string:
@@ -39713,34 +39730,6 @@ impl Sema:
                     return self.list_sequence_return_type(recv_type, mc_resolved_arg_count, node)
                 if field == self.syms.traverse:
                     return self.list_traverse_return_type(recv_type, arg_types, mc_resolved_arg_count, node)
-            if type_name_sym == self.syms.listslot:
-                if field == self.syms.get:
-                    return self.check_slot_get_copy("ListSlot.get", self.get_generic_inst_arg(recv_type, 0), node)
-                if mc_method_name_raw == "set":
-                    return self.ty_void as i32
-            if type_name_sym == self.syms.listrange:
-                if field == self.syms.get:
-                    return self.check_slot_get_copy("ListRange.get", self.get_generic_inst_arg(recv_type, 0), node)
-                if mc_method_name_raw == "set":
-                    return self.ty_void as i32
-                if generic_len_ret != 0:
-                    return generic_len_ret
-                if field == self.syms.split_at or field == self.syms.split_at_mut:
-                    return self.ensure_listrange_pair_type_for(self.get_generic_inst_arg(recv_type, 0))
-            if type_name_sym == self.syms.listiterplace:
-                if field == self.syms.next:
-                    let ip_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    var vs_tid = self.find_generic_inst(self.syms.listslot, ip_elem_ty)
-                    if vs_tid == 0:
-                        let vs_args: List[i32] = []
-                        vs_args.push(ip_elem_ty)
-                        vs_tid = self.ensure_generic_inst_type(self.syms.listslot, vs_args, 1) as i32
-                    let opt_tid = self.find_generic_inst(self.syms.option, vs_tid)
-                    if opt_tid != 0:
-                        return opt_tid
-                    let opt_args: List[i32] = []
-                    opt_args.push(vs_tid)
-                    return self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
             if type_name_sym == self.syms.hashmap:
                 if field == self.syms.insert or field == self.syms.clear:
                     return self.ty_void as i32
@@ -39787,21 +39776,6 @@ impl Sema:
                         return set_slot_ret
                 if generic_len_ret != 0:
                     return generic_len_ret
-            if type_name_sym == self.syms.slotmap:
-                let sm_elem_ret_ty = self.get_generic_inst_arg(recv_type, 0)
-                if field == self.syms.slot:
-                    return self.ensure_slotmapslot_type_for(sm_elem_ret_ty)
-                if field == self.syms.get_disjoint:
-                    let sm_slot_ty = self.ensure_slotmapslot_type_for(sm_elem_ret_ty)
-                    let sm_tuple_elems: List[i32] = []
-                    sm_tuple_elems.push(sm_slot_ty)
-                    sm_tuple_elems.push(sm_slot_ty)
-                    return self.ensure_tuple_type(sm_tuple_elems, 2) as i32
-            if type_name_sym == self.syms.slotmapslot:
-                if field == self.syms.get:
-                    return self.check_slot_get_copy("SlotMapSlot.get", self.get_generic_inst_arg(recv_type, 0), node)
-                if mc_method_name_raw == "set":
-                    return self.ty_void as i32
             if type_name_sym == self.syms.option:
                 // TODO(D22): Option/Result payload projection is transparent to
                 // view origins. These return-type branches currently recover the

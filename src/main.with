@@ -148,7 +148,7 @@ type TestDirectives {
     expect_stderr: List[str],
     expect_check_stdout: List[str],
     expect_check_stdout_not: List[str],
-    expect_check_fail: str,
+    expect_check_fail: List[str],
     // Diagnostics a failing check must not print (#1336: an arity fixture
     // passed while `unknown type 'T'` led its stderr).
     expect_check_fail_not: List[str],
@@ -196,7 +196,7 @@ fn empty_test_directives -> TestDirectives:
         expect_stderr: [],
         expect_check_stdout: [],
         expect_check_stdout_not: [],
-        expect_check_fail: "",
+        expect_check_fail: [],
         expect_check_fail_not: [],
         expect_build_fail: "",
         expect_build_stderr: [],
@@ -4827,9 +4827,9 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
             else if line.starts_with(expect_check_fail_not_prefix):
                 result.expect_check_fail_not.push(line.slice(expect_check_fail_not_prefix.len(), line.len()))
             else if line.starts_with(expect_check_fail_prefix):
-                result.expect_check_fail = line.slice(expect_check_fail_prefix.len(), line.len())
+                result.expect_check_fail.push(line.slice(expect_check_fail_prefix.len(), line.len()))
             else if line.starts_with(expect_error_prefix):
-                result.expect_check_fail = line.slice(expect_error_prefix.len(), line.len())
+                result.expect_check_fail.push(line.slice(expect_error_prefix.len(), line.len()))
             else if line.starts_with(expect_build_fail_prefix):
                 result.expect_build_fail = line.slice(expect_build_fail_prefix.len(), line.len())
             else if line.starts_with(expect_build_stderr_not_prefix):
@@ -5055,9 +5055,11 @@ fn run_test_directive_command(target: &str, directives: &TestDirectives, quiet: 
         if result.rc == 0:
             emit_test_stage_error("expected check failure", target, "check", "")
             return 1
-        if not test_output_contains_expected(result.stderr, directives.expect_check_fail):
-            emit_test_stage_error("missing expected check error: " ++ directives.expect_check_fail, target, "check", "")
-            return 1
+        for expected_err in directives.expect_check_fail:
+            if not test_output_contains_expected(result.stderr, expected_err):
+                emit_test_stage_error("missing expected check error: " ++ expected_err, target, "check", "")
+                emit_test_child_stderr(result.stderr)
+                return 1
         for i in 0..directives.expect_check_fail_not.len():
             let forbidden = directives.expect_check_fail_not[i]
             if forbidden.len() > 0 and test_output_contains_expected(result.stderr, forbidden):

@@ -96,13 +96,13 @@ enum ConstKind: i32:
 
 
 fn mir_intrinsic_is_len32(intrinsic: MirIntrinsic):
-    intrinsic == MirIntrinsic.LIST_LEN32 or intrinsic == MirIntrinsic.MAP_LEN32 or intrinsic == MirIntrinsic.STR_LEN32 or intrinsic == MirIntrinsic.ARR_LEN32 or intrinsic == MirIntrinsic.VECRANGE_LEN32
+    intrinsic == MirIntrinsic.LIST_LEN32 or intrinsic == MirIntrinsic.MAP_LEN32 or intrinsic == MirIntrinsic.STR_LEN32 or intrinsic == MirIntrinsic.ARR_LEN32
 
 fn mir_intrinsic_is_len64(intrinsic: MirIntrinsic):
-    intrinsic == MirIntrinsic.LIST_LEN64 or intrinsic == MirIntrinsic.MAP_LEN64 or intrinsic == MirIntrinsic.STR_LEN64 or intrinsic == MirIntrinsic.ARR_LEN64 or intrinsic == MirIntrinsic.VECRANGE_LEN64
+    intrinsic == MirIntrinsic.LIST_LEN64 or intrinsic == MirIntrinsic.MAP_LEN64 or intrinsic == MirIntrinsic.STR_LEN64 or intrinsic == MirIntrinsic.ARR_LEN64
 
 fn mir_intrinsic_is_ulen32(intrinsic: MirIntrinsic):
-    intrinsic == MirIntrinsic.LIST_ULEN32 or intrinsic == MirIntrinsic.MAP_ULEN32 or intrinsic == MirIntrinsic.STR_ULEN32 or intrinsic == MirIntrinsic.ARR_ULEN32 or intrinsic == MirIntrinsic.VECRANGE_ULEN32
+    intrinsic == MirIntrinsic.LIST_ULEN32 or intrinsic == MirIntrinsic.MAP_ULEN32 or intrinsic == MirIntrinsic.STR_ULEN32 or intrinsic == MirIntrinsic.ARR_ULEN32
 
 // ── Projection kinds ─────────────────────────────────────────────
 

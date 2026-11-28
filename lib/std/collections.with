@@ -281,31 +281,6 @@ impl[K: Ord + Clone, V] BTreeMap[K, V]:
         self.tree.mlib_slot_tree_reset()
         self.words.mlib_word_tree_reset()
 
-    // Every entry dropped and freed; the engine's own slots are its to clear.
-    mut fn drop_entries():
-        comptime if btree_is_word[K]():
-            var word_cursor = mlib_word_tree_it_s { pair: mlib_word_tree_pair_s {} }
-            unsafe { mlib_word_tree_it(&raw mut word_cursor, &raw mut self.words) }
-            while not word_cursor.mlib_word_tree_end_p():
-                var entry = unsafe { *(word_cursor.mlib_word_tree_ref().value_ptr) } as *mut BTreeWordEntry[K, V]
-                let key: K = unsafe { move entry.key }
-                drop(key)
-                let value: V = unsafe { move entry.value }
-                drop(value)
-                with_free(entry as *mut u8)
-                word_cursor.mlib_word_tree_next()
-        else:
-            var cursor = mlib_slot_tree_it_s {}
-            unsafe { mlib_slot_tree_it(&raw mut cursor, &raw mut self.tree) }
-            while not cursor.mlib_slot_tree_end_p():
-                var entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut cursor))).entry } as *mut BTreeEntry[K, V]
-                let key: K = unsafe { move entry.key }
-                drop(key)
-                let value: V = unsafe { move entry.value }
-                drop(value)
-                with_free(entry as *mut u8)
-                cursor.mlib_slot_tree_next()
-
     /// Observes the least key's entry, or `None` when empty.
     pub fn first() -> Option[(&K, &V)]:
         if self.len() == 0: return None
@@ -358,6 +333,32 @@ impl[K: Ord + Clone, V] BTreeMap[K, V]:
 
     @[iter_of_self]
     pub fn values() -> BTreeMapValues[K, V]: BTreeMapValues { entries: self.iter() }
+
+impl[K, V] BTreeMap[K, V]:
+    // Every entry dropped and freed; the engine's own slots are its to clear.
+    mut fn drop_entries():
+        comptime if btree_is_word[K]():
+            var word_cursor = mlib_word_tree_it_s { pair: mlib_word_tree_pair_s {} }
+            unsafe { mlib_word_tree_it(&raw mut word_cursor, &raw mut self.words) }
+            while not word_cursor.mlib_word_tree_end_p():
+                var entry = unsafe { *(word_cursor.mlib_word_tree_ref().value_ptr) } as *mut BTreeWordEntry[K, V]
+                let key: K = unsafe { move entry.key }
+                drop(key)
+                let value: V = unsafe { move entry.value }
+                drop(value)
+                with_free(entry as *mut u8)
+                word_cursor.mlib_word_tree_next()
+        else:
+            var cursor = mlib_slot_tree_it_s {}
+            unsafe { mlib_slot_tree_it(&raw mut cursor, &raw mut self.tree) }
+            while not cursor.mlib_slot_tree_end_p():
+                var entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut cursor))).entry } as *mut BTreeEntry[K, V]
+                let key: K = unsafe { move entry.key }
+                drop(key)
+                let value: V = unsafe { move entry.value }
+                drop(value)
+                with_free(entry as *mut u8)
+                cursor.mlib_slot_tree_next()
 
 impl[K, V] Drop for BTreeMap[K, V]:
     move fn drop():
@@ -588,26 +589,6 @@ impl[T: Ord + Clone] BTreeSet[T]:
         self.tree.mlib_slot_tree_reset()
         self.words.mlib_word_tree_reset()
 
-    mut fn drop_entries():
-        comptime if btree_is_word[T]():
-            var word_cursor = mlib_word_tree_it_s { pair: mlib_word_tree_pair_s {} }
-            unsafe { mlib_word_tree_it(&raw mut word_cursor, &raw mut self.words) }
-            while not word_cursor.mlib_word_tree_end_p():
-                var item = unsafe { *(word_cursor.mlib_word_tree_ref().value_ptr) } as *mut BTreeWordItem[T]
-                let stored: T = unsafe { move item.key }
-                drop(stored)
-                with_free(item as *mut u8)
-                word_cursor.mlib_word_tree_next()
-        else:
-            var cursor = mlib_slot_tree_it_s {}
-            unsafe { mlib_slot_tree_it(&raw mut cursor, &raw mut self.tree) }
-            while not cursor.mlib_slot_tree_end_p():
-                var entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut cursor))).entry } as *mut MlibSlot[T]
-                let stored: T = unsafe { move entry.key }
-                drop(stored)
-                with_free(entry as *mut u8)
-                cursor.mlib_slot_tree_next()
-
     /// The elements, in order, as an owned list of clones.
     pub fn items() -> List[T]:
         let out: List[T] = List.with_capacity(self.len())
@@ -643,6 +624,27 @@ impl[T: Ord + Clone] BTreeSet[T]:
         comptime if btree_is_word[T](): unsafe { mlib_word_tree_it(&raw mut word_cursor, word_handle(&self.words)) }
         else: unsafe { mlib_slot_tree_it(&raw mut cursor, btree_handle(&self.tree)) }
         BTreeSetIter { cursor: cursor, word_cursor: word_cursor }
+
+impl[T] BTreeSet[T]:
+    mut fn drop_entries():
+        comptime if btree_is_word[T]():
+            var word_cursor = mlib_word_tree_it_s { pair: mlib_word_tree_pair_s {} }
+            unsafe { mlib_word_tree_it(&raw mut word_cursor, &raw mut self.words) }
+            while not word_cursor.mlib_word_tree_end_p():
+                var item = unsafe { *(word_cursor.mlib_word_tree_ref().value_ptr) } as *mut BTreeWordItem[T]
+                let stored: T = unsafe { move item.key }
+                drop(stored)
+                with_free(item as *mut u8)
+                word_cursor.mlib_word_tree_next()
+        else:
+            var cursor = mlib_slot_tree_it_s {}
+            unsafe { mlib_slot_tree_it(&raw mut cursor, &raw mut self.tree) }
+            while not cursor.mlib_slot_tree_end_p():
+                var entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut cursor))).entry } as *mut MlibSlot[T]
+                let stored: T = unsafe { move entry.key }
+                drop(stored)
+                with_free(entry as *mut u8)
+                cursor.mlib_slot_tree_next()
 
 impl[T] Drop for BTreeSet[T]:
     move fn drop():
@@ -733,6 +735,19 @@ impl[T] SlotMap[T]:
         unsafe { *slot = value }
         Some(old)
 
+    /// Scoped mutable handle to the slot `h` names.
+    pub mut fn slot(h: Handle[T]) -> SlotMapSlot[T]:
+        SlotMapSlot { map_ptr: self.ptr as i64, index: h.index, generation: h.generation }
+
+    /// Two distinct scoped mutable handles into the same map.
+    pub mut fn get_disjoint(a: Handle[T], b: Handle[T]) -> (SlotMapSlot[T], SlotMapSlot[T]):
+        if with_slotmap_contains(self.ptr as *mut u8, a.index, a.generation) == 0 or with_slotmap_contains(self.ptr as *mut u8, b.index, b.generation) == 0 or (a.index == b.index and a.generation == b.generation):
+            panic("SlotMap.get_disjoint requires distinct valid handles")
+        (
+            SlotMapSlot { map_ptr: self.ptr as i64, index: a.index, generation: a.generation },
+            SlotMapSlot { map_ptr: self.ptr as i64, index: b.index, generation: b.generation },
+        )
+
 /// Scoped mutable slot handle returned by SlotMap.slot/get_disjoint.
 /// Use `.get()` / `.set(value)` inside the `with` block, matching ListSlot.
 pub type SlotMapSlot[T] ephemeral {
@@ -740,6 +755,22 @@ pub type SlotMapSlot[T] ephemeral {
     index: u32,
     generation: u32,
 }
+
+impl[T: Copy] SlotMapSlot[T]:
+    /// Copy out the value stored in this slot. Requires `T: Copy`.
+    pub fn get() -> T:
+        let slot = with_slotmap_get_ptr(self.map_ptr as *mut u8, self.index, self.generation) as *const T
+        if slot == null: panic("SlotMapSlot.get requires a valid handle")
+        let v: &T = unsafe { &*slot }
+        *v
+
+impl[T] SlotMapSlot[T]:
+    /// Replace the value stored in this slot, dropping the previous occupant.
+    pub mut fn set(value: T):
+        let slot = with_slotmap_get_ptr(self.map_ptr as *mut u8, self.index, self.generation) as *mut T
+        if slot == null: panic("SlotMapSlot.set requires a valid handle")
+        let _old: T = unsafe { *slot }
+        unsafe { *slot = value }
 
 /// Memory ordering for atomic operations.
 pub enum Order: i32:
@@ -772,9 +803,76 @@ pub type Atomic[T]  {
 ///       s.set(v + 1)
 pub type ListSlot[T] ephemeral { data_ptr: i64, index: i64 }
 
+impl[T: Copy] ListSlot[T]:
+    /// Copy out the element at this slot. Requires `T: Copy`.
+    pub fn get() -> T:
+        let slot = (self.data_ptr + self.index * sizeof[T]()) as *const T
+        let v: &T = unsafe { &*slot }
+        *v
+
+impl[T] ListSlot[T]:
+    /// Replace the element at this slot, dropping the previous occupant.
+    pub fn set(value: T):
+        let slot = (self.data_ptr + self.index * sizeof[T]()) as *mut T
+        let _old: T = unsafe { *slot }
+        unsafe { *slot = value }
+
+/// Scoped range handle over a contiguous sub-slice of a List, array, or slice.
+/// Obtain via `xs.range(start..end)`, `xs.split_at(mid)`, or `xs.split_at_mut(mid)`.
+pub type ListRange[T] ephemeral { data_ptr: i64, offset: i64, len: i64 }
+
+impl[T: Copy] ListRange[T]:
+    /// Copy out the element at `index`. Requires `T: Copy`.
+    pub fn get(index: isize) -> T:
+        let idx = index as i64
+        if idx < 0 or idx >= self.len: panic("ListRange.get index out of bounds")
+        let slot = (self.data_ptr + (self.offset + idx) * sizeof[T]()) as *const T
+        let v: &T = unsafe { &*slot }
+        *v
+
+impl[T] ListRange[T]:
+    /// Replace the element at `index`, dropping the previous occupant.
+    pub fn set(index: isize, value: T):
+        let idx = index as i64
+        if idx < 0 or idx >= self.len: panic("ListRange.set index out of bounds")
+        let slot = (self.data_ptr + (self.offset + idx) * sizeof[T]()) as *mut T
+        let _old: T = unsafe { *slot }
+        unsafe { *slot = value }
+
+    pub fn len() -> isize: self.len as isize
+    pub fn len32() -> i32: self.len as i32
+    pub fn len64() -> i64: self.len
+    pub fn ulen32() -> u32: self.len as u32
+    pub fn is_empty() -> bool: self.len == 0
+
+    @[iter_of_self]
+    pub fn split_at(mid: isize) -> (ListRange[T], ListRange[T]):
+        let idx = mid as i64
+        if idx < 0 or idx > self.len: panic("split_at index out of bounds")
+        (
+            ListRange { data_ptr: self.data_ptr, offset: self.offset, len: idx },
+            ListRange { data_ptr: self.data_ptr, offset: self.offset + idx, len: self.len - idx },
+        )
+
+    @[iter_of_self]
+    pub mut fn split_at_mut(mid: isize) -> (ListRange[T], ListRange[T]):
+        let idx = mid as i64
+        if idx < 0 or idx > self.len: panic("split_at index out of bounds")
+        (
+            ListRange { data_ptr: self.data_ptr, offset: self.offset, len: idx },
+            ListRange { data_ptr: self.data_ptr, offset: self.offset + idx, len: self.len - idx },
+        )
+
 /// Iterator yielding ListSlot[T] handles for in-place element mutation (§19.5).
 /// Obtain via `vec.iter_place()`. Each `.next()` returns `Option[ListSlot[T]]`.
 pub type ListIterPlace[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
+
+impl[T] ListIterPlace[T]:
+    pub mut fn next() -> Option[ListSlot[T]]:
+        if self.idx >= self.len: return None
+        let i = self.idx
+        self.idx = i + 1
+        Some(ListSlot { data_ptr: self.data_ptr, index: i })
 
 /// Scoped handle to a HashMap entry (mut.md Rev 8 §10).
 /// Obtain via `map.entry(key)`. Use with `with`:

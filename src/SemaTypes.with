@@ -211,10 +211,7 @@ enum MirIntrinsic: i32:
     FMT_BUF_WRITE_FMT
     FMT_BUF_FINISH
     LIST_SLOT
-    VECSLOT_GET
-    VECSLOT_SET
     LIST_ITER_PLACE
-    VECITERPLACE_NEXT
     MAP_ENTRY
     ENTRY_OR_INSERT
     ENTRY_GET
@@ -223,16 +220,9 @@ enum MirIntrinsic: i32:
     LIST_RANGE
     SPLIT_AT
     SPLIT_AT_MUT
-    VECRANGE_GET
-    VECRANGE_SET
-    VECRANGE_LEN
     LIST_GET_REF
     DYN_CALL
     SLOTMAP_NEW
-    SLOTMAP_SLOT
-    SLOTMAP_GET_DISJOINT
-    SLOTMAPSLOT_GET
-    SLOTMAPSLOT_SET
     FIBER_SELECT_BIASED
     FIBER_DETACH
     FIBER_DETACH_CANCEL
@@ -248,9 +238,6 @@ enum MirIntrinsic: i32:
     ARR_LEN32
     ARR_LEN64
     ARR_ULEN32
-    VECRANGE_LEN32
-    VECRANGE_LEN64
-    VECRANGE_ULEN32
     FMT_BUF_WRITE_STR_REF
     STR_CLONE_REF
     // A floating-point math builtin (`cos(x)` / `x.cos()`); the MathBuiltins
@@ -333,10 +320,6 @@ fn mir_len_method_intrinsic(base: MirIntrinsic, method_name: &str) -> MirIntrins
         if method_name == "len32": return MirIntrinsic.ARR_LEN32
         if method_name == "len64": return MirIntrinsic.ARR_LEN64
         if method_name == "ulen32": return MirIntrinsic.ARR_ULEN32
-    if base == MirIntrinsic.VECRANGE_LEN:
-        if method_name == "len32": return MirIntrinsic.VECRANGE_LEN32
-        if method_name == "len64": return MirIntrinsic.VECRANGE_LEN64
-        if method_name == "ulen32": return MirIntrinsic.VECRANGE_ULEN32
     MirIntrinsic.NONE
 
 // D65 phase 5 (#2043): how a method call that is neither an ordinary call

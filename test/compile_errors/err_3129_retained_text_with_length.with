@@ -1,4 +1,4 @@
-//! expect-check-fail: a NUL-terminated retained case has no length option; state '&[u8]' or '&str' for bytes read to a length (§16.2b.5)
+//! expect-check-fail: a NUL-terminated or resource retained case has no length option; state '&[u8]' or '&str' for bytes read to a length (§16.2b.5)
 //! expect-check-fail: = help: delete 'length param …', or write '&[u8]' or '&str' as the case's type
 
 // #3129 (§16.2b.5): a NUL-terminated string carries its own end; a length option beside it is a second, disagreeing size.
