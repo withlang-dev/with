@@ -1,0 +1,185 @@
+// Zero-unsafe UAT for c.harfbuzz (#3156): build a minimal self-contained
+// OpenType font in memory, load via Blob.create_or_fail -> Face.create_or_fail
+// -> Font.create, populate Buffer from UTF-8, shape with font.shape, and
+// read shaped glyph infos and advance positions via buf.serialize_glyphs.
+use contracts.harfbuzz
+use c_import("harfbuzz/hb.h")
+use std.string
+
+fn push_u16(mut out: List[u8], v: u32):
+    out.push(((v >> 8) & 0xFF) as u8)
+    out.push((v & 0xFF) as u8)
+
+fn push_u32(mut out: List[u8], v: u32):
+    out.push(((v >> 24) & 0xFF) as u8)
+    out.push(((v >> 16) & 0xFF) as u8)
+    out.push(((v >> 8) & 0xFF) as u8)
+    out.push((v & 0xFF) as u8)
+
+fn push_tag(mut out: List[u8], a: u8, b: u8, c: u8, d: u8):
+    out.push(a)
+    out.push(b)
+    out.push(c)
+    out.push(d)
+
+fn build_minimal_ttf() -> List[u8]:
+    // 5 required OpenType tables (alphabetical): cmap, head, hhea, hmtx, maxp.
+    var cmap: List[u8] = []
+    push_u16(cmap, 0)       // version
+    push_u16(cmap, 1)       // numTables
+    push_u16(cmap, 3)       // platformID = Windows
+    push_u16(cmap, 1)       // encodingID = Unicode BMP
+    push_u32(cmap, 12)      // subtable offset
+    // Format 4 subtable: 2 segments: 0x0020..0x007E -> glyph (c - 31), and 0xFFFF sentinel.
+    push_u16(cmap, 4)       // format
+    push_u16(cmap, 32)      // length (14 + 2*2 + 2 + 2*2 + 2*2 + 2*2 = 32)
+    push_u16(cmap, 0)       // language
+    push_u16(cmap, 4)       // segCountX2 (2 segments * 2)
+    push_u16(cmap, 4)       // searchRange
+    push_u16(cmap, 1)       // entrySelector
+    push_u16(cmap, 0)       // rangeShift
+    push_u16(cmap, 0x007E)  // endCode[0]
+    push_u16(cmap, 0xFFFF)  // endCode[1]
+    push_u16(cmap, 0)       // reservedPad
+    push_u16(cmap, 0x0020)  // startCode[0]
+    push_u16(cmap, 0xFFFF)  // startCode[1]
+    push_u16(cmap, 0xFFE1)  // idDelta[0] = -31 (0x0020 -> glyph 1)
+    push_u16(cmap, 1)       // idDelta[1] = 1 (0xFFFF -> glyph 0)
+    push_u16(cmap, 0)       // idRangeOffset[0]
+    push_u16(cmap, 0)       // idRangeOffset[1]
+
+    var head: List[u8] = []
+    push_u32(head, 0x00010000) // version 1.0
+    push_u32(head, 0x00010000) // fontRevision
+    push_u32(head, 0)          // checkSumAdjustment
+    push_u32(head, 0x5F0F3CF5) // magicNumber
+    push_u16(head, 0)          // flags
+    push_u16(head, 1000)       // unitsPerEm
+    for _ in 0..16: head.push(0 as u8) // created + modified
+    push_u16(head, 0)          // xMin
+    push_u16(head, 0)          // yMin
+    push_u16(head, 600)        // xMax
+    push_u16(head, 800)        // yMax
+    push_u16(head, 0)          // macStyle
+    push_u16(head, 8)          // lowestRecPPEM
+    push_u16(head, 2)          // fontDirectionHint
+    push_u16(head, 0)          // indexToLocFormat
+    push_u16(head, 0)          // glyphDataFormat
+
+    var hhea: List[u8] = []
+    push_u32(hhea, 0x00010000) // version 1.0
+    push_u16(hhea, 800)        // ascent
+    push_u16(hhea, 0xFF38)     // descent (-200)
+    push_u16(hhea, 0)          // lineGap
+    push_u16(hhea, 600)        // advanceWidthMax
+    for _ in 0..22: hhea.push(0 as u8)
+    push_u16(hhea, 1)          // numberOfHMetrics = 1
+
+    var hmtx: List[u8] = []
+    push_u16(hmtx, 600)        // advanceWidth = 600
+    push_u16(hmtx, 0)          // lsb = 0
+    for _ in 0..95: push_u16(hmtx, 0) // leftSideBearings[numGlyphs - numberOfHMetrics]
+
+    var maxp: List[u8] = []
+    push_u32(maxp, 0x00010000) // version 1.0 (TrueType)
+    push_u16(maxp, 96)         // numGlyphs = 96
+    for _ in 0..26: maxp.push(0 as u8)
+
+    // Offset table (12 bytes) + 5 table records (5 * 16 = 80 bytes) = 92 bytes.
+    let cmap_off: u32 = 92
+    let cmap_pad = (4 - (cmap.len() as u32 % 4)) % 4
+    let head_off = cmap_off + cmap.len() as u32 + cmap_pad
+    let head_pad = (4 - (head.len() as u32 % 4)) % 4
+    let hhea_off = head_off + head.len() as u32 + head_pad
+    let hhea_pad = (4 - (hhea.len() as u32 % 4)) % 4
+    let hmtx_off = hhea_off + hhea.len() as u32 + hhea_pad
+    let hmtx_pad = (4 - (hmtx.len() as u32 % 4)) % 4
+    let maxp_off = hmtx_off + hmtx.len() as u32 + hmtx_pad
+
+    var font: List[u8] = []
+    push_u32(font, 0x00010000) // sfntVersion
+    push_u16(font, 5)          // numTables
+    push_u16(font, 64)         // searchRange
+    push_u16(font, 2)          // entrySelector
+    push_u16(font, 16)         // rangeShift
+
+    // Table directory (cmap, head, hhea, hmtx, maxp)
+    push_tag(font, 'c' as u8, 'm' as u8, 'a' as u8, 'p' as u8)
+    push_u32(font, 0)
+    push_u32(font, cmap_off)
+    push_u32(font, cmap.len() as u32)
+
+    push_tag(font, 'h' as u8, 'e' as u8, 'a' as u8, 'd' as u8)
+    push_u32(font, 0)
+    push_u32(font, head_off)
+    push_u32(font, head.len() as u32)
+
+    push_tag(font, 'h' as u8, 'h' as u8, 'e' as u8, 'a' as u8)
+    push_u32(font, 0)
+    push_u32(font, hhea_off)
+    push_u32(font, hhea.len() as u32)
+
+    push_tag(font, 'h' as u8, 'm' as u8, 't' as u8, 'x' as u8)
+    push_u32(font, 0)
+    push_u32(font, hmtx_off)
+    push_u32(font, hmtx.len() as u32)
+
+    push_tag(font, 'm' as u8, 'a' as u8, 'x' as u8, 'p' as u8)
+    push_u32(font, 0)
+    push_u32(font, maxp_off)
+    push_u32(font, maxp.len() as u32)
+
+    for b in cmap: font.push(b)
+    for _ in 0..cmap_pad: font.push(0 as u8)
+    for b in head: font.push(b)
+    for _ in 0..head_pad: font.push(0 as u8)
+    for b in hhea: font.push(b)
+    for _ in 0..hhea_pad: font.push(0 as u8)
+    for b in hmtx: font.push(b)
+    for _ in 0..hmtx_pad: font.push(0 as u8)
+    for b in maxp: font.push(b)
+    font
+
+fn main:
+    let ver = hb_version_string().unwrap().to_str_lossy()
+    assert(ver.len() > 0)
+
+    let ttf = build_minimal_ttf()
+    let blob = Blob.create_or_fail(ttf).unwrap()
+    assert(blob.get_length() == ttf.len() as u32)
+    let face = Face.create_or_fail(blob, 0).unwrap()
+    assert(face.get_upem() == 1000)
+    assert(face.get_glyph_count() == 96)
+    let font = Font.create(face).unwrap()
+    font.set_scale(1000, 1000)
+    let (sx, sy) = font.get_scale()
+    assert(sx == 1000 and sy == 1000)
+    let (found, gid_h) = font.get_nominal_glyph('H' as u32)
+    assert(found != 0 and gid_h == 41)
+    assert(font.get_glyph_h_advance(gid_h) == 600)
+
+    let buf = Buffer.create().unwrap()
+    buf.add_utf8("Hello" as []u8, 0, -1)
+    buf.guess_segment_properties()
+    assert(buf.get_direction() == HB_DIRECTION_LTR)
+
+    let no_feats: [hb_feature_t; 0] = []
+    font.shape(buf, no_feats)
+    assert(buf.get_length() == 5)
+    assert(buf.has_positions() != 0)
+
+    var serialized: [u8; 256] = [0 as u8; 256]
+    let (count, consumed) = buf.serialize_glyphs(0, 5, serialized, font, HB_BUFFER_SERIALIZE_FORMAT_TEXT, HB_BUFFER_SERIALIZE_FLAG_DEFAULT)
+    assert(count == 5 and consumed > 0)
+    var sb = StringBuilder.new()
+    for i in 0..(consumed as isize):
+        sb.push_byte(serialized[i])
+    let text = sb.to_str()
+    assert(text.contains("gid41=0+600"))
+    assert(text.contains("gid80=4+600"))
+
+    let m = Map.create().unwrap()
+    assert(m.is_empty() != 0)
+    m.set(65, 10)
+    assert(m.get_population() == 1)
+    print("harfbuzz ok")

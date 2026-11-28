@@ -1,0 +1,11 @@
+scenario: c.harfbuzz shapes UTF-8 text from an OpenType blob and reads glyph infos and positions without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: with get c.harfbuzz
+write src/main.with from harfbuzz_main.with
+run: with run
+expect exit: 0
+expect stdout contains: harfbuzz ok
