@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D254 — Dependent-resource parent drop, retained resource parameters, const-widened handle accessors, and row-pointer image buffers (delegated; #3153)](2026-11-27-D254-parent-drop-retained-resource-and-row-buffers.md)
 - [D253 — Borrow-only `*const T` resources from immutable C globals (delegated; #3163)](2026-11-27-D253-borrow-only-const-globals.md)
 - [D252 — Implicit-length size-checked buffers (`min <fn>(param A)` and `stride ... table <TBL>[param F]`) (delegated; #3154, #3163)](2026-11-27-D252-min-fn-and-stride-buffers.md)
 - [D251 — Out-allocated owned byte buffers (`buffer out param P len param L freed by F`) (delegated; #3154)](2026-11-27-D251-out-allocated-buffers.md)

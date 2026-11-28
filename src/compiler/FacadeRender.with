@@ -1675,7 +1675,7 @@ fn facade_render_lend_item(pool: &AstPool, intern: &InternPool, ci: &List[i32], 
             let rops = pool.get_data1(rc as NodeId)
             let ra = facade_render_param_ref(pool, intern, li.decl, pool.get_extra(rops))
             let rby = facade_render_param_ref(pool, intern, li.decl, pool.get_extra(rops + 1))
-            let is_paired = ra >= 0 and (facade_render_buffer_of(pool, intern, li.decl, ra).0 == ra or facade_render_value_record_kind(pool, intern, li.decl, ra).len() > 0)
+            let is_paired = ra >= 0 and (facade_render_buffer_of(pool, intern, li.decl, ra).0 == ra or facade_render_value_record_kind(pool, intern, li.decl, ra).len() > 0 or facade_render_received_param(pool, intern, li.decl, ra, facade_render_param_type(pool, intern, li.decl, ra)) > 0)
             if rby != 0 or not is_paired:
                 li.lends = false
                 li.decl = 0
@@ -1856,14 +1856,15 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
             return ("", facade_render_no_error_use())
     if drop_fn != 0 and facade_render_repr_arg_at(pool, intern, drop_fn, facade_render_destroyer_at(pool, intern, item, drop_fn), repr_text, "self.repr", pinned).len() == 0:
         return ("", facade_render_no_error_use())
-    if drop_fn != 0 and facade_render_param_count(pool, drop_fn) != 1 and facade_render_drop_helper(pool, intern, ci, item).len() == 0:
-        return ("", facade_render_no_error_use())
     // Stage 6 (spec §16.2b.6, ruling §26-§30): what each producer's result
     // depends on. A producer whose received resources the renderer cannot
     // hand to C, or whose parent no one resource wraps, renders nothing;
     // Sema names it.
     let deps = facade_render_item_deps(pool, intern, ci, item)
     if not deps.ok:
+        return ("", facade_render_no_error_use())
+    let parent_drop_call = facade_render_parent_drop_call(pool, intern, ci, item, deps, drop_fn, repr_text, pinned)
+    if drop_fn != 0 and facade_render_param_count(pool, drop_fn) != 1 and facade_render_drop_helper(pool, intern, ci, item).len() == 0 and parent_drop_call.len() == 0:
         return ("", facade_render_no_error_use())
     let field = if pinned: "Box[" ++ repr_text ++ "]" else: repr_text
     // Stage 9 (ruling §45, spec §16.2b.9): userdata a callback method
@@ -1882,7 +1883,7 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     // No reference count or generation check is added (ruling §29).
     var out = if deps.slot_res.len() > 0: "type " ++ name ++ " ephemeral { " ++ facade_render_dep_fields(pool, intern, deps) ++ "repr: " ++ field ++ ", live: bool" ++ keep_fields ++ " }\n" else: "type " ++ name ++ " { repr: " ++ field ++ ", live: bool" ++ keep_fields ++ " }\n"
     if drop_fn != 0 or global_drop.len() > 0:
-        let drop_call = facade_render_drop_call(pool, intern, name, drop_fn, drop_global, repr_text, "self.repr", pinned, "            ")
+        let drop_call = if parent_drop_call.len() > 0: parent_drop_call else: facade_render_drop_call(pool, intern, name, drop_fn, drop_global, repr_text, "self.repr", pinned, "            ")
         // `abandon <fn>` (§16.2b.9): the `callbacks none` abandonment path
         // runs before the destroyer on a drop path whose callback pair is
         // not proven callback-free. A spurious call costs one call and a
@@ -3114,6 +3115,69 @@ fn facade_render_abandon_helper(pool: &AstPool, intern: &InternPool, resource: i
 // call `Drop` makes when `drop f(param N)` passes the resource at N and the
 // contract fixes or discards every other parameter. "" when no helper is
 // needed, or the shape is one Sema names.
+// D254: pointer type matching allowing `*mut T` <-> `*const T`.
+fn facade_render_ptr_same_pointee(a: &str, b: &str) -> bool:
+    if a == b: return true
+    if a.starts_with("*mut ") and b == "*const " ++ a.slice(5, a.len()): return true
+    if a.starts_with("*const ") and b == "*mut " ++ a.slice(7, a.len()): return true
+    false
+
+// D254: statement(s) and argument expression retrieving a dependent resource's
+// borrowed parent repr for a `drop F(param N)` that requires the parent pointer
+// (`png_destroy_info_struct`). Returns (pre_stmts, arg_expr).
+fn facade_render_drop_parent_arg(pool: &AstPool, intern: &InternPool, deps: &FacadeDeps, drop_fn: i32, pi: i32) -> (str, str):
+    let ptype = facade_render_param_type(pool, intern, drop_fn, pi)
+    let want = facade_render_unalias(pool, intern, ptype)
+    let matches = []
+    for (si, sres) in deps.slot_res.enumerate():
+        let rrepr = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(sres as NodeId)) as NodeId))
+        if facade_render_ptr_same_pointee(rrepr, want):
+            matches.push(si as i32)
+    if matches.len() == 0: return ("", "")
+    if matches.len() == 1 and not deps.slot_optional[matches[0]]:
+        return ("", "(self." ++ facade_render_slot_field(deps, matches[0]) ++ ".repr as " ++ ptype ++ ")")
+    let vname = f"facade_drop_parent_{pi}"
+    var pre = "var " ++ vname ++ ": " ++ ptype ++ " = null\n            "
+    for si in matches:
+        let fld = facade_render_slot_field(deps, si)
+        if deps.slot_optional[si]:
+            pre = pre ++ "match self." ++ fld ++ ":\n                Some(__fp) => " ++ vname ++ " = (__fp.repr as " ++ ptype ++ ")\n                None => {}\n            "
+        else:
+            pre = pre ++ vname ++ " = (self." ++ fld ++ ".repr as " ++ ptype ++ ")\n            "
+    (pre, vname)
+
+fn facade_render_parent_drop_call(pool: &AstPool, intern: &InternPool, ci: &List[i32], item: i32, deps: &FacadeDeps, drop_fn: i32, repr_text: &str, pinned: bool) -> str:
+    if drop_fn == 0 or deps.slot_res.len() == 0 or facade_render_param_count(pool, drop_fn) <= 1: return ""
+    if facade_render_drop_helper(pool, intern, ci, item).len() > 0: return ""
+    let dat = facade_render_destroyer_at(pool, intern, item, drop_fn)
+    var args = ""
+    var pre = ""
+    var uses_parent = false
+    for pi in 0..facade_render_param_count(pool, drop_fn):
+        if pi > 0: args = args ++ ", "
+        if pi == dat:
+            let ptype = facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, drop_fn, pi))
+            let unaliased_repr = facade_render_unalias(pool, intern, repr_text)
+            if not pinned and ptype == "*mut " ++ unaliased_repr:
+                pre = pre ++ "var facade_drop_p = self.repr\n            "
+                args = args ++ "&raw mut facade_drop_p"
+            else:
+                let rarg = facade_render_repr_arg_at(pool, intern, drop_fn, dat, repr_text, "self.repr", pinned)
+                if rarg.len() == 0: return ""
+                args = args ++ rarg
+            continue
+        let fixed = facade_render_fixed_literal(pool, intern, drop_fn, pi)
+        if fixed.len() > 0:
+            args = args ++ fixed
+            continue
+        let (ppre, parg) = facade_render_drop_parent_arg(pool, intern, deps, drop_fn, pi)
+        if parg.len() == 0: return ""
+        uses_parent = true
+        pre = pre ++ ppre
+        args = args ++ parg
+    if not uses_parent: return ""
+    pre ++ facade_render_call(pool, intern, drop_fn, args)
+
 fn facade_render_drop_helper(pool: &AstPool, intern: &InternPool, ci: &List[i32], resource: i32) -> str:
     let name = intern.resolve(pool.get_data0(resource as NodeId))
     let drop_fn = facade_render_drop_decl(pool, intern, ci, resource)
@@ -3253,7 +3317,7 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
         b.args = fixed
         return b
     let (bp, bl, mode, elements, fixed_sym) = facade_render_buffer_of(pool, intern, decl, pi)
-    let writable = mode == 1 or mode == 2 or mode == 4 or mode == 6 or mode == 7 or mode == 8 or mode == 11 or mode == 13
+    let writable = mode == 1 or mode == 2 or mode == 4 or mode == 6 or mode == 7 or mode == 8 or mode == 11 or mode == 13 or mode == 15
     let inout = mode == 1
     let is_updates = mode == 3 or mode == 4
     let is_fixed_size = mode == 5 or mode == 6
@@ -3261,9 +3325,43 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
     let is_out_alloc = mode == 9
     let is_min_fn = mode == 10 or mode == 11
     let is_stride = mode == 12 or mode == 13
+    let is_rows = mode == 14 or mode == 15
     let ptr_len = inout or is_updates or is_out_alloc
     if not is_fixed_size and ((bp < 0 and bl >= 0) or (bl < 0 and bp >= 0)):
         b.ok = false
+        return b
+    if bp == pi and is_rows:
+        // D254: `buffer param P len|capacity rows height <H_FN>(param A, <R>)
+        // rowbytes <RB_FN>(param A, <R>)` — flat byte slice + info resource,
+        // synthesizing a temporary row-pointer array for C (`png_read_image` /
+        // `png_write_image`).
+        let bclause = facade_render_buffer_clause(pool, intern, decl, pi)
+        if bclause == 0:
+            b.ok = false
+            return b
+        let bops = pool.get_data1(bclause as NodeId)
+        let h_fn = intern.resolve(fixed_sym)
+        let info_res = intern.resolve(pool.get_extra(bops + 5))
+        let rb_fn = intern.resolve(pool.get_extra(bops + 6))
+        let arg_expr = if bl == slot and slot_arg.len() > 0: slot_arg else: facade_render_param_name(pool, intern, start, bl)
+        let info_var = facade_render_fresh(pname ++ "_info", taken)
+        let h_var = facade_render_fresh(pname ++ "_h", taken)
+        let rb_var = facade_render_fresh(pname ++ "_rb", taken)
+        let rows_var = facade_render_fresh(pname ++ "_rows", taken)
+        let ry_var = facade_render_fresh(pname ++ "_ry", taken)
+        let fname = intern.resolve(pool.get_data0(decl as NodeId))
+        let slicety = if writable: "[]mut u8" else: "[]u8"
+        let base_expr = if writable: "&raw mut " ++ pname ++ "[0]" else: "&raw const " ++ pname ++ "[0]"
+        b.params = pname ++ ": " ++ slicety ++ ", " ++ info_var ++ ": &" ++ info_res
+        b.prologue = "let " ++ h_var ++ ": usize = (unsafe { " ++ h_fn ++ "(" ++ arg_expr ++ ", " ++ info_var ++ ".repr) }) as usize\n"
+        b.prologue = b.prologue ++ "let " ++ rb_var ++ ": usize = (unsafe { " ++ rb_fn ++ "(" ++ arg_expr ++ ", " ++ info_var ++ ".repr) }) as usize\n"
+        b.prologue = b.prologue ++ "if " ++ h_var ++ " == 0 or " ++ rb_var ++ " == 0 or " ++ pname ++ ".len() < " ++ h_var ++ " * " ++ rb_var ++ ": panic(\"" ++ fname ++ ": buffer '" ++ pname ++ "' is smaller than height * rowbytes (§16.2b.8)\")\n"
+        b.prologue = b.prologue ++ "var " ++ rows_var ++ ": List[*mut u8] = List.new()\n"
+        b.prologue = b.prologue ++ "var " ++ ry_var ++ ": usize = 0\n"
+        b.prologue = b.prologue ++ "while " ++ ry_var ++ " < " ++ h_var ++ ":\n"
+        b.prologue = b.prologue ++ "    " ++ rows_var ++ ".push(unsafe { ((" ++ base_expr ++ " as i64) + ((" ++ ry_var ++ " * " ++ rb_var ++ ") as i64)) as *mut u8 })\n"
+        b.prologue = b.prologue ++ "    " ++ ry_var ++ " = " ++ ry_var ++ " + 1\n"
+        b.args = "&raw mut " ++ rows_var ++ "[0]"
         return b
     if bp == pi and is_out_alloc:
         // D251: `buffer out param P len param L freed by F` — P receives
@@ -4616,7 +4714,7 @@ fn facade_render_wrapped_callbacks(pool: &AstPool, intern: &InternPool, cbi: &Fa
             continue
         var hits = 0
         for part in parts:
-            if facade_render_unalias(pool, intern, part) == hrepr: hits = hits + 1
+            if facade_render_ptr_same_pointee(facade_render_unalias(pool, intern, part), hrepr): hits = hits + 1
         if hits == 1:
             out.push(pi)
     out
@@ -4673,12 +4771,12 @@ fn facade_render_wrapper(pool: &AstPool, intern: &InternPool, ci: &List[i32], cb
         let a = facade_render_fresh(f"facade_a{j}", taken)
         names.push(a)
         params = params ++ (if j > 0: ", " else: "") ++ a
-        if facade_render_unalias(pool, intern, parts[j]) == hrepr: h = j as i32
+        if facade_render_ptr_same_pointee(facade_render_unalias(pool, intern, parts[j]), hrepr): h = j as i32
     if h < 0:
         return ""
     let inner = indent ++ "    "
     var body = indent ++ "let " ++ wname ++ ": " ++ raw ++ " = (" ++ params ++ ") => {\n"
-    body = body ++ inner ++ "let " ++ d ++ " = " ++ facade_render_call(pool, intern, acc_decl, names[h]) ++ " as *const " ++ cell_type ++ "\n"
+    body = body ++ inner ++ "let " ++ d ++ " = " ++ facade_render_call(pool, intern, acc_decl, names[h] ++ " as " ++ hrepr) ++ " as *const " ++ cell_type ++ "\n"
     let k = facade_render_argv_of(cbi, pi)
     // A position the callback does not have renders nothing: the checker
     // refuses it ("param 7 does not exist"), where indexing here panicked.

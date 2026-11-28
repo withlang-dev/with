@@ -6015,6 +6015,38 @@ impl Parser:
                 if extra_f == 0: return 0
                 if self.expect(TokenKind.TK_R_BRACKET) == 0: return 0
                 mode = if is_cap: 13 else: 12
+            else if self.current_ident_is("rows"):
+                // D254 (§16.2b.8): 2D row-pointer array (`T **`) synthesized from
+                // a flat byte slice checked against `height <H_FN>(param A, <R>)
+                // rowbytes <RB_FN>(param A, <R>)` (`png_read_image`, `png_write_image`).
+                self.advance()
+                if not self.current_ident_is("height"):
+                    self.emit_error("a rows buffer is written 'buffer param <P> len|capacity rows height <H_FN>(param <A>, <Resource>) rowbytes <RB_FN>(param <A>, <Resource>)' (§16.2b.8)")
+                    return 0
+                self.advance()
+                fixed_sym = self.expect_ident()
+                if fixed_sym == 0: return 0
+                if self.expect(TokenKind.TK_L_PAREN) == 0: return 0
+                l = self.parse_facade_param_ref()
+                if l == 0: return 0
+                if self.expect(TokenKind.TK_COMMA) == 0: return 0
+                extra_w = self.expect_ident()
+                if extra_w == 0: return 0
+                if self.expect(TokenKind.TK_R_PAREN) == 0: return 0
+                if not self.current_ident_is("rowbytes"):
+                    self.emit_error("a rows buffer is written 'buffer param <P> len|capacity rows height <H_FN>(param <A>, <Resource>) rowbytes <RB_FN>(param <A>, <Resource>)' (§16.2b.8)")
+                    return 0
+                self.advance()
+                extra_h = self.expect_ident()
+                if extra_h == 0: return 0
+                if self.expect(TokenKind.TK_L_PAREN) == 0: return 0
+                let l2 = self.parse_facade_param_ref()
+                if l2 == 0: return 0
+                if self.expect(TokenKind.TK_COMMA) == 0: return 0
+                extra_f = self.expect_ident()
+                if extra_f == 0: return 0
+                if self.expect(TokenKind.TK_R_PAREN) == 0: return 0
+                mode = if is_cap: 15 else: 14
             else:
                 l = self.parse_facade_param_ref()
                 if l == 0: return 0
@@ -6056,7 +6088,7 @@ impl Parser:
             if elements: self.advance()
             ops.push((elements) as i32)
             ops.push(fixed_sym)
-            if mode == 12 or mode == 13:
+            if mode >= 12:
                 ops.push(extra_w)
                 ops.push(extra_h)
                 ops.push(extra_f)
