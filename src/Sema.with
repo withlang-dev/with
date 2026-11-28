@@ -578,6 +578,10 @@ type ForeignContract {
     returns_borrow_domain: i32,     // the origin foreign-state domain (`from domain D`, §16.2b.7), or 0
     returns_borrow_parent: i32,     // D85 (§16.2b.6): `from parent P of param N` — the parent resource P of the resource param N receives, or 0
     returns_static_tid: i32,
+    returns_static_resource: i32,   // D256: `returns static <Resource>` for borrow-only `*const T` singletons
+    nv_slice_ptr: List[i32],        // D256: `nv_slice param P len param L` pointer parameter indices
+    nv_slice_len: List[i32],        // D256: `nv_slice param P len param L` length parameter indices (parallel)
+    nv_outs: List[i32],             // D256: `nv_out param P` output pair parameter indices
     preserves_params: List[i32],
     preserves_domains: List[i32],
     of_resource: i32,

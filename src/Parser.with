@@ -5952,35 +5952,42 @@ impl Parser:
             else:
                 ops.push(0)
         else if word == "buffer" and self.current_ident_is("out"):
-            // D251 (§16.2b.8): `buffer out param P len param L freed by F` —
-            // C allocates an output byte buffer through `*mut *mut u8` P and
-            // writes its length through `*mut <int>` L; the bridge copies it
-            // into an owned `List[u8]` and releases P with F.
+            // D251/D256 (§16.2b.8): `buffer out param P len param L freed by F`
+            // or `buffer out param P len return` (borrowed out-ptr whose byte
+            // length is the return value, copied into an owned `List[u8]`).
             kind = FACADE_CLAUSE_BUFFER
             self.advance()
             let p = self.parse_facade_param_ref()
             if p == 0: return 0
             if not self.current_ident_is("len"):
-                self.emit_error("an out-allocated buffer is written 'buffer out param <P> len param <L> freed by <fn>' (§16.2b.8)")
+                self.emit_error("an out buffer is written 'buffer out param <P> len param <L> freed by <fn>' or 'buffer out param <P> len return' (§16.2b.8)")
                 return 0
             self.advance()
-            let l = self.parse_facade_param_ref()
-            if l == 0: return 0
-            if not self.current_ident_is("freed"):
-                self.emit_error("an out-allocated buffer is written 'buffer out param <P> len param <L> freed by <fn>' (§16.2b.8)")
-                return 0
-            self.advance()
-            if not self.current_ident_is("by"):
-                self.emit_error("an out-allocated buffer is written 'buffer out param <P> len param <L> freed by <fn>' (§16.2b.8)")
-                return 0
-            self.advance()
-            let free_fn = self.expect_ident()
-            if free_fn == 0: return 0
-            ops.push(p)
-            ops.push(l)
-            ops.push(9)
-            ops.push(0)
-            ops.push(free_fn)
+            if self.peek() == TokenKind.TK_KW_RETURN:
+                self.advance()
+                ops.push(p)
+                ops.push(0)
+                ops.push(18)
+                ops.push(0)
+                ops.push(0)
+            else:
+                let l = self.parse_facade_param_ref()
+                if l == 0: return 0
+                if not self.current_ident_is("freed"):
+                    self.emit_error("an out-allocated buffer is written 'buffer out param <P> len param <L> freed by <fn>' (§16.2b.8)")
+                    return 0
+                self.advance()
+                if not self.current_ident_is("by"):
+                    self.emit_error("an out-allocated buffer is written 'buffer out param <P> len param <L> freed by <fn>' (§16.2b.8)")
+                    return 0
+                self.advance()
+                let free_fn = self.expect_ident()
+                if free_fn == 0: return 0
+                ops.push(p)
+                ops.push(l)
+                ops.push(9)
+                ops.push(0)
+                ops.push(free_fn)
         else if word == "buffer":
             // `buffer param P len param L` / `buffer param P capacity param L`
             // / `buffer param P capacity param L inout` (D64/D243, §16.2b.8):
@@ -6342,6 +6349,25 @@ impl Parser:
             if set_fn == 0: return 0
             ops.push(get_fn)
             ops.push(set_fn)
+        else if word == "nv_slice":
+            // D256: `nv_slice param P len param L` — array of `{name, value, namelen, valuelen, flags}` pairs.
+            kind = FacadeAsyncClause.NvSlice as i32
+            let p = self.parse_facade_param_ref()
+            if p == 0: return 0
+            if not self.current_ident_is("len"):
+                self.emit_error("an nv_slice clause is written 'nv_slice param <P> len param <L>' (D256)")
+                return 0
+            self.advance()
+            let l = self.parse_facade_param_ref()
+            if l == 0: return 0
+            ops.push(p)
+            ops.push(l)
+        else if word == "nv_out":
+            // D256: `nv_out param P` — single output `{name, value, namelen, valuelen, flags}` struct.
+            kind = FacadeAsyncClause.NvOut as i32
+            let p = self.parse_facade_param_ref()
+            if p == 0: return 0
+            ops.push(p)
         else if word == "param":
             // `param N fixed <literal>` (D64, §16.2b.11): the C parameter is
             // bound to the literal and leaves the presented signature.

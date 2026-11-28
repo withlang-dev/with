@@ -492,18 +492,22 @@ fn facade_render_hosted_fn_errors(pool: &AstPool, intern: &InternPool, ci: &List
         if abandon_fn != 0 and (facade_render_destroyer_at(pool, intern, resource, abandon_fn) != 0 or facade_render_param_count(pool, abandon_fn) > 1):
             out = out ++ facade_render_abandon_helper(pool, intern, resource, abandon_fn)
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
+    let outer_err_active = g_facade_render_active_item
     for item in items:
+        g_facade_render_active_item = item
         let li = facade_render_lend_item(pool, intern, ci, item)
-        if not li.bridged or li.variadic != 0 or li.text_view or li.borrow_res != 0 or not facade_render_lend_hosted(pool, intern, li, resource, repr):
+        if not li.bridged or li.variadic != 0 or li.text_view or li.borrow_res != 0 or li.static_res != 0 or not facade_render_lend_hosted(pool, intern, li, resource, repr):
             continue
         let at = facade_render_lend_at(pool, intern, li)
         let bridge = if at == 0: facade_render_bridge(pool, intern, li.decl, 1, -1, "") else: facade_render_bridge(pool, intern, li.decl, 0, at, "self.repr")
         let fname = intern.resolve(pool.get_data0(li.decl as NodeId))
+        let presented = if li.rename != 0: intern.resolve(li.rename) else: facade_render_present(pool, intern, ci, resource, fname)
         // D210: the record a field-paired operation returns.
-        if bridge.ok: out = out ++ facade_render_step_type(pool, intern, li.decl, intern.resolve(pool.get_data0(resource as NodeId)), facade_render_present(pool, intern, ci, resource, fname))
+        if bridge.ok: out = out ++ facade_render_step_type(pool, intern, li.decl, intern.resolve(pool.get_data0(resource as NodeId)), presented)
         if not bridge.ok or facade_render_fn_oks(pool, intern, li.decl).len() == 0:
             continue
-        out = out ++ facade_render_fn_error_type(pool, intern, li.decl, facade_render_present(pool, intern, ci, resource, fname), facade_render_message_call(pool, intern, ci, resource).len() > 0)
+        out = out ++ facade_render_fn_error_type(pool, intern, li.decl, presented, facade_render_message_call(pool, intern, ci, resource).len() > 0)
+    g_facade_render_active_item = outer_err_active
     // A variadic operation hosted here with `ok CONST` (D242, #3128): every
     // listed case presents a `Result` (`Result[T, E]` for `fills T`,
     // `Result[Unit, E]` for all other cases).
@@ -742,7 +746,9 @@ fn facade_render_lend_methods(pool: &AstPool, intern: &InternPool, ci: &List[i32
     let pinned = in_place and not facade_render_has_clause(pool, resource, FACADE_CLAUSE_MOVABLE)
     var out = ""
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
+    let outer_lend_active = g_facade_render_active_item
     for item in items:
+        g_facade_render_active_item = item
         let li = facade_render_lend_item(pool, intern, ci, item)
         if not facade_render_lend_hosted(pool, intern, li, resource, repr):
             continue
@@ -869,6 +875,7 @@ fn facade_render_lend_methods(pool: &AstPool, intern: &InternPool, ci: &List[i32
             continue
         let (ret, body) = facade_render_bridge_body(pool, intern, decl, bridge, facade_render_call(pool, intern, decl, call_args), mname, "        ", if failed_only: "" else: facade_render_message_call(pool, intern, ci, resource))
         out = out ++ head ++ mname ++ gens ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ pro ++ body
+    g_facade_render_active_item = outer_lend_active
     out
 
 // The names of a rendered parameter list, as arguments: `a: A, mut b: B`
@@ -1128,13 +1135,19 @@ fn facade_render_borrowed_type(pool: &AstPool, intern: &InternPool, ci: &List[i3
     let const_pointee = if unaliased_repr.starts_with("*const "): unaliased_repr.slice(7, unaliased_repr.len()) else: ""
     let const_globals = if facade_render_is_borrow_only_resource(pool, resource) and const_pointee.len() > 0: facade_render_const_globals(pool, intern, const_pointee) else: []
     var has_borrowed_return = false
+    var has_static_return = false
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
     for i in 0..items.len():
         let item = items[i]
         let cstart = pool.get_data1(item as NodeId)
         for k in 0..pool.get_data2(item as NodeId):
             let clause = pool.get_extra(cstart + k)
-            if pool.get_data0(clause as NodeId) != FACADE_CLAUSE_RETURNS_BORROW:
+            let ckind = pool.get_data0(clause as NodeId)
+            if ckind == FACADE_CLAUSE_RETURNS_STATIC:
+                if render_type_expr(pool, intern, pool.get_extra(pool.get_data1(clause as NodeId)) as NodeId) == rname:
+                    has_static_return = true
+                continue
+            if ckind != FACADE_CLAUSE_RETURNS_BORROW:
                 continue
             let ops = pool.get_data1(clause as NodeId)
             let res_name = intern.resolve(pool.get_extra(ops))
@@ -1152,8 +1165,7 @@ fn facade_render_borrowed_type(pool: &AstPool, intern: &InternPool, ci: &List[i3
                 continue
             has_borrowed_return = true
             break
-        if has_borrowed_return: break
-    if not has_borrowed_return and const_globals.len() == 0:
+    if not has_borrowed_return and not has_static_return and const_globals.len() == 0:
         return ""
     // D134 (§16.2b.6): one borrowed type serves every origin. The
     // origin is a type parameter bound at each call by the value
@@ -1163,7 +1175,10 @@ fn facade_render_borrowed_type(pool: &AstPool, intern: &InternPool, ci: &List[i3
     // borrow taken through a borrow views that borrow (D122).
     let bname = facade_render_borrowed_name(rname)
     let bfield = if not unaliased_repr.starts_with("*") and facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT): "*mut " ++ repr_text else: repr_text
-    var out = "type " ++ bname ++ "[Origin] ephemeral { origin: &Origin, repr: " ++ bfield ++ " }\n"
+    var out = ""
+    if has_static_return:
+        out = out ++ "let __facade_static_" ++ rname ++ ": i32 = 0\n"
+    out = out ++ "type " ++ bname ++ "[Origin] ephemeral { origin: &Origin, repr: " ++ bfield ++ " }\n"
     let detach = facade_render_detach_methods(pool, intern, ci, resource, repr_text)
     if methods.len() > 0 or detach.len() > 0:
         out = out ++ "impl[Origin] " ++ bname ++ "[Origin]:\n" ++ methods ++ detach
@@ -1653,6 +1668,7 @@ type FacadeLendItem {
     text_free: i32,          // `text return, owned, freed by F` (D122 §16.2b.8): F's symbol, or 0
     text_bytes: bool,        // `text return bytes` (D134 §16.2b.8): owned bytes even under a `text utf8` facade
     detaches: i32,           // `detaches param N` (D134 §16.2b.6): the param ref, or 0
+    static_res: i32,         // D256: `returns static <Resource>` resource symbol, or 0
 }
 
 // Whether the fn item states a variadic contract.
@@ -1663,7 +1679,7 @@ fn facade_item_is_variadic(pool: &AstPool, item: i32) -> bool:
     false
 
 fn facade_render_lend_item(pool: &AstPool, intern: &InternPool, ci: &List[i32], item: i32) -> FacadeLendItem:
-    let li = FacadeLendItem { decl: 0, of_sym: 0, of_param: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, present_cases: 0, record_view: false, text_free: 0, text_bytes: false, detaches: 0 }
+    let li = FacadeLendItem { decl: 0, of_sym: 0, of_param: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, present_cases: 0, record_view: false, text_free: 0, text_bytes: false, detaches: 0, static_res: 0 }
     let retain_clauses = []
     let cstart = pool.get_data1(item as NodeId)
     for k in 0..pool.get_data2(item as NodeId):
@@ -1688,9 +1704,13 @@ fn facade_render_lend_item(pool: &AstPool, intern: &InternPool, ci: &List[i32], 
             else if not facade_render_resource_named(pool, intern, intern.resolve(li.borrow_res)):
                 li.record_view = true
         else if kind == FACADE_CLAUSE_RETURNS_STATIC:
-            // `returns static CStr` (ruling §40): a text view of static
-            // storage, no origin to keep it inside.
-            if render_type_expr(pool, intern, pool.get_extra(ops) as NodeId) == "CStr": li.text_view = true
+            // `returns static CStr` (ruling §40) or `returns static <Resource>` (D256).
+            let st_node = pool.get_extra(ops)
+            let st_name = render_type_expr(pool, intern, st_node as NodeId)
+            if st_name == "CStr": li.text_view = true
+            else if facade_render_resource_named(pool, intern, st_name):
+                li.static_res = pool.get_data0(st_node as NodeId)
+                li.bridged = true
             else: li.lends = false
         else if kind == FACADE_CLAUSE_VALID_ON_FAILED: li.valid_on_failed = true
         // D122 (§16.2b.8): the returned text is new, owned, released with F.
@@ -3261,10 +3281,16 @@ type FacadeBridge {
     generics: str,     // D246: extra owner type params for borrow-only resource params, comma-separated
 }
 
+// D256: active `NK_FACADE_FN` item currently being rendered so multiple
+// renamed stanzas for the same C function resolve to their own clauses.
+var g_facade_render_active_item: i32 = 0
+
 // The fn item describing the C function the declaration `decl` names, in
 // any facade block, or 0.
 fn facade_render_fn_item(pool: &AstPool, intern: &InternPool, decl: i32) -> i32:
     let want = intern.resolve(pool.get_data0(decl as NodeId))
+    if g_facade_render_active_item != 0 and intern.resolve(pool.get_data0(g_facade_render_active_item as NodeId)) == want:
+        return g_facade_render_active_item
     let items = facade_render_all_items(pool, NodeKind.NK_FACADE_FN)
     for item in items:
         if intern.resolve(pool.get_data0(item as NodeId)) == want:
@@ -3480,6 +3506,31 @@ fn facade_render_buffer_of(pool: &AstPool, intern: &InternPool, decl: i32, pi: i
             return (p, l, mode, pool.get_extra(ops + 3), fixed_sym)
     (-1, -1, 0, 0, 0)
 
+// D256: `nv_slice param P len param L` lookup for parameter `pi`.
+fn facade_render_nv_slice_of(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32) -> (i32, i32):
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0: return (-1, -1)
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) != FacadeAsyncClause.NvSlice as i32: continue
+        let ops = pool.get_data1(clause as NodeId)
+        let p = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops))
+        let l = facade_render_param_ref(pool, intern, decl, pool.get_extra(ops + 1))
+        if p == pi or l == pi: return (p, l)
+    (-1, -1)
+
+// D256: whether `nv_out param P` names parameter `pi`.
+fn facade_render_is_nv_out(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32) -> bool:
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0: return false
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) != FacadeAsyncClause.NvOut as i32: continue
+        if facade_render_param_ref(pool, intern, decl, pool.get_extra(pool.get_data1(clause as NodeId))) == pi: return true
+    false
+
 // D252: return the FACADE_CLAUSE_BUFFER node for parameter `pi` (for reading
 // trailing stride operands `w_ref`, `h_ref`, `f_ref`), or 0.
 fn facade_render_buffer_clause(pool: &AstPool, intern: &InternPool, decl: i32, pi: i32) -> i32:
@@ -3557,6 +3608,53 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
             return b
         b.args = fixed
         return b
+    let (nvp, nvl) = facade_render_nv_slice_of(pool, intern, decl, pi)
+    if nvp == pi:
+        // D256: `nv_slice param P len param L` — `&List[(str, str)]` marshaled into
+        // a temporary `List[S]` with `flags = 0` so C copies every header byte.
+        let unaliased = facade_render_unalias(pool, intern, ptype)
+        let stype = if unaliased.starts_with("*const "): unaliased.slice(7, unaliased.len()) else if unaliased.starts_with("*mut "): unaliased.slice(5, unaliased.len()) else: ""
+        if stype.len() == 0:
+            b.ok = false
+            return b
+        let name_ty = facade_render_record_field_type(pool, intern, stype, "name")
+        let val_ty = facade_render_record_field_type(pool, intern, stype, "value")
+        let nlen_ty = facade_render_record_field_type(pool, intern, stype, "namelen")
+        let vlen_ty = facade_render_record_field_type(pool, intern, stype, "valuelen")
+        let flags_ty = facade_render_record_field_type(pool, intern, stype, "flags")
+        let vec_var = facade_render_fresh(pname ++ "_nvs", taken)
+        let idx_var = facade_render_fresh(pname ++ "_i", taken)
+        b.params = pname ++ ": &List[(str, str)]"
+        b.prologue = "var " ++ vec_var ++ ": List[" ++ stype ++ "] = List.new()\nvar " ++ idx_var ++ ": i64 = 0\nwhile " ++ idx_var ++ " < " ++ pname ++ ".len():\n    let __nv_kb: []u8 = " ++ pname ++ "[" ++ idx_var ++ "].0 as []u8\n    let __nv_vb: []u8 = " ++ pname ++ "[" ++ idx_var ++ "].1 as []u8\n    " ++ vec_var ++ ".push(" ++ stype ++ " { name: (if __nv_kb.len() == 0: null else: (&raw const __nv_kb[0] as " ++ name_ty ++ ")), value: (if __nv_vb.len() == 0: null else: (&raw const __nv_vb[0] as " ++ val_ty ++ ")), namelen: __nv_kb.len() as " ++ nlen_ty ++ ", valuelen: __nv_vb.len() as " ++ vlen_ty ++ ", flags: 0 as " ++ flags_ty ++ " })\n    " ++ idx_var ++ " = " ++ idx_var ++ " + 1\n"
+        b.args = "(if " ++ vec_var ++ ".len() == 0: null else: (&raw const " ++ vec_var ++ "[0] as " ++ ptype ++ "))"
+        return b
+    if nvl == pi:
+        let bname = facade_render_param_name(pool, intern, start, nvp)
+        let vec_var = facade_render_fresh(bname ++ "_nvs", taken)
+        b.args = "(" ++ vec_var ++ ".len() as " ++ ptype ++ ")"
+        return b
+    if facade_render_is_nv_out(pool, intern, decl, pi):
+        // D256: `nv_out param P` — single output `{name, value, namelen, valuelen, flags}`
+        // copied immediately into an owned `(List[u8], List[u8])` fill return.
+        let unaliased = facade_render_unalias(pool, intern, ptype)
+        let stype = if unaliased.starts_with("*mut "): unaliased.slice(5, unaliased.len()) else: ""
+        if stype.len() == 0:
+            b.ok = false
+            return b
+        let nlen_ty = facade_render_record_field_type(pool, intern, stype, "namelen")
+        let vlen_ty = facade_render_record_field_type(pool, intern, stype, "valuelen")
+        let flags_ty = facade_render_record_field_type(pool, intern, stype, "flags")
+        let nv_var = facade_render_fresh(pname ++ "_nv", taken)
+        let n_out = facade_render_fresh(pname ++ "_name", taken)
+        let v_out = facade_render_fresh(pname ++ "_val", taken)
+        let i_var = facade_render_fresh(pname ++ "_i", taken)
+        let pair_var = facade_render_fresh(pname ++ "_out", taken)
+        b.prologue = "var " ++ nv_var ++ ": " ++ stype ++ " = " ++ stype ++ " { name: null, value: null, namelen: 0 as " ++ nlen_ty ++ ", valuelen: 0 as " ++ vlen_ty ++ ", flags: 0 as " ++ flags_ty ++ " }\n"
+        b.args = "&raw mut " ++ nv_var
+        b.post_checks = "var " ++ n_out ++ ": List[u8] = List.new()\nif " ++ nv_var ++ ".name != null and " ++ nv_var ++ ".namelen > 0:\n    var " ++ i_var ++ ": i64 = 0\n    while " ++ i_var ++ " < (" ++ nv_var ++ ".namelen as i64):\n        " ++ n_out ++ ".push(unsafe { *((" ++ nv_var ++ ".name as i64 + " ++ i_var ++ ") as *const u8) })\n        " ++ i_var ++ " = " ++ i_var ++ " + 1\nvar " ++ v_out ++ ": List[u8] = List.new()\nif " ++ nv_var ++ ".value != null and " ++ nv_var ++ ".valuelen > 0:\n    var " ++ i_var ++ "_v: i64 = 0\n    while " ++ i_var ++ "_v < (" ++ nv_var ++ ".valuelen as i64):\n        " ++ v_out ++ ".push(unsafe { *((" ++ nv_var ++ ".value as i64 + " ++ i_var ++ "_v) as *const u8) })\n        " ++ i_var ++ "_v = " ++ i_var ++ "_v + 1\nlet " ++ pair_var ++ ": (List[u8], List[u8]) = (" ++ n_out ++ ", " ++ v_out ++ ")\n"
+        b.fills = pair_var
+        b.fill_types = "(List[u8], List[u8])"
+        return b
     let (bp, bl, mode, elements, fixed_sym) = facade_render_buffer_of(pool, intern, decl, pi)
     let writable = mode == 1 or mode == 2 or mode == 4 or mode == 6 or mode == 7 or mode == 8 or mode == 11 or mode == 13 or mode == 15 or mode == 17
     let inout = mode == 1
@@ -3568,9 +3666,28 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
     let is_stride = mode == 12 or mode == 13
     let is_rows = mode == 14 or mode == 15
     let is_iov = mode == 16 or mode == 17
+    let is_out_ret = mode == 18
     let ptr_len = inout or is_updates or is_out_alloc
-    if not is_fixed_size and ((bp < 0 and bl >= 0) or (bl < 0 and bp >= 0)):
+    if not is_fixed_size and not is_out_ret and ((bp < 0 and bl >= 0) or (bl < 0 and bp >= 0)):
         b.ok = false
+        return b
+    if bp == pi and is_out_ret:
+        // D256: `buffer out param P len return` — borrowed out-pointer whose byte
+        // length is the integer return value, copied immediately into `List[u8]`.
+        let ptr_type = facade_render_unalias(pool, intern, ptype)
+        if not ptr_type.starts_with("*mut "):
+            b.ok = false
+            return b
+        let elem_ptr = ptr_type.slice(5, ptr_type.len())
+        let ptr_var = facade_render_fresh(pname ++ "_out_ptr", taken)
+        let out_var = facade_render_fresh(pname ++ "_out", taken)
+        let idx_var = facade_render_fresh(pname ++ "_i", taken)
+        let ret_var = facade_render_fresh("status", taken)
+        b.prologue = "var " ++ ptr_var ++ ": " ++ elem_ptr ++ " = null\n"
+        b.args = "&raw mut " ++ ptr_var
+        b.post_checks = "var " ++ out_var ++ ": List[u8] = List.new()\nif " ++ ptr_var ++ " != null and " ++ ret_var ++ " > 0:\n    var " ++ idx_var ++ ": i64 = 0\n    while " ++ idx_var ++ " < (" ++ ret_var ++ " as i64):\n        " ++ out_var ++ ".push(unsafe { *((" ++ ptr_var ++ " as i64 + " ++ idx_var ++ ") as *const u8) })\n        " ++ idx_var ++ " = " ++ idx_var ++ " + 1\n"
+        b.fills = out_var
+        b.fill_types = "List[u8]"
         return b
     if bp == pi and is_iov:
         // D255: `buffer param P len|capacity param L via <init_fn>` — fat-pointer
@@ -4249,14 +4366,16 @@ fn facade_render_free_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32], f
     var out = facade_render_callback_ops(pool, intern, ci, 0, facade)
     let extra_start = pool.get_data1(facade as NodeId)
     let resources = facade_render_all_items(pool, NodeKind.NK_FACADE_RESOURCE)
+    let outer_free_active = g_facade_render_active_item
     for i in 0..pool.get_data2(facade as NodeId):
         let item = pool.get_extra(extra_start + i)
         if pool.kind(item as NodeId) != NodeKind.NK_FACADE_FN:
             continue
+        g_facade_render_active_item = item
         let li = facade_render_lend_item(pool, intern, ci, item)
         if not li.lends or li.decl == 0 or li.text_view or (li.borrow_res != 0 and not li.record_view):
             continue
-        if not li.bridged and li.variadic == 0 and not li.record_view and li.text_free == 0:
+        if not li.bridged and li.variadic == 0 and not li.record_view and li.text_free == 0 and li.static_res == 0:
             continue
         var hosted = false
         for resource in resources:
@@ -4276,6 +4395,13 @@ fn facade_render_free_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32], f
         if not bridge.ok:
             continue
         let base = if li.rename != 0: presented else: facade_render_bridge_name(cname)
+        if li.static_res != 0:
+            let srname = intern.resolve(li.static_res)
+            let sbname = facade_render_borrowed_name(srname)
+            let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
+            let gens = if bridge.generics.len() > 0: "[" ++ bridge.generics ++ "]" else: ""
+            out = out ++ "fn " ++ base ++ gens ++ "(" ++ bridge.params ++ ") -> Option[" ++ sbname ++ "[i32]]:\n" ++ facade_render_indent(bridge.prologue, "    ") ++ "    let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, bridge.args) ++ "\n    if " ++ handle ++ " == null: None else: Some(" ++ sbname ++ " { origin: &__facade_static_" ++ srname ++ ", repr: " ++ handle ++ " })\n"
+            continue
         if li.variadic != 0:
             // One function per case (D66, §16.2b.5), `<base>__<CONST>`;
             // a call to the presented name is retargeted to the case
@@ -4302,6 +4428,7 @@ fn facade_render_free_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32], f
         let rendered = if li.rename != 0: presented else: facade_render_bridge_name(cname)
         let (result, body) = facade_render_bridge_body(pool, intern, decl, bridge, facade_render_call(pool, intern, decl, bridge.args), presented, "    ", "")
         out = out ++ "fn " ++ rendered ++ "(" ++ bridge.params ++ ")" ++ result ++ ":\n" ++ facade_render_indent(bridge.prologue, "    ") ++ body
+    g_facade_render_active_item = outer_free_active
     out
 
 // Whether a facade block of the compilation declares a resource `name`.
@@ -4880,7 +5007,7 @@ fn facade_render_callback_item(pool: &AstPool, intern: &InternPool, ci: &List[i3
 fn facade_render_callback_hosted(pool: &AstPool, intern: &InternPool, cbi: &FacadeCallbackItem, resource: i32, repr: &str) -> bool:
     if cbi.decl == 0:
         return false
-    let li = FacadeLendItem { decl: cbi.decl, of_sym: cbi.of_sym, of_param: cbi.of_param, rename: cbi.rename, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, present_cases: 0, record_view: false, text_free: 0, text_bytes: false, detaches: 0 }
+    let li = FacadeLendItem { decl: cbi.decl, of_sym: cbi.of_sym, of_param: cbi.of_param, rename: cbi.rename, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, present_cases: 0, record_view: false, text_free: 0, text_bytes: false, detaches: 0, static_res: 0 }
     facade_render_lend_hosted(pool, intern, li, resource, repr)
 
 // Whether some callback method of `resource` retains userdata: the

@@ -300,16 +300,18 @@ fn facade_clause_bridges(kind: i32) -> bool:
     // A `text return` on a free operation renders its bridge too (the copy
     // and the release): unlisted, the bridge was rendered and a call by the
     // C name never reached it.
-    kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_BUFFER_FIELD or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_DISCARDED or kind == FACADE_CLAUSE_OK or kind == FACADE_CLAUSE_NULLABLE or kind == FACADE_CLAUSE_TEXT_PARAM or kind == FACADE_CLAUSE_VALUE_RECORD or kind == FACADE_CLAUSE_TEXT_RETURN or kind == FacadeAsyncClause.AsyncReq as i32 or kind == FacadeAsyncClause.ReadAllocPair as i32 or kind == FacadeAsyncClause.CloseRelease as i32
+    kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_BUFFER_FIELD or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_DISCARDED or kind == FACADE_CLAUSE_OK or kind == FACADE_CLAUSE_NULLABLE or kind == FACADE_CLAUSE_TEXT_PARAM or kind == FACADE_CLAUSE_VALUE_RECORD or kind == FACADE_CLAUSE_TEXT_RETURN or kind == FacadeAsyncClause.AsyncReq as i32 or kind == FacadeAsyncClause.ReadAllocPair as i32 or kind == FacadeAsyncClause.CloseRelease as i32 or kind == FacadeAsyncClause.NvSlice as i32 or kind == FacadeAsyncClause.NvOut as i32
 pub const FACADE_CLAUSE_BUFFER_FIELD: i32 = 46     // [pointer_field_sym, count_field_sym]  (`buffer field P remaining field N`: a slice carried by two fields of the resource's record, D210 §16.2b.8)
 pub const FACADE_CLAUSE_DISCARDED: i32 = 48        // [param_ref]  (`param N discarded`: an out-pointer the wrapper hands scratch storage, D209 §16.2b.11)
-// D255: C struct-prefix subtyping and async event-loop handle/request clauses.
+// D255/D256: C struct-prefix subtyping, async event-loop clauses, and nv header clauses.
 enum FacadeAsyncClause: i32:
     Extends = 56         // [base_sym]  (`extends Base`)
     AsyncClose = 57      // [close_fn_sym, check_fn_sym]  (`async_close <close_fn> check <check_fn>`)
     AsyncReq = 58        // [req_param_ref, set_fn_sym, get_fn_sym]  (`async_req param N via <set>, <get>`)
     ReadAllocPair = 59   // [alloc_cb_ref, buf_init_sym, read_cb_ref, set_fn_sym, get_fn_sym]
     CloseRelease = 60    // [get_fn_sym, set_fn_sym]  (`close_release via <get>, <set>`)
+    NvSlice = 61         // [ptr_ref, len_ref]  (`nv_slice param P len param L`, D256)
+    NvOut = 62           // [ptr_ref]  (`nv_out param P`, D256)
 // #3121 (§16.2b.4): `null status CONST` clause tag (numbered beside FACADE_CLAUSE_*).
 enum FacadeStatusClause: i32:
     NullStatus = 49 // [const_sym]
