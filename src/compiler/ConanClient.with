@@ -2486,6 +2486,7 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
     let meta = runtime_read_file(dep_dir ++ "/metadata.json")
     let import_dirs: List[str] = []
     for rel in json_extract_string_array(meta, "include_paths"): import_dirs.push(dep_dir ++ "/" ++ rel)
+    let import_defines = json_extract_string_array(meta, "defines")
     let libs = json_extract_string_array(meta, "libs")
     let link_lib: str = if libs.len() > 0: libs[0] else: ""
     var registry = conan_registry_facts(name, dep_dir)
@@ -2512,7 +2513,7 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
     if library.units.len() == 0 and g_migrate_facade_without_bodies == 0:
         conan_write_header_only_binary_contract(name, version, dep_dir)
         return
-    let summary = migrate_c_facade_for_package(library.units, corpus.include_paths, corpus.defines, source_dir, name, version, registry.path, import_dirs, link_lib, dep_dir ++ "/contract.with", report_path)
+    let summary = migrate_c_facade_for_package(library.units, corpus.include_paths, corpus.defines, source_dir, name, version, registry.path, import_dirs, import_defines, link_lib, dep_dir ++ "/contract.with", report_path)
     if library.note.len() > 0 and runtime_file_exists(report_path) != 0:
         let _noted = runtime_write_file(report_path, runtime_read_file(report_path) ++ "  " ++ library.note ++ "\n")
     if summary.len() == 0: return
