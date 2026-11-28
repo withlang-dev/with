@@ -1,0 +1,154 @@
+// Zero-unsafe UAT for c.libssh2 (#3145): connect over loopback TCP to a
+// temporary non-root sshd, authenticate with an ed25519 key pair, execute a
+// remote command over an SSH channel and verify its output + exit status,
+// and write/read/stat/unlink a file over SFTP.
+use contracts.libssh2
+use c_import("libssh2.h")
+use c_import("libssh2_sftp.h")
+use std.fs
+use std.net
+use std.process
+use std.string.StringBuilder
+use std.time
+
+fn find_first_existing(paths: &List[str]) -> str:
+    for i in 0..paths.len():
+        if file_exists(paths[i]):
+            return paths[i]
+    ""
+
+fn main:
+    let sshd_bin = find_first_existing(&["/usr/sbin/sshd", "/sbin/sshd"])
+    assert(sshd_bin.len() > 0)
+    let sftp_srv = find_first_existing(&[
+        "/usr/libexec/sftp-server",
+        "/usr/lib/openssh/sftp-server",
+        "/usr/libexec/openssh/sftp-server",
+    ])
+    assert(sftp_srv.len() > 0)
+
+    let work = f"/tmp/with-libssh2-uat-{pid()}"
+    let _ = remove_tree(work)
+    assert(mkdir_p(work) == 0)
+    assert(chmod(work, 448) == 0)
+
+    let host_key = f"{work}/host_ed25519"
+    let user_key = f"{work}/user_ed25519"
+    let user_pub = f"{work}/user_ed25519.pub"
+    let auth_keys = f"{work}/authorized_keys"
+    let pid_file = f"{work}/sshd.pid"
+    let cfg_file = f"{work}/sshd_config"
+
+    assert(run(&["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", host_key]) == 0)
+    assert(run(&["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", user_key]) == 0)
+    let pub_text = read_file(user_pub).unwrap()
+    assert(write_file(auth_keys, pub_text) == 0)
+    assert(chmod(auth_keys, 384) == 0)
+    assert(chmod(user_key, 384) == 0)
+
+    let probe = tcp_listen(0)
+    assert(probe >= 0)
+    let port = sock_port(probe)
+    let _ = socket_close(probe)
+    assert(port > 0)
+
+    let cfg = f"ListenAddress 127.0.0.1:{port}\nHostKey {host_key}\nPidFile {pid_file}\nAuthorizedKeysFile {auth_keys}\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nPubkeyAuthentication yes\nUsePAM no\nStrictModes no\nSubsystem sftp {sftp_srv}\n"
+    assert(write_file(cfg_file, cfg) == 0)
+    assert(run(&[sshd_bin, "-f", cfg_file]) == 0)
+    let wait_start = Instant.now()
+    var sshd_pid = ""
+    while wait_start.elapsed().as_millis() < 5000:
+        if file_exists(pid_file):
+            let got_pid = read_file(pid_file)
+            if got_pid.is_ok():
+                let trimmed = got_pid.unwrap().trim()
+                if trimmed.len() > 0:
+                    sshd_pid = trimmed
+                    break
+    assert(sshd_pid.len() > 0)
+    defer:
+        let _ = run(&["kill", sshd_pid])
+        let _ = remove_tree(work)
+
+    let user = env("USER")
+    assert(user.len() > 0)
+
+    assert(libssh2_init(0) == 0)
+    let ver = libssh2_version(0).unwrap().to_str_lossy()
+    assert(ver.starts_with("1."))
+
+    var sock: i32 = -1
+    let conn_start = Instant.now()
+    while conn_start.elapsed().as_millis() < 5000:
+        sock = tcp_connect_timeout("127.0.0.1", port, 200)
+        if sock >= 0:
+            break
+    assert(sock >= 0)
+
+    var exec_out = ""
+    var sftp_out = ""
+    {
+        let session = Session.new().unwrap()
+        session.set_blocking(1)
+        assert(session.handshake(sock) == 0)
+        assert(session.banner_get().unwrap().to_str_lossy().contains("SSH-2.0"))
+
+        assert(session.userauth_publickey_fromfile_ex(user as []u8, Some(user_pub), user_key, None) == 0)
+        assert(session.userauth_authenticated() != 0)
+
+        // 1. Exec a remote command over an SSH channel and read stdout
+        {
+            let ch = session.open_ex("session" as []u8, LIBSSH2_CHANNEL_WINDOW_DEFAULT as u32, LIBSSH2_CHANNEL_PACKET_DEFAULT as u32).unwrap()
+            assert(ch.process_startup("exec" as []u8, "printf libssh2-exec-ok" as []u8) == 0)
+            let out_sb = StringBuilder.new()
+            var rbuf: [u8; 256] = [0 as u8; 256]
+            while true:
+                let n = ch.read_ex(0, rbuf)
+                if n <= 0:
+                    break
+                for i in 0..n:
+                    out_sb.push_byte(rbuf[i as isize])
+            assert(ch.close() == 0)
+            assert(ch.wait_closed() == 0)
+            assert(ch.get_exit_status() == 0)
+            exec_out = out_sb.to_str()
+            assert(exec_out == "libssh2-exec-ok")
+        }
+
+        // 2. SFTP write, read back, fstat, and unlink
+        {
+            let sftp = session.sftp_init().unwrap()
+            let remote_path = f"{work}/sftp_roundtrip.txt"
+            let payload = "hello-over-sftp-from-with"
+            let wflags = (LIBSSH2_FXF_WRITE | LIBSSH2_FXF_CREAT | LIBSSH2_FXF_TRUNC) as u64
+            let wmode = (LIBSSH2_SFTP_S_IRUSR | LIBSSH2_SFTP_S_IWUSR) as i64
+            {
+                let wh = sftp.open_ex(remote_path as []u8, wflags, wmode, LIBSSH2_SFTP_OPENFILE).unwrap()
+                let written = wh.write(payload as []u8)
+                assert(written == payload.len() as i64)
+            }
+            {
+                let rh = sftp.open_ex(remote_path as []u8, LIBSSH2_FXF_READ as u64, 0, LIBSSH2_SFTP_OPENFILE).unwrap()
+                var sbuf: [u8; 128] = [0 as u8; 128]
+                let got = rh.read(sbuf)
+                assert(got == payload.len() as i64)
+                let sb = StringBuilder.new()
+                for i in 0..got:
+                    sb.push_byte(sbuf[i as isize])
+                sftp_out = sb.to_str()
+                assert(sftp_out == payload)
+                let (fstat_rc, attrs) = rh.fstat_ex(0)
+                assert(fstat_rc == 0)
+                assert(attrs.filesize == payload.len() as u64)
+            }
+            assert(sftp.unlink_ex(remote_path as []u8) == 0)
+        }
+
+        let _ = session.disconnect_ex(SSH_DISCONNECT_BY_APPLICATION, "done", "")
+    }
+
+    let _ = socket_close(sock)
+    libssh2_exit()
+
+    print(f"libssh2 {ver}: exec={exec_out} sftp={sftp_out}")
+    print("libssh2 ok")

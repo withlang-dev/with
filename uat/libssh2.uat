@@ -1,0 +1,13 @@
+scenario: c.libssh2 connects with public-key auth, executes a remote command, and reads/writes via SFTP without unsafe
+requires: network
+platforms: darwin, linux-x86_64
+# D171, #3145: libssh2 depends transitively on OpenSSL, which links Conan
+# Center's prebuilt binary on darwin and linux-x86_64.
+
+new directory
+run: with init .
+run: with get c.libssh2
+write src/main.with from libssh2_main.with
+run: with run
+expect exit: 0
+expect stdout contains: libssh2 ok

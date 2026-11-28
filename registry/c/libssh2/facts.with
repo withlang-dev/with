@@ -1,0 +1,340 @@
+// libssh2 1.11.1, the version `with get c.libssh2` pins. Every citation is a
+// line of the package's installed headers, include/libssh2.h and
+// include/libssh2_sftp.h.
+//
+// Resource hierarchy:
+// - Session (`LIBSSH2_SESSION *`), created by libssh2_session_init_ex (with
+//   default allocators and NULL abstract) and freed by libssh2_session_free.
+// - Channel (`LIBSSH2_CHANNEL *`), borrows Session, created by
+//   libssh2_channel_open_ex / direct_tcpip_ex / direct_streamlocal_ex and
+//   freed by libssh2_channel_free.
+// - Sftp (`LIBSSH2_SFTP *`), borrows Session, created by libssh2_sftp_init
+//   and shut down by libssh2_sftp_shutdown.
+// - SftpHandle (`LIBSSH2_SFTP_HANDLE *`), borrows Sftp, created by
+//   libssh2_sftp_open_ex and closed by libssh2_sftp_close_handle.
+// - KnownHosts (`LIBSSH2_KNOWNHOSTS *`), borrows Session.
+// - Agent (`LIBSSH2_AGENT *`), borrows Session.
+//
+// Raw functions (genuinely unmodeled/unsafe by nature):
+// - libssh2_free / libssh2_session_abstract / libssh2_session_callback_set*:
+//   raw allocator frees, untyped void** abstract storage, generic callback casts.
+// - libssh2_session_supported_algs / libssh2_base64_decode /
+//   libssh2_userauth_banner / libssh2_channel_get_exit_signal: out-pointers
+//   allocating buffers freed via libssh2_free.
+// - libssh2_userauth_publickey / keyboard_interactive / publickey_sk / sign_sk:
+//   raw crypto signing and interactive prompt callbacks with void** abstract.
+// - libssh2_poll / libssh2_channel_forward_*: raw pollfd arrays and listener loops.
+// - libssh2_scp_*: legacy SCP protocol with platform `struct stat` pointers.
+// - libssh2_publickey_*: legacy publickey subsystem with raw list allocations.
+c facts libssh2:
+    // ── Session ───────────────────────────────────────────────────
+    resource Session wraps *mut _LIBSSH2_SESSION
+        from libssh2_session_init_ex    // libssh2.h 1.11.1:646: allocates a new SSH session
+        drop libssh2_session_free    // libssh2.h 1.11.1:682: frees all session resources
+    fn libssh2_session_init_ex
+        rename new    // libssh2.h 1.11.1:649: Session.new() mirrors libssh2_session_init()
+        param 0 fixed null    // libssh2.h 1.11.1:646: default allocator
+        param 1 fixed null    // libssh2.h 1.11.1:647: default deallocator
+        param 2 fixed null    // libssh2.h 1.11.1:648: default reallocator
+        param 3 fixed null    // libssh2.h 1.11.1:648: NULL abstract user pointer
+    fn libssh2_session_banner_set
+        of Session    // libssh2.h 1.11.1:662: sets local SSH protocol banner
+        lend    // libssh2.h 1.11.1:662: copies banner string into session
+    fn libssh2_banner_set
+        of Session    // libssh2.h 1.11.1:666: deprecated alias for libssh2_session_banner_set
+        rename legacy_banner_set    // libssh2.h 1.11.1:666: disambiguate from session_banner_set
+        lend    // libssh2.h 1.11.1:666: copies banner string into session
+    fn libssh2_session_banner_get
+        of Session    // libssh2.h 1.11.1:706: returns remote SSH banner string
+        lend    // libssh2.h 1.11.1:706: borrows session
+        returns borrow CStr from param 0    // libssh2.h 1.11.1:706: banner string owned by session
+    fn libssh2_session_handshake
+        of Session    // libssh2.h 1.11.1:672: performs SSH transport handshake over connected socket
+        lend    // libssh2.h 1.11.1:672: borrows session
+    fn libssh2_session_disconnect_ex
+        of Session    // libssh2.h 1.11.1:674: sends SSH disconnect message
+        lend    // libssh2.h 1.11.1:674: borrows session and message strings
+    fn libssh2_hostkey_hash
+        of Session    // libssh2.h 1.11.1:684: returns remote hostkey hash digest
+        lend    // libssh2.h 1.11.1:684: borrows session
+        returns borrow CStr from param 0    // libssh2.h 1.11.1:684: buffer owned by session
+    fn libssh2_session_method_pref
+        of Session    // libssh2.h 1.11.1:690: sets preferred algorithm list for method_type
+        lend    // libssh2.h 1.11.1:690: copies prefs string into session
+    fn libssh2_session_methods
+        of Session    // libssh2.h 1.11.1:693: returns negotiated method name
+        lend    // libssh2.h 1.11.1:693: borrows session
+        returns borrow CStr from param 0    // libssh2.h 1.11.1:693: static/session-owned method name
+    fn libssh2_session_last_errno
+        of Session    // libssh2.h 1.11.1:698: returns last libssh2 error code
+        lend    // libssh2.h 1.11.1:698: borrows session
+    fn libssh2_session_block_directions
+        of Session    // libssh2.h 1.11.1:702: returns blocking direction bitmask
+        lend    // libssh2.h 1.11.1:702: borrows session
+    fn libssh2_session_flag
+        of Session    // libssh2.h 1.11.1:704: sets session option flag
+        lend    // libssh2.h 1.11.1:704: borrows session
+    fn libssh2_session_set_blocking
+        of Session    // libssh2.h 1.11.1:988: toggles blocking I/O mode
+        lend    // libssh2.h 1.11.1:988: borrows session
+    fn libssh2_session_get_blocking
+        of Session    // libssh2.h 1.11.1:990: queries blocking I/O mode
+        lend    // libssh2.h 1.11.1:990: borrows session
+    fn libssh2_session_set_timeout
+        of Session    // libssh2.h 1.11.1:995: sets blocking timeout in milliseconds
+        lend    // libssh2.h 1.11.1:995: borrows session
+    fn libssh2_session_get_timeout
+        of Session    // libssh2.h 1.11.1:997: returns blocking timeout in milliseconds
+        lend    // libssh2.h 1.11.1:997: borrows session
+    fn libssh2_session_set_read_timeout
+        of Session    // libssh2.h 1.11.1:999: sets read timeout in seconds
+        lend    // libssh2.h 1.11.1:999: borrows session
+    fn libssh2_session_get_read_timeout
+        of Session    // libssh2.h 1.11.1:1001: returns read timeout in seconds
+        lend    // libssh2.h 1.11.1:1001: borrows session
+    fn libssh2_userauth_authenticated
+        of Session    // libssh2.h 1.11.1:714: returns nonzero if session is authenticated
+        lend    // libssh2.h 1.11.1:714: borrows session
+    fn libssh2_userauth_password_ex
+        of Session    // libssh2.h 1.11.1:717: authenticates via username and password
+        lend    // libssh2.h 1.11.1:717: borrows session and credential slices
+        buffer param 1 len param 2    // libssh2.h 1.11.1:718: username bytes
+        buffer param 3 len param 4    // libssh2.h 1.11.1:720: password bytes
+        param 5 fixed null    // libssh2.h 1.11.1:722: NULL password-change callback
+    fn libssh2_userauth_publickey_fromfile_ex
+        of Session    // libssh2.h 1.11.1:732: authenticates via public/private key files
+        lend    // libssh2.h 1.11.1:732: borrows session and path strings
+        buffer param 1 len param 2    // libssh2.h 1.11.1:733: username bytes
+        nullable param 3    // libssh2.h 1.11.1:735: publickey path may be NULL when derived from privatekey
+        nullable param 5    // libssh2.h 1.11.1:737: passphrase may be NULL for unencrypted keys
+    fn libssh2_userauth_publickey_frommemory
+        of Session    // libssh2.h 1.11.1:779: authenticates via in-memory key buffers
+        lend    // libssh2.h 1.11.1:779: borrows session and key buffers
+        buffer param 1 len param 2    // libssh2.h 1.11.1:780: username bytes
+        buffer param 3 len param 4    // libssh2.h 1.11.1:782: public key bytes
+        buffer param 5 len param 6    // libssh2.h 1.11.1:784: private key bytes
+        nullable param 7    // libssh2.h 1.11.1:786: passphrase may be NULL
+    fn libssh2_keepalive_config
+        of Session    // libssh2.h 1.11.1:1472: configures SSH keepalive interval
+        lend    // libssh2.h 1.11.1:1472: borrows session
+    fn libssh2_keepalive_send
+        of Session    // libssh2.h 1.11.1:1484: sends keepalive packet if interval elapsed
+        lend    // libssh2.h 1.11.1:1484: borrows session
+        fills param 1    // libssh2.h 1.11.1:1484: writes seconds_to_next
+    fn libssh2_trace
+        of Session    // libssh2.h 1.11.1:1491: sets debug trace bitmask
+        lend    // libssh2.h 1.11.1:1491: borrows session
+
+    // ── Channel ───────────────────────────────────────────────────
+    resource Channel wraps *mut _LIBSSH2_CHANNEL
+        from libssh2_channel_open_ex    // libssh2.h 1.11.1:839: opens an SSH channel
+        borrows param 0    // libssh2.h 1.11.1:839: channel retains session pointer
+        from libssh2_channel_direct_tcpip_ex    // libssh2.h 1.11.1:850: opens a direct-tcpip forwarding channel
+        borrows param 0    // libssh2.h 1.11.1:850: channel retains session pointer
+        from libssh2_channel_direct_streamlocal_ex    // libssh2.h 1.11.1:856: opens a Unix-socket forwarding channel
+        borrows param 0    // libssh2.h 1.11.1:856: channel retains session pointer
+        drop libssh2_channel_free    // libssh2.h 1.11.1:1047: frees channel resources
+    fn libssh2_channel_open_ex
+        rename open_ex    // libssh2.h 1.11.1:839: session.open_ex(channel_type, window, packet)
+        buffer param 1 len param 2    // libssh2.h 1.11.1:839: channel_type bytes (e.g. "session")
+        param 5 fixed null    // libssh2.h 1.11.1:842: NULL extra open message
+        param 6 fixed 0    // libssh2.h 1.11.1:842: zero message_len
+    fn libssh2_channel_direct_tcpip_ex
+        rename direct_tcpip    // libssh2.h 1.11.1:850: session.direct_tcpip(host, port, shost, sport)
+    fn libssh2_channel_direct_streamlocal_ex
+        rename direct_streamlocal    // libssh2.h 1.11.1:856: session.direct_streamlocal(path, shost, sport)
+    fn libssh2_channel_setenv_ex
+        of Channel    // libssh2.h 1.11.1:872: sets remote environment variable on channel
+        lend    // libssh2.h 1.11.1:872: borrows channel and slices
+        buffer param 1 len param 2    // libssh2.h 1.11.1:873: varname bytes
+        buffer param 3 len param 4    // libssh2.h 1.11.1:875: value bytes
+    fn libssh2_channel_request_auth_agent
+        of Channel    // libssh2.h 1.11.1:883: requests SSH agent forwarding
+        lend    // libssh2.h 1.11.1:883: borrows channel
+    fn libssh2_channel_request_pty_size_ex
+        of Channel    // libssh2.h 1.11.1:901: updates remote PTY dimensions
+        lend    // libssh2.h 1.11.1:901: borrows channel
+    fn libssh2_channel_signal_ex
+        of Channel    // libssh2.h 1.11.1:916: sends POSIX signal to remote process
+        lend    // libssh2.h 1.11.1:916: borrows channel and signame slice
+        buffer param 1 len param 2    // libssh2.h 1.11.1:917: signal name bytes
+    fn libssh2_channel_process_startup
+        of Channel    // libssh2.h 1.11.1:922: starts remote shell, exec command, or subsystem
+        lend    // libssh2.h 1.11.1:922: borrows channel and request/message slices
+        buffer param 1 len param 2    // libssh2.h 1.11.1:923: request type bytes ("exec", "subsystem")
+        buffer param 3 len param 4    // libssh2.h 1.11.1:925: command/subsystem message bytes
+    fn libssh2_channel_read_ex
+        of Channel    // libssh2.h 1.11.1:938: reads stdout (stream_id=0) or stderr (1) from channel
+        lend    // libssh2.h 1.11.1:938: borrows channel and fills buf
+        buffer param 2 capacity param 3    // libssh2.h 1.11.1:939: output buffer buf[0..buflen)
+    fn libssh2_channel_write_ex
+        of Channel    // libssh2.h 1.11.1:971: writes bytes to channel stream
+        lend    // libssh2.h 1.11.1:971: borrows channel and input buf
+        buffer param 2 len param 3    // libssh2.h 1.11.1:972: input buffer buf[0..buflen)
+    fn libssh2_poll_channel_read
+        of Channel    // libssh2.h 1.11.1:948: checks if data is ready to read on channel
+        lend    // libssh2.h 1.11.1:948: borrows channel
+    fn libssh2_channel_receive_window_adjust2
+        of Channel    // libssh2.h 1.11.1:966: adjusts receive window size
+        lend    // libssh2.h 1.11.1:966: borrows channel
+        fills param 3    // libssh2.h 1.11.1:969: writes new window size into *storewindow
+    fn libssh2_channel_set_blocking
+        of Channel    // libssh2.h 1.11.1:992: toggles blocking mode on channel's session
+        lend    // libssh2.h 1.11.1:992: borrows channel
+    fn libssh2_channel_handle_extended_data2
+        of Channel    // libssh2.h 1.11.1:1008: sets extended-data handling mode
+        lend    // libssh2.h 1.11.1:1008: borrows channel
+    fn libssh2_channel_flush_ex
+        of Channel    // libssh2.h 1.11.1:1028: flushes unread data on channel stream
+        lend    // libssh2.h 1.11.1:1028: borrows channel
+    fn libssh2_channel_get_exit_status
+        of Channel    // libssh2.h 1.11.1:1034: returns remote command exit status
+        lend    // libssh2.h 1.11.1:1034: borrows channel
+    fn libssh2_channel_send_eof
+        of Channel    // libssh2.h 1.11.1:1042: sends SSH_MSG_CHANNEL_EOF
+        lend    // libssh2.h 1.11.1:1042: borrows channel
+    fn libssh2_channel_eof
+        of Channel    // libssh2.h 1.11.1:1043: checks whether remote sent EOF
+        lend    // libssh2.h 1.11.1:1043: borrows channel
+    fn libssh2_channel_wait_eof
+        of Channel    // libssh2.h 1.11.1:1044: waits for remote EOF
+        lend    // libssh2.h 1.11.1:1044: borrows channel
+    fn libssh2_channel_close
+        of Channel    // libssh2.h 1.11.1:1045: closes channel
+        lend    // libssh2.h 1.11.1:1045: borrows channel
+    fn libssh2_channel_wait_closed
+        of Channel    // libssh2.h 1.11.1:1046: waits for remote close confirmation
+        lend    // libssh2.h 1.11.1:1046: borrows channel
+
+    // ── SFTP ──────────────────────────────────────────────────────
+    resource Sftp wraps *mut _LIBSSH2_SFTP
+        from libssh2_sftp_init    // libssh2_sftp.h 1.11.1:223: opens SFTP subsystem
+        borrows param 0    // libssh2_sftp.h 1.11.1:223: SFTP session runs over SSH session
+        drop libssh2_sftp_shutdown    // libssh2_sftp.h 1.11.1:224: shuts down SFTP subsystem
+    fn libssh2_sftp_init
+        rename sftp_init    // libssh2_sftp.h 1.11.1:223: session.sftp_init()
+    fn libssh2_sftp_last_error
+        of Sftp    // libssh2_sftp.h 1.11.1:225: returns last SFTP status code
+        lend    // libssh2_sftp.h 1.11.1:225: borrows sftp
+    fn libssh2_sftp_rename_ex
+        of Sftp    // libssh2_sftp.h 1.11.1:292: renames remote file
+        lend    // libssh2_sftp.h 1.11.1:292: borrows sftp and path slices
+        buffer param 1 len param 2    // libssh2_sftp.h 1.11.1:293: source filename bytes
+        buffer param 3 len param 4    // libssh2_sftp.h 1.11.1:295: destination filename bytes
+    fn libssh2_sftp_posix_rename_ex
+        of Sftp    // libssh2_sftp.h 1.11.1:306: POSIX-renames remote file
+        lend    // libssh2_sftp.h 1.11.1:306: borrows sftp and path slices
+        buffer param 1 len param 2    // libssh2_sftp.h 1.11.1:307: source filename bytes
+        buffer param 3 len param 4    // libssh2_sftp.h 1.11.1:309: destination filename bytes
+    fn libssh2_sftp_unlink_ex
+        of Sftp    // libssh2_sftp.h 1.11.1:315: deletes remote file
+        lend    // libssh2_sftp.h 1.11.1:315: borrows sftp and path slice
+        buffer param 1 len param 2    // libssh2_sftp.h 1.11.1:316: filename bytes
+    fn libssh2_sftp_mkdir_ex
+        of Sftp    // libssh2_sftp.h 1.11.1:329: creates remote directory
+        lend    // libssh2_sftp.h 1.11.1:329: borrows sftp and path slice
+        buffer param 1 len param 2    // libssh2_sftp.h 1.11.1:330: directory path bytes
+    fn libssh2_sftp_rmdir_ex
+        of Sftp    // libssh2_sftp.h 1.11.1:335: removes remote directory
+        lend    // libssh2_sftp.h 1.11.1:335: borrows sftp and path slice
+        buffer param 1 len param 2    // libssh2_sftp.h 1.11.1:336: directory path bytes
+    fn libssh2_sftp_stat_ex
+        of Sftp    // libssh2_sftp.h 1.11.1:341: queries or sets remote file attributes
+        lend    // libssh2_sftp.h 1.11.1:341: borrows sftp and path slice
+        buffer param 1 len param 2    // libssh2_sftp.h 1.11.1:342: path bytes
+        fills param 4    // libssh2_sftp.h 1.11.1:345: fills LIBSSH2_SFTP_ATTRIBUTES
+    fn libssh2_sftp_statvfs
+        of Sftp    // libssh2_sftp.h 1.11.1:324: queries remote filesystem stats
+        lend    // libssh2_sftp.h 1.11.1:324: borrows sftp and path slice
+        buffer param 1 len param 2    // libssh2_sftp.h 1.11.1:325: path bytes
+        fills param 3    // libssh2_sftp.h 1.11.1:327: fills LIBSSH2_SFTP_STATVFS
+    fn libssh2_sftp_symlink_ex
+        of Sftp    // libssh2_sftp.h 1.11.1:356: creates or reads remote symlink
+        lend    // libssh2_sftp.h 1.11.1:356: borrows sftp and buffers
+        buffer param 1 len param 2    // libssh2_sftp.h 1.11.1:357: path bytes
+        buffer param 3 capacity param 4    // libssh2_sftp.h 1.11.1:359: target buffer
+
+    // ── SftpHandle ────────────────────────────────────────────────
+    resource SftpHandle wraps *mut _LIBSSH2_SFTP_HANDLE
+        from libssh2_sftp_open_ex    // libssh2_sftp.h 1.11.1:230: opens remote file or directory
+        borrows param 0    // libssh2_sftp.h 1.11.1:230: handle retains fp->sftp
+        drop libssh2_sftp_close_handle    // libssh2_sftp.h 1.11.1:271: closes SFTP handle
+    fn libssh2_sftp_open_ex
+        rename open_ex    // libssh2_sftp.h 1.11.1:230: sftp.open_ex(path, flags, mode, open_type)
+        buffer param 1 len param 2    // libssh2_sftp.h 1.11.1:231: filename bytes
+    fn libssh2_sftp_read
+        of SftpHandle    // libssh2_sftp.h 1.11.1:255: reads bytes from remote file
+        lend    // libssh2_sftp.h 1.11.1:255: borrows handle and fills buffer
+        buffer param 1 capacity param 2    // libssh2_sftp.h 1.11.1:256: output buffer[0..buffer_maxlen)
+    fn libssh2_sftp_write
+        of SftpHandle    // libssh2_sftp.h 1.11.1:267: writes bytes to remote file
+        lend    // libssh2_sftp.h 1.11.1:267: borrows handle and input buffer
+        buffer param 1 len param 2    // libssh2_sftp.h 1.11.1:268: input buffer[0..count)
+    fn libssh2_sftp_fsync
+        of SftpHandle    // libssh2_sftp.h 1.11.1:269: fsyncs remote file
+        lend    // libssh2_sftp.h 1.11.1:269: borrows handle
+    fn libssh2_sftp_seek
+        of SftpHandle    // libssh2_sftp.h 1.11.1:275: seeks file offset
+        lend    // libssh2_sftp.h 1.11.1:275: borrows handle
+    fn libssh2_sftp_seek64
+        of SftpHandle    // libssh2_sftp.h 1.11.1:276: seeks 64-bit file offset
+        lend    // libssh2_sftp.h 1.11.1:276: borrows handle
+    fn libssh2_sftp_tell
+        of SftpHandle    // libssh2_sftp.h 1.11.1:280: returns current file offset
+        lend    // libssh2_sftp.h 1.11.1:280: borrows handle
+    fn libssh2_sftp_tell64
+        of SftpHandle    // libssh2_sftp.h 1.11.1:281: returns current 64-bit file offset
+        lend    // libssh2_sftp.h 1.11.1:281: borrows handle
+    fn libssh2_sftp_fstat_ex
+        of SftpHandle    // libssh2_sftp.h 1.11.1:283: queries or sets open file attributes
+        lend    // libssh2_sftp.h 1.11.1:283: borrows handle
+        fills param 1    // libssh2_sftp.h 1.11.1:284: fills LIBSSH2_SFTP_ATTRIBUTES
+    fn libssh2_sftp_fstatvfs
+        of SftpHandle    // libssh2_sftp.h 1.11.1:321: queries filesystem stats for open handle
+        lend    // libssh2_sftp.h 1.11.1:321: borrows handle
+        fills param 1    // libssh2_sftp.h 1.11.1:322: fills LIBSSH2_SFTP_STATVFS
+
+    // ── KnownHosts & Agent ────────────────────────────────────────
+    resource KnownHosts wraps *mut _LIBSSH2_KNOWNHOSTS
+        from libssh2_knownhost_init    // libssh2.h 1.11.1:1109: initializes known hosts collection
+        borrows param 0    // libssh2.h 1.11.1:1109: retains session pointer
+        drop libssh2_knownhost_free    // libssh2.h 1.11.1:1255: frees known hosts collection
+    fn libssh2_knownhost_init
+        rename knownhost_init    // libssh2.h 1.11.1:1109: session.knownhost_init()
+    fn libssh2_knownhost_readline
+        of KnownHosts    // libssh2.h 1.11.1:1266: parses one known_hosts line
+        lend    // libssh2.h 1.11.1:1266: borrows collection and line bytes
+        buffer param 1 len param 2    // libssh2.h 1.11.1:1266: line[0..len)
+    fn libssh2_knownhost_readfile
+        of KnownHosts    // libssh2.h 1.11.1:1283: reads known_hosts file
+        lend    // libssh2.h 1.11.1:1283: borrows collection
+    fn libssh2_knownhost_writefile
+        of KnownHosts    // libssh2.h 1.11.1:1315: writes known_hosts file
+        lend    // libssh2.h 1.11.1:1315: borrows collection
+
+    resource Agent wraps *mut _LIBSSH2_AGENT
+        from libssh2_agent_init    // libssh2.h 1.11.1:1352: initializes ssh-agent handle
+        borrows param 0    // libssh2.h 1.11.1:1352: retains session pointer
+        drop libssh2_agent_free    // libssh2.h 1.11.1:1437: frees ssh-agent handle
+    fn libssh2_agent_init
+        rename agent_init    // libssh2.h 1.11.1:1352: session.agent_init()
+    fn libssh2_agent_connect
+        of Agent    // libssh2.h 1.11.1:1362: connects to local ssh-agent
+        lend    // libssh2.h 1.11.1:1362: borrows agent
+    fn libssh2_agent_list_identities
+        of Agent    // libssh2.h 1.11.1:1372: requests identity list from ssh-agent
+        lend    // libssh2.h 1.11.1:1372: borrows agent
+    fn libssh2_agent_disconnect
+        of Agent    // libssh2.h 1.11.1:1428: disconnects from ssh-agent
+        lend    // libssh2.h 1.11.1:1428: borrows agent
+    fn libssh2_agent_set_identity_path
+        of Agent    // libssh2.h 1.11.1:1446: overrides ssh-agent socket path
+        lend    // libssh2.h 1.11.1:1446: borrows agent
+    fn libssh2_agent_get_identity_path
+        of Agent    // libssh2.h 1.11.1:1456: returns ssh-agent socket path
+        lend    // libssh2.h 1.11.1:1456: borrows agent
+        returns borrow CStr from param 0    // libssh2.h 1.11.1:1456: owned by agent
+
+    // ── Standalone helpers ────────────────────────────────────────
+    fn libssh2_version
+        returns static CStr    // libssh2.h 1.11.1:1076: static library version string
