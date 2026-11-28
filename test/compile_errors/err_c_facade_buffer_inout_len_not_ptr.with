@@ -1,4 +1,4 @@
-//! expect-check-fail: which is not a pointer to an integer; C reads the capacity through it
+//! expect-check-fail: which is not a pointer to an integer; C reads the count through it
 //! expect-check-fail: = help: when the count is passed by value, write 'capacity param 1' or 'len param 1'
 
 // D64 §16.2b.8: an inout capacity is written back through a pointer.

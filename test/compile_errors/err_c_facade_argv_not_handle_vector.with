@@ -1,4 +1,4 @@
-//! expect-check-fail: argv param 1 of the callback param 2: extern "C" fn(*mut ctx, i32, *mut *mut val) -> Unit step is i32; an argument vector is a pointer to the handles C passes
+//! expect-check-fail: argv param 1 of the callback param 2: unsafe extern "C" fn(*mut ctx, i32, *mut *mut val) -> Unit step is i32; an argument vector is a pointer to the handles C passes
 //! expect-check-fail: = help: after 'argv' name the callback's 'T **' parameter
 
 // Spec §16.2b.9 (D76, ruling Amendment 2): the pairing is stated, and

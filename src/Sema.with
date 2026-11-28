@@ -8191,8 +8191,7 @@ impl Sema:
             if not (if self.in_negated_literal_context != 0: self.int_literal_fits_type_negated(node, width_ty) else: self.int_literal_fits_type(node, width_ty)):
                 let spelled = self.ast.int_literal_digits(node as NodeId)
                 let digits = if spelled.len() > 0: spelled else: f"{self.ast.int_lit_value(node as NodeId)}"
-                self.emit_error_with_help(f"`{digits}` is not a `c_char` literal:
- an integer literal from 0 to 127 is a `c_char` on every target (§16.1)", node, "write the value at an integer type and convert it: `… as c_char`")
+                self.emit_error_with_help(f"`{digits}` is not a `c_char` literal: an integer literal from 0 to 127 is a `c_char` on every target (§16.1)", node, "write the value at an integer type and convert it: `… as c_char`")
         else if self.in_bitwise_literal_context != 0:
             if not self.int_literal_bit_pattern_fits_type(node, width_ty):
                 self.emit_error("integer literal bit pattern does not fit expected type", node)
