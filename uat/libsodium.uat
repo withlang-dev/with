@@ -1,0 +1,11 @@
+scenario: c.libsodium runs secretbox, box seal/open, sign/verify, pwhash, and randombytes without unsafe
+requires: network
+platforms: darwin, linux, windows
+
+new directory
+run: with init .
+run: with get c.libsodium
+write src/main.with from libsodium_main.with
+run: with run
+expect exit: 0
+expect stdout contains: libsodium ok
